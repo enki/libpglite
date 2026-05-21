@@ -291,6 +291,35 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "\n".join(doctor.errors),
         )
 
+    def test_native_package_rejects_wasm_and_javascript_payloads(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        root = pathlib.Path(tempdir.name)
+        (root / "postgres" / "share").mkdir(parents=True)
+        (root / "postgres" / "share" / "pglite.wasm").write_bytes(b"wasm")
+        (root / "postgres" / "share" / "pglite.mjs").write_text("export {}\n")
+        (root / "postgres" / "lib" / "emscripten-module.o").parent.mkdir(parents=True)
+        (root / "postgres" / "lib" / "emscripten-module.o").write_bytes(b"object")
+        (root / "postgres" / "lib" / "backend-wasm2c-fallback.a").write_bytes(b"archive")
+        with tempdir:
+            doctor.validate_native_only_payload()
+
+        errors = "\n".join(doctor.errors)
+        self.assertIn("native package contains non-native payload: postgres/share/pglite.wasm", errors)
+        self.assertIn("native package contains non-native payload: postgres/share/pglite.mjs", errors)
+        self.assertIn(
+            "native package contains non-native payload: postgres/lib/emscripten-module.o",
+            errors,
+        )
+        self.assertIn(
+            "native package contains non-native payload: postgres/lib/backend-wasm2c-fallback.a",
+            errors,
+        )
+
     def test_build_provenance_must_match_bundle(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS,

@@ -41,7 +41,8 @@ Current closure frontier:
   with native Postgres/PGlite linked and full extension parity exercised. It
   still needs broader protocol coverage before the native build lane is
   complete; the Ubuntu package path now proves the Linux final artifact for the
-  current conformance set.
+  current conformance set, and the package doctor now rejects WASM, JavaScript,
+  Emscripten-named, wasm2c-named, and bitcode payloads in native packages.
 - ADR-0004: production packaging is now regression-tested to fail while root
   ADRs remain open, and the doctor has focused conformance-diagnostic failure
   regressions. It still needs every root ADR closed before production packages

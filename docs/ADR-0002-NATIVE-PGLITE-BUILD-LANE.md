@@ -66,8 +66,6 @@ The native lane must preserve the PGlite runtime model:
   deterministic shutdown from the dynamic plugin.
 - The high-level Rust client transport runs against the same dynamic plugin and
   packaged prefix used by the raw protocol checks.
-- Production packaging contains no JavaScript, Emscripten module object, wasm
-  runtime, or wasm2c fallback input.
 - Linux and macOS preflight keep proving the same final-package path whenever
   the native link, package, platform-floor, dependency, or extension substrate
   changes.
@@ -113,6 +111,11 @@ The native lane must preserve the PGlite runtime model:
   set built into the packaged prefix, and the package doctor self-test
   exercising the final archive. This closes the macOS release-path proof for
   this ADR, but not the ADR itself because Linux remains a supported target.
+- The package doctor now rejects native package payloads that contain `.wasm`,
+  JavaScript module files, Emscripten-named artifacts, wasm2c-named artifacts,
+  or bitcode inputs. `scripts/test-doctor-native-plugin-package.py` pins those
+  failures so the native package cannot silently regress to a WASM or wasm2c
+  fallback shape.
 - Broader extended-query coverage and richer transaction/error cases remain
   open. Full extension parity, packaging hardening, and the current restart
   lifecycle now have macOS and Ubuntu final-package evidence and remain tracked

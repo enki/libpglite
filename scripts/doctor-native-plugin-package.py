@@ -84,6 +84,7 @@ class Doctor:
         self.validate_bundle()
         self.validate_plugin()
         self.validate_postgres_prefix()
+        self.validate_native_only_payload()
         self.validate_diagnostics()
         self.validate_build_provenance()
         self.validate_platform_baseline()
@@ -195,6 +196,20 @@ class Doctor:
         ]:
             if not (self.root / rel).is_file():
                 self.errors.append(f"required PostgreSQL prefix file is missing: {rel}")
+
+    def validate_native_only_payload(self) -> None:
+        forbidden_suffixes = {".wasm", ".js", ".mjs", ".bc"}
+        forbidden_fragments = {"emscripten", "wasm2c"}
+        for path in sorted(self.root.rglob("*")):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(self.root).as_posix()
+            name = path.name.lower()
+            if path.suffix.lower() in forbidden_suffixes:
+                self.errors.append(f"native package contains non-native payload: {rel}")
+                continue
+            if any(fragment in name for fragment in forbidden_fragments):
+                self.errors.append(f"native package contains non-native payload: {rel}")
 
     def validate_diagnostics(self) -> None:
         diagnostics = self.bundle.get("diagnostics")
