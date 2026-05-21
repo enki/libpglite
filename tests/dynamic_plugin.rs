@@ -216,6 +216,38 @@ fn dynamic_plugin_tokio_postgres_client_child() {
 }
 
 #[test]
+fn dynamic_plugin_uses_bundled_postgres_prefix_from_plugin_dir() {
+    if std::env::var_os("LIBPGLITE_RUN_BUNDLED_PREFIX_CHILD").is_none() {
+        return;
+    }
+
+    let _guard = test_guard();
+    let Some(plugin_dir) = std::env::var_os("LIBPGLITE_TEST_PLUGIN_DIR") else {
+        panic!("LIBPGLITE_TEST_PLUGIN_DIR is required");
+    };
+    assert!(
+        std::env::var_os("LIBPGLITE_TEST_POSTGRES_PREFIX").is_none(),
+        "bundled prefix test must not receive an explicit test prefix"
+    );
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let config = PgliteConfig::new(
+        "dynamic-plugin-bundled-prefix-test",
+        tempdir.path().join("pgdata"),
+    );
+    let mut runtime = DynamicPgliteRuntime::initialize_with_plugin_dir(config, plugin_dir)
+        .expect("runtime opens through bundled plugin resolver");
+
+    startup(&mut runtime);
+    let response = runtime
+        .exec_protocol_raw(&query_message("select 1"))
+        .expect("simple query succeeds through bundled prefix");
+    assert_no_error_message(&response);
+    assert_message_type(&response, b'D');
+    assert_message_type(&response, b'Z');
+    runtime.shutdown().expect("runtime shuts down");
+}
+
+#[test]
 fn dynamic_plugin_prefix_initialize_child() {
     if std::env::var_os("LIBPGLITE_RUN_PREFIX_INITIALIZE_CHILD").is_none() {
         return;

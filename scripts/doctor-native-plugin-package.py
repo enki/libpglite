@@ -652,7 +652,7 @@ class Doctor:
         env["LIBPGLITE_TEST_PLUGIN_PATH"] = str(plugin_path)
         env["LIBPGLITE_TEST_POSTGRES_PREFIX"] = str(postgres_root)
 
-        command = [
+        explicit_prefix_command = [
             "cargo",
             "test",
             "--features",
@@ -663,10 +663,38 @@ class Doctor:
             "--",
             "--nocapture",
         ]
-        print("running package self-test:", " ".join(command))
-        result = subprocess.run(command, cwd=repo_root, env=env, check=False)
+        print("running package self-test:", " ".join(explicit_prefix_command))
+        result = subprocess.run(
+            explicit_prefix_command, cwd=repo_root, env=env, check=False
+        )
         if result.returncode != 0:
             self.errors.append(f"package self-test failed with exit code {result.returncode}")
+
+        bundled_env = os.environ.copy()
+        bundled_env["RUST_TEST_THREADS"] = "1"
+        bundled_env["LIBPGLITE_TEST_PLUGIN_DIR"] = str(self.root)
+        bundled_env["LIBPGLITE_RUN_BUNDLED_PREFIX_CHILD"] = "1"
+        bundled_env.pop("LIBPGLITE_TEST_PLUGIN_PATH", None)
+        bundled_env.pop("LIBPGLITE_TEST_POSTGRES_PREFIX", None)
+        bundled_prefix_command = [
+            "cargo",
+            "test",
+            "--features",
+            "dynamic-loading",
+            "--test",
+            "dynamic_plugin",
+            "dynamic_plugin_uses_bundled_postgres_prefix_from_plugin_dir",
+            "--",
+            "--nocapture",
+        ]
+        print("running package self-test:", " ".join(bundled_prefix_command))
+        result = subprocess.run(
+            bundled_prefix_command, cwd=repo_root, env=bundled_env, check=False
+        )
+        if result.returncode != 0:
+            self.errors.append(
+                f"package bundled-prefix self-test failed with exit code {result.returncode}"
+            )
 
     def diagnostic_path(self, key: str) -> pathlib.Path | None:
         diagnostics = self.bundle.get("diagnostics")

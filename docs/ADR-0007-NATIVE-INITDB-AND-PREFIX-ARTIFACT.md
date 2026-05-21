@@ -62,3 +62,7 @@ the plugin or provide an equivalent generated artifact.
 - The dynamic runtime test suite also verifies that a nonempty directory without
   `PG_VERSION` is rejected before native backend startup. That keeps invalid
   prefix/data-dir inputs from poisoning the current single-start process.
+- Package doctor `--self-test` now runs a bundled-prefix runtime smoke that
+  opens the plugin by package directory without `LIBPGLITE_TEST_POSTGRES_PREFIX`.
+  This proves the release artifact can find the packaged `postgres/` prefix
+  beside the plugin instead of relying on build-machine prefix paths.
