@@ -193,6 +193,11 @@ PGlite-shipped extension.
   materialized as `status=present`. Regression tests cover missing control
   files, missing default-version install SQL, missing referenced native modules,
   and missing PostGIS projection data.
+- The missing-control-file regression now covers the full pinned
+  `other_extensions` parity set (`age`, `pg_hashids`, `pg_ivm`,
+  `pg_textsearch`, `pg_uuidv7`, `pgtap`, `postgis`, and `vector`) rather than a
+  single representative extension, so a future partial inventory cannot satisfy
+  the package doctor test surface.
 - Missing PGlite `other_extensions` submodules are warnings for development
   packages and production-package failures. Missing submodule commits or URLs
   are package errors in all modes because they mean the native inventory cannot

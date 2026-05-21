@@ -20,6 +20,16 @@ ABI_SYMBOLS = set(doctor_module.ABI_SYMBOLS)
 PATCH_PATH = "patches/postgres-pglite/0001-test.patch"
 PATCH_SHA256 = "a" * 64
 SOURCE_COMMIT = "0123456789abcdef0123456789abcdef01234567"
+PGLITE_OTHER_EXTENSIONS = [
+    "age",
+    "pg_hashids",
+    "pg_ivm",
+    "pg_textsearch",
+    "pg_uuidv7",
+    "pgtap",
+    "postgis",
+    "vector",
+]
 
 
 class DoctorDiagnosticsTests(unittest.TestCase):
@@ -641,6 +651,34 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "inventoried extension is missing control file: vector",
             "\n".join(doctor.errors),
         )
+
+    def test_present_other_extension_control_file_gate_covers_full_pglite_set(self):
+        inventory_lines = ["format=libpglite-native-extension-inventory-v1"]
+        for extension in PGLITE_OTHER_EXTENSIONS:
+            inventory_lines.append(
+                f"other_extension={extension};"
+                f"source=pglite/other_extensions/{extension};"
+                "submodule_state=?;"
+                "submodule_commit=35ab919bf5da677709b2ebb8be07480bb25e97cf;"
+                "status=present;"
+                f"submodule_url=https://example.com/{extension}.git"
+            )
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+            extension_inventory_text="\n".join(inventory_lines) + "\n",
+        )
+        with tempdir:
+            doctor.validate_extensions()
+
+        errors = "\n".join(doctor.errors)
+        for extension in PGLITE_OTHER_EXTENSIONS:
+            self.assertIn(
+                f"inventoried extension is missing control file: {extension}",
+                errors,
+            )
 
     def test_present_other_extension_requires_default_version_install_sql(self):
         tempdir, doctor = self.make_doctor(
