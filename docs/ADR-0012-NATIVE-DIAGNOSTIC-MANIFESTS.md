@@ -80,6 +80,14 @@ actual plugin and prefix contents.
 - `dependencies.txt` is generated with `otool -L` on macOS and `ldd` on Linux.
   This currently exposes remaining relocatability weaknesses, including absolute
   build paths, instead of hiding them.
+- `scripts/doctor-native-plugin-package.py` validates either an extracted
+  package directory or a `.tar.zst` package without rebuilding it. It checks the
+  bundle manifest, plugin checksum, ABI symbols, PostgreSQL prefix files,
+  diagnostic manifests, extension control files, and dependency report shape.
+- Packaging now runs the doctor against the staged native package before writing
+  the binary archive, and preflight runs it again against the archive.
+- In development mode the doctor warns about build-machine dependency paths. In
+  production mode, or with `--strict-relocatable`, those paths are hard failures.
 - This ADR remains open until diagnostics are generated as structured release
-  data, production packaging rejects stale or non-relocatable diagnostics, and a
-  standalone validation command can inspect a packaged plugin directory.
+  data, production packaging rejects stale diagnostics, and conformance results
+  are written as structured diagnostics.

@@ -174,5 +174,7 @@ out_dir="${LIBPGLITE_RELEASE_OUT_DIR:-"$repo_root/dist/preflight-native-plugin"}
 rm -rf "$out_dir"
 echo "==> preflight ${release_version}: package smoke test"
 scripts/package-native-plugin-release.sh "$release_version" "$plugin_binary" "$out_dir"
+echo "==> preflight ${release_version}: package doctor"
+scripts/doctor-native-plugin-package.py "$out_dir/libpglite-plugin-native-${release_version}-$(rustc -vV | awk -F': ' '$1 == "host" {print $2}').tar.zst"
 
 echo "==> preflight ${release_version}: complete"

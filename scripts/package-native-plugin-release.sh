@@ -351,6 +351,8 @@ bundle = {
 pathlib.Path(out).write_text(json.dumps(bundle, indent=2, sort_keys=True) + "\n")
 PY
 
+"$repo_root/scripts/doctor-native-plugin-package.py" "$binary_stage"
+
 tar -C "$binary_stage" --zstd -cf "$binary_asset" .
 
 git -C "$repo_root" archive --format=tar HEAD | tar -C "$source_stage" -xf -
