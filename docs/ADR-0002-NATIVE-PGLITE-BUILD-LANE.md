@@ -68,6 +68,19 @@ The native lane must preserve the PGlite runtime model:
 - The native build lane also emits an install prefix for `initdb` and PostgreSQL
   runtime support files; ADR-0007 owns making that prefix relocatable and
   package-ready.
+- Non-Emscripten `pgl_exit()` is diverted to a small native C trap helper so
+  expected Postgres/PGlite exits can be recovered inside C before control
+  returns to Rust. The same helper source is compiled in two modes: a tiny
+  exit-only object used when broad Postgres `LDFLAGS_EX` reaches helper
+  programs, and a backend trampoline object linked into the plugin for wrapped
+  calls such as `PostgresSingleUserMain()`, `PostgresMainLoopOnce()`, and
+  `pgl_run_atexit_funcs()`.
+- Cargo build scripts now track the generated native link manifest itself, so
+  object/archive changes from the preparation script invalidate stale plugin
+  link arguments.
+- On macOS the release plugin links the native Postgres/PGlite objects while
+  exporting only the `libpglite_plugin_*` ABI symbols; Postgres and
+  `libpglite_native_*` symbols remain local implementation details.
 - The Rust runtime lifecycle still returns a deliberate initialization error;
   startup, data directory initialization, callback transport, recovery, and
   shutdown remain owned by this ADR and ADR-0003.

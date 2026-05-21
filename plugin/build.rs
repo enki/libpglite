@@ -53,6 +53,7 @@ fn emit_native_pglite_link_inputs() {
     let manifest = env::var_os("LIBPGLITE_NATIVE_LINK_MANIFEST")
         .map(PathBuf::from)
         .unwrap_or_else(default_manifest_path);
+    println!("cargo:rerun-if-changed={}", manifest.display());
     let contents = fs::read_to_string(&manifest).unwrap_or_else(|err| {
         panic!(
             "failed to read native PGlite link manifest at {}: {err}. Run scripts/prepare-native-pglite-link.sh first.",

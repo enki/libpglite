@@ -155,6 +155,14 @@ pglitec_object="$object_dir/pglitec.o"
 cc -fPIC -O2 -DNDEBUG \
   -c "$patched_source/pglite/src/pglitec/pglitec.c" \
   -o "$pglitec_object"
+native_exit_object="$object_dir/libpglite_native_exit.o"
+cc -fPIC -O2 -DNDEBUG \
+  -c "$repo_root/native/c/libpglite_native_trap.c" \
+  -o "$native_exit_object"
+native_trap_object="$object_dir/libpglite_native_trap.o"
+cc -fPIC -O2 -DNDEBUG -DLIBPGLITE_NATIVE_BACKEND_TRAMPOLINES \
+  -c "$repo_root/native/c/libpglite_native_trap.c" \
+  -o "$native_trap_object"
 
 make_jobs="${LIBPGLITE_NATIVE_MAKE_JOBS:-}"
 if [[ -z "$make_jobs" ]]; then
@@ -187,10 +195,14 @@ backend_archive="$build_dir/libpglite_postgres_backend.a"
 timezone_archive="$build_dir/libpglite_postgres_timezone.a"
 common_archive="$postgres_build_dir/src/common/libpgcommon_srv.a"
 port_archive="$postgres_build_dir/src/port/libpgport_srv.a"
+patch_fingerprint="$(git -C "$repo_root" hash-object "$repo_root/patches/postgres-pglite/0001-pglitec-native-portability.patch")"
+native_trap_fingerprint="$(git -C "$repo_root" hash-object "$repo_root/native/c/libpglite_native_trap.c")"
 
 if [[ "$build_postgres" == "1" ]]; then
   build_env_fingerprint="source_commit=$source_commit
 macos_deployment_target=${MACOSX_DEPLOYMENT_TARGET:-}
+patch_fingerprint=$patch_fingerprint
+native_trap_fingerprint=$native_trap_fingerprint
 pglite_copt=$pglite_copt"
   build_env_file="$postgres_build_dir/.libpglite-native-build-env"
   if [[ ! -f "$build_env_file" || "$(cat "$build_env_file")" != "$build_env_fingerprint" ]]; then
@@ -221,7 +233,7 @@ pglite_copt=$pglite_copt"
   make -C "$postgres_build_dir/src/backend" generated-headers submake-libpgport
   make -C "$postgres_build_dir/src/backend" postgres \
     COPT="$pglite_copt" \
-    LDFLAGS_EX="$pglitec_object" \
+    LDFLAGS_EX="$pglitec_object $native_exit_object" \
     -j"$make_jobs"
 
   backend_objects=()
@@ -259,7 +271,7 @@ pglite_copt=$pglite_copt"
   make -C "$postgres_build_dir/src/interfaces/libpq" install
   make -C "$postgres_build_dir/src/backend" install \
     COPT="$pglite_copt" \
-    LDFLAGS_EX="$pglitec_object"
+    LDFLAGS_EX="$pglitec_object $native_exit_object"
   make -C "$postgres_build_dir/src/backend/snowball" install
   make -C "$postgres_build_dir/src/pl/plpgsql/src" install
   make -C "$postgres_build_dir/src/bin/initdb" install
@@ -294,7 +306,12 @@ fi
     echo "required_file=$file"
   done
   echo "patch=patches/postgres-pglite/0001-pglitec-native-portability.patch"
+  echo "patch_fingerprint=$patch_fingerprint"
   echo "object=$pglitec_object"
+  echo "object=$native_trap_object"
+  echo "native_exit_object=$native_exit_object"
+  echo "native_trap_source=native/c/libpglite_native_trap.c"
+  echo "native_trap_fingerprint=$native_trap_fingerprint"
   if [[ "$build_postgres" == "1" ]]; then
     echo "archive=$backend_archive"
     echo "archive=$timezone_archive"

@@ -44,3 +44,13 @@ clear preprocessor gates.
   compatibility flags.
 - ADR-0002 can consume PGlite C support as a real native link input.
 
+## Implementation Notes
+
+- The carried patch keeps Emscripten behavior unchanged while routing native
+  `pgl_exit()` through `libpglite_native_exit()`. This gives the Rust adapter a
+  C-level recovery boundary without unwinding through Rust frames.
+- Native shared-memory metadata access is gated for macOS and Linux because the
+  exposed `struct shmid_ds` field names differ across platforms.
+- The native build compiles the patched `pglitec.c` as PIC and fingerprints the
+  patch in the generated link manifest so source-substrate changes force a
+  rebuild.

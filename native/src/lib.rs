@@ -17,6 +17,17 @@ mod ffi {
     use std::ffi::c_void;
 
     unsafe extern "C" {
+        pub fn libpglite_native_pgl_run_atexit_funcs() -> i32;
+        pub fn libpglite_native_pgl_set_active(new_value: i32) -> i32;
+        pub fn libpglite_native_pgl_pq_flush() -> i32;
+        pub fn libpglite_native_postgres_main_longjmp() -> i32;
+        pub fn libpglite_native_postgres_main_loop_once() -> i32;
+        pub fn libpglite_native_postgres_send_ready_for_query_if_necessary() -> i32;
+        pub fn libpglite_native_postgres_single_user_main(
+            argc: i32,
+            argv: *mut *mut c_char,
+            username: *const c_char,
+        ) -> i32;
         pub fn PostgresMainLoopOnce();
         pub fn PostgresSingleUserMain(argc: i32, argv: *mut *mut c_char, username: *const c_char);
         pub fn pgl_set_rw_cbs(
@@ -32,6 +43,13 @@ mod ffi {
             ^ PostgresSingleUserMain as usize
             ^ pgl_set_rw_cbs as usize
             ^ pgl_startPGlite as usize
+            ^ libpglite_native_postgres_main_loop_once as usize
+            ^ libpglite_native_postgres_main_longjmp as usize
+            ^ libpglite_native_postgres_send_ready_for_query_if_necessary as usize
+            ^ libpglite_native_postgres_single_user_main as usize
+            ^ libpglite_native_pgl_pq_flush as usize
+            ^ libpglite_native_pgl_run_atexit_funcs as usize
+            ^ libpglite_native_pgl_set_active as usize
     }
 }
 

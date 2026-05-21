@@ -2,7 +2,7 @@ diff --git a/pglite/src/pglitec/pglitec.c b/pglite/src/pglitec/pglitec.c
 index 9f3ec40..b3c9d23 100644
 --- a/pglite/src/pglitec/pglitec.c
 +++ b/pglite/src/pglitec/pglitec.c
-@@ -20,6 +20,8 @@
+@@ -25,11 +25,14 @@
  #include <sys/time.h>
  #include <setjmp.h>
  #include <string.h>
@@ -11,7 +11,25 @@ index 9f3ec40..b3c9d23 100644
  
  #if defined(__EMSCRIPTEN__)
  #include <emscripten/emscripten.h>
-@@ -358,7 +360,13 @@ pgl_shmctl(int shmid, int cmd, struct shmid_ds *buf) {
+ #else
+ #define EMSCRIPTEN_KEEPALIVE
++extern void libpglite_native_exit(int status) __attribute__((noreturn));
+ // TODO: an include for libpglite
+ #endif
+ 
+@@ -231,7 +234,11 @@
+         pgl_stdout = NULL;
+     }
+     optind = 1;
++#if defined(__EMSCRIPTEN__)
+     exit(status);
++#else
++    libpglite_native_exit(status);
++#endif
+ }
+ 
+ /*
+@@ -358,7 +365,13 @@
                  return 0;
              } else if (cmd == IPC_STAT && buf != NULL) {
                  buf->shm_segsz = seg->size;
@@ -25,13 +43,12 @@ index 9f3ec40..b3c9d23 100644
                  buf->shm_nattch = 0;
                  buf->shm_atime = buf->shm_dtime = buf->shm_ctime = time(NULL);
                  return 0;
-@@ -407,7 +415,7 @@ pgl_munmap(void *addr, size_t length) {
- pgl_read_t pgl_read;
- 
+@@ -410,7 +423,7 @@
  /* write TO JS
--* Callback used for writing data to the frontend
-+* Callback used for writing data to the frontend
+ * Callback used for writing data to the frontend
  */
 -typedef ssize_t (*pgl_write_t)(void *buffer, size_t length);
 +typedef ssize_t (*pgl_write_t)(const void *buffer, size_t length);
  pgl_write_t pgl_write;
+ 
+ /*
