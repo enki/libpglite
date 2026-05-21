@@ -14,9 +14,8 @@ crate, internal native crate, native Postgres/PGlite runtime, packaged Postgres
 prefix, extension parity set, dependency prefix, diagnostics, and package doctor
 are implemented.
 
-The current release gate has passed on macOS and on Ubuntu 24.04 through
-`../smolvm/`. All design records for the first native release scope are closed
-under `docs/done/`.
+The current release gate has passed on macOS and on Ubuntu 24.04. All design
+records for the first native release scope are closed under `docs/done/`.
 
 ## Intended Use
 
