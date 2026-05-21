@@ -1,6 +1,6 @@
 # ADR-0002: Native PGlite Build Lane
 
-Status: Open
+Status: Done
 Date: 2026-05-21
 
 ## Context
@@ -65,8 +65,8 @@ The native lane must preserve the PGlite runtime model:
   parameter-bound extended query, named prepared-statement reuse, transaction
   success, transaction rollback, recoverable protocol error, and deterministic
   shutdown from the dynamic plugin.
-- The high-level Rust client transport runs against the same dynamic plugin and
-  packaged prefix used by the raw protocol checks.
+- The high-level Rust client transport runs against the extracted final package,
+  not only the build-tree plugin and prefix.
 - The final protocol scope is explicit before this ADR moves to done. The
   current minimum is the raw case set above plus the high-level Rust client
   transport from the packaged artifact; any additional PostgreSQL frontend
@@ -75,6 +75,41 @@ The native lane must preserve the PGlite runtime model:
 - Linux and macOS preflight prove the same final-package path after the final
   protocol scope is set, and packaged diagnostics record the exact raw protocol
   cases and high-level client command that passed.
+
+## Closing Evidence
+
+- The native build lane links the pinned PostgreSQL/PGlite backend into the
+  dynamic plugin without JavaScript, Emscripten module objects, a WASM runtime,
+  wasm2c-named payloads, or bitcode payloads in the native package.
+- The raw protocol conformance scope for the first production runtime is now
+  explicit: startup, simple query, empty query, transaction rollback,
+  transaction commit, recoverable protocol error, basic extended query,
+  parameter-bound extended query, named prepared-statement reuse, and
+  deterministic shutdown.
+- `scripts/doctor-native-plugin-package.py` rejects raw-protocol conformance
+  diagnostics that omit any required named case, and it validates the recorded
+  command, timestamps, log checksum, and pass status for each conformance
+  result.
+- The dynamic-plugin raw protocol test initializes a clean data directory,
+  processes frontend protocol bytes, recovers after a PostgreSQL error, creates
+  contrib and PGlite extension parity entries, and shuts down deterministically.
+- The high-level `tokio-postgres` client test runs through the same runtime
+  boundary and covers parameter binding, extension loading, transaction
+  rollback, and post-rollback query recovery.
+- The package doctor `--self-test` now extracts the final package and runs both
+  the raw protocol/extension sweep and the `tokio-postgres` client transport
+  against the packaged plugin and packaged Postgres prefix.
+- `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS on
+  2026-05-21 through native link, raw protocol conformance, high-level client
+  conformance, prefix initialize/resume conformance, package smoke, package
+  doctor, and final-artifact self-test.
+- `scripts/doctor-native-plugin-package.py --strict-relocatable --self-test
+  dist/preflight-native-plugin/libpglite-plugin-native-v0.1.0-aarch64-apple-darwin.tar.zst`
+  passed on 2026-05-21 after the doctor self-test was extended to run the
+  high-level client from the extracted package.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed the same
+  release-path shape in the Ubuntu `24.04` baseline for the then-current
+  conformance set; future protocol widening must rerun that lane before release.
 
 ## Implementation Notes
 
@@ -136,3 +171,8 @@ The native lane must preserve the PGlite runtime model:
   named prepared-statement reuse, and deterministic shutdown. The package doctor
   rejects raw-protocol conformance results that do not name all of those cases,
   so packaged diagnostics can explain what the passing result actually proved.
+- The package doctor `--self-test` now runs the high-level
+  `tokio-postgres` client transport against the extracted final package using
+  the packaged plugin and packaged Postgres prefix. The test covers parameter
+  binding, a loaded extension, transaction rollback, and post-rollback query
+  recovery through the normal Rust PostgreSQL client layer.

@@ -58,6 +58,16 @@ class PackageNativePluginReleaseTests(unittest.TestCase):
             self.assertIn(line, text)
 
     def test_production_packaging_is_blocked_while_root_adrs_are_open(self):
+        test_adr = SCRIPT.parents[1] / "docs" / "ADR-9999-TEST-OPEN.md"
+        test_adr.write_text(
+            "# ADR-9999: Test Open ADR\n\n"
+            "Status: Open\n\n"
+            "## Acceptance Criteria\n\n"
+            "- test\n\n"
+            "## Remaining Closure Criteria\n\n"
+            "- test\n"
+        )
+        self.addCleanup(lambda: test_adr.exists() and test_adr.unlink())
         with tempfile.TemporaryDirectory() as tempdir:
             plugin = pathlib.Path(tempdir) / "liblibpglite_plugin_native.dylib"
             plugin.write_bytes(b"placeholder")
@@ -77,7 +87,8 @@ class PackageNativePluginReleaseTests(unittest.TestCase):
             "production packaging is blocked while release-gating ADRs remain open",
             result.stderr,
         )
-        self.assertIn("docs/ADR-0004-RUNTIME-READY-RELEASE-GATE.md", result.stderr)
+        self.assertIn("docs/ADR-9999-TEST-OPEN.md", result.stderr)
+        self.assertNotIn("docs/ADR-0004-RUNTIME-READY-RELEASE-GATE.md", result.stderr)
 
     def test_production_packaging_requires_dependency_prefix_manifest(self):
         text = SCRIPT.read_text()

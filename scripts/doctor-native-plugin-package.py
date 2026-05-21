@@ -196,7 +196,11 @@ class Doctor:
         if release_mode not in {"development", "production"}:
             self.errors.append(f"unsupported releaseMode: {release_mode!r}")
         runtime_status = self.bundle.get("runtimeStatus")
-        if runtime_status not in {"native-runtime-pending-adr-0002", "runtime-ready"}:
+        if runtime_status not in {
+            "native-runtime-development",
+            "native-runtime-pending-adr-0002",
+            "runtime-ready",
+        }:
             self.errors.append(f"unsupported runtimeStatus: {runtime_status!r}")
         elif release_mode == "production" and runtime_status != "runtime-ready":
             self.errors.append(
@@ -1189,6 +1193,31 @@ class Doctor:
         )
         if result.returncode != 0:
             self.errors.append(f"package self-test failed with exit code {result.returncode}")
+
+        tokio_env = os.environ.copy()
+        tokio_env["RUST_TEST_THREADS"] = "1"
+        tokio_env["LIBPGLITE_RUN_TOKIO_POSTGRES_CHILD"] = "1"
+        tokio_env["LIBPGLITE_TEST_PLUGIN_PATH"] = str(plugin_path)
+        tokio_env["LIBPGLITE_TEST_POSTGRES_PREFIX"] = str(postgres_root)
+        tokio_client_command = [
+            "cargo",
+            "test",
+            "--features",
+            "dynamic-loading,client-tokio-postgres",
+            "--test",
+            "dynamic_plugin",
+            "dynamic_plugin_tokio_postgres_client_child",
+            "--",
+            "--nocapture",
+        ]
+        print("running package self-test:", " ".join(tokio_client_command))
+        result = subprocess.run(
+            tokio_client_command, cwd=repo_root, env=tokio_env, check=False
+        )
+        if result.returncode != 0:
+            self.errors.append(
+                f"package tokio-postgres self-test failed with exit code {result.returncode}"
+            )
 
         bundled_env = os.environ.copy()
         bundled_env["RUST_TEST_THREADS"] = "1"

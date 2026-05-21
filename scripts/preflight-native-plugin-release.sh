@@ -20,10 +20,8 @@ Runs local release-boundary checks:
   - native plugin raw-protocol and tokio-postgres client checks
   - native plugin package smoke test
 
-ADR-0002 still owns the real native PGlite/Postgres runtime. This preflight
-checks the facade/plugin/release boundary and native link substrate without
-claiming the remaining extension, dependency, platform, and release gates are
-complete.
+This preflight checks the native runtime, extension, dependency, platform,
+diagnostic, and package gates from the artifact that would ship.
 USAGE
 }
 

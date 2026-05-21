@@ -146,8 +146,8 @@ PGlite-shipped extension.
 
 ## Implementation Notes
 
-- ADR-0002 still owns the core native backend link model. This ADR expands the
-  set of mandatory native link inputs once the base runtime can execute queries.
+- ADR-0002 owns the core native backend link model. This ADR expands the set of
+  mandatory native link inputs once the base runtime can execute queries.
 - ADR-0007 owns the prefix artifact. This ADR expands that artifact from core
   runtime support files to the full PGlite extension prefix.
 - PostgreSQL `contrib` should not be treated as a manually curated subset unless

@@ -33,6 +33,15 @@ PGLITE_OTHER_EXTENSIONS = [
 
 
 class DoctorDiagnosticsTests(unittest.TestCase):
+    def test_package_self_test_runs_high_level_client_from_extracted_package(self):
+        text = SCRIPT.read_text()
+        self.assertIn("LIBPGLITE_RUN_TOKIO_POSTGRES_CHILD", text)
+        self.assertIn("LIBPGLITE_TEST_PLUGIN_PATH", text)
+        self.assertIn("LIBPGLITE_TEST_POSTGRES_PREFIX", text)
+        self.assertIn("dynamic-loading,client-tokio-postgres", text)
+        self.assertIn("dynamic_plugin_tokio_postgres_client_child", text)
+        self.assertIn("package tokio-postgres self-test failed", text)
+
     def make_doctor(
         self,
         plugin_symbols: set[str],
@@ -52,7 +61,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
                     "target=test-target",
                     "release_version=v0.1.0",
                     "release_mode=development",
-                    "runtime_status=native-runtime-pending-adr-0002",
+                    "runtime_status=native-runtime-development",
                     f"libpglite_git_commit={SOURCE_COMMIT}",
                     "plugin_filename=liblibpglite_plugin_native.dylib",
                     "plugin_sha256=abc123",
@@ -177,7 +186,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "target": "test-target",
             "libpgliteReleaseVersion": "v0.1.0",
             "releaseMode": "development",
-            "runtimeStatus": "native-runtime-pending-adr-0002",
+                "runtimeStatus": "native-runtime-development",
             "libpgliteGitCommit": SOURCE_COMMIT,
             "postgresPrefix": dict(doctor_module.POSTGRES_PREFIX_LAYOUT),
             "plugin": {

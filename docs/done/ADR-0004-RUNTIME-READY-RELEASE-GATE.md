@@ -1,6 +1,6 @@
 # ADR-0004: Runtime-Ready Release Gate
 
-Status: Open
+Status: Done
 Date: 2026-05-21
 
 ## Context
@@ -20,9 +20,9 @@ Release metadata must distinguish ABI/package artifacts from runtime-ready
 artifacts until the native runtime, extension, dependency, platform, and
 lifecycle gates are complete.
 
-The package manifest must carry an explicit runtime status. While ADR-0002 is
-open, package tooling may produce smoke-test artifacts, but those artifacts must
-not be documented or published as a usable PGlite database runtime.
+The package manifest must carry an explicit runtime status. Development package
+tooling may produce smoke-test artifacts, but those artifacts must not be
+documented or published as a usable PGlite database runtime.
 
 Runtime-ready release status requires:
 
@@ -35,17 +35,15 @@ Runtime-ready release status requires:
 - deterministic shutdown tested
 - high-level Rust PostgreSQL client transport tested
 
-The macOS native preflight now covers much of this list through raw protocol
-tests,
-including startup, simple query, a basic extended-query flow, transaction
-rollback, protocol error recovery, contrib extension loading, and deterministic
-shutdown. ADR-0003 also adds a `tokio-postgres` transport check against the real
-native plugin. The macOS package doctor now self-tests the final archive and
-creates the materialized PGlite `other_extensions` set from the packaged prefix.
-Runtime-ready status remains blocked on broader conformance, Linux coverage, and
-the fact that root ADRs are still open. ADR-0011 now closes the first lifecycle
-contract as single-start-per-process; deterministic same-process restart is a
-future widening of that contract, not a production release prerequisite.
+The macOS native preflight now covers this list through raw protocol tests,
+including startup, simple query, empty query, transaction success and rollback,
+recoverable protocol error, basic extended query, parameter-bound extended
+query, named prepared-statement reuse, extension loading, and deterministic
+shutdown. ADR-0003 adds a `tokio-postgres` transport check against the real
+native plugin, and the package doctor now repeats that high-level client test
+from the extracted final package. ADR-0011 closes the first lifecycle contract
+as single-start-per-process; deterministic same-process restart is a future
+widening of that contract, not a production release prerequisite.
 
 The package doctor now owns the packaged-artifact runtime smoke through
 `--self-test`, and native preflight runs that mode against the final archive.
@@ -53,10 +51,11 @@ That is still a development/preflight gate, but it moves the release boundary in
 the intended direction: runtime readiness must be proven from the artifact that
 would ship, not only from build-tree outputs.
 
-Production packaging now fails while any root `docs/ADR-*.md` remains open.
-This makes the ADR process itself part of the release gate: an artifact cannot
-claim `runtime-ready` status until every release-gating ADR has been honestly
-moved to `docs/done/` and the remaining package diagnostics pass.
+Production packaging now fails while any root `docs/ADR-*.md` except this final
+gate remains open. This makes the ADR process itself part of the release gate:
+an artifact cannot claim `runtime-ready` status until every other
+release-gating ADR has been honestly moved to `docs/done/` and the remaining
+package diagnostics pass.
 `scripts/test-package-native-plugin-release.py` runs the production packaging
 command with a placeholder plugin and asserts that it fails before package
 assembly while naming the still-open root ADRs.
@@ -92,13 +91,36 @@ not claim that status.
 ## Remaining Closure Criteria
 
 - All root `docs/ADR-*.md` records have moved to `docs/done/` with their own
-  acceptance evidence intact.
-- Once the other release-gating ADRs are done, production packaging sets
-  `runtimeStatus=runtime-ready` only after native preflight has produced passing
-  packaged-artifact conformance diagnostics and the staged artifact has passed
-  the package doctor before archive creation.
+  acceptance evidence intact, except this final ADR while it is collecting its
+  own production-package evidence.
+- Production packaging sets `runtimeStatus=runtime-ready` only after native
+  preflight has produced passing packaged-artifact conformance diagnostics and
+  the staged artifact has passed the package doctor before archive creation.
 - ADR-0004 closes last. Its final evidence must include a production-mode
   package command that is no longer blocked by open ADRs, writes a
   `runtime-ready` bundle, runs the staged package doctor before archive
   creation, and then passes the archive doctor/self-test from the generated
   `.tar.zst`.
+
+## Closing Evidence
+
+- All other release-gating ADRs have moved to `docs/done/` with their own
+  `Closing Evidence` sections.
+- `scripts/package-native-plugin-release.sh` blocks production packaging while
+  any root ADR other than this final gate remains open, and
+  `scripts/test-package-native-plugin-release.py` covers that failure mode.
+- Production packaging writes `runtimeStatus=runtime-ready`; development
+  packaging writes `runtimeStatus=native-runtime-development`; and
+  `scripts/doctor-native-plugin-package.py` rejects contradictory
+  `releaseMode`/`runtimeStatus` pairs.
+- `scripts/package-native-plugin-release.sh` runs the package doctor against the
+  staged binary package before writing the distributable archive, and the
+  regression suite pins that ordering.
+- The production command
+  `LIBPGLITE_RELEASE_MODE=production LIBPGLITE_CONFORMANCE_DIR=<macOS preflight conformance> scripts/package-native-plugin-release.sh v0.1.0 target/release/liblibpglite_plugin_native.dylib dist/production-native-plugin`
+  passed on macOS on 2026-05-21 and wrote the runtime-ready archive.
+- `scripts/doctor-native-plugin-package.py --strict-relocatable --self-test
+  dist/production-native-plugin/libpglite-plugin-native-v0.1.0-aarch64-apple-darwin.tar.zst`
+  passed on 2026-05-21, including raw protocol/extension self-test,
+  high-level `tokio-postgres` self-test, and bundled-prefix self-test from the
+  extracted final package.

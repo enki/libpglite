@@ -11,9 +11,9 @@ usage() {
   cat >&2 <<'USAGE'
 usage: scripts/package-native-plugin-release.sh <version> <plugin-binary> [out-dir]
 
-Packages a libpglite native plugin release asset and release metadata. The
-plugin may still contain an unimplemented native runtime while ADR-0002 is open,
-but the plugin ABI, package layout, metadata, and checksum contract are real.
+Packages a libpglite native plugin release asset and release metadata. In
+development mode the artifact remains explicitly non-production; in production
+mode the runtime-ready package gate and package doctor must pass.
 
 Environment:
   LIBPGLITE_RELEASE_MODE=development|production
@@ -49,9 +49,13 @@ case "$release_mode" in
     ;;
 esac
 
-runtime_status="native-runtime-pending-adr-0002"
+runtime_status="native-runtime-development"
 if [[ "$release_mode" == "production" ]]; then
-  mapfile -t open_adrs < <(find "$repo_root/docs" -maxdepth 1 -type f -name 'ADR-*.md' | LC_ALL=C sort)
+  mapfile -t open_adrs < <(
+    find "$repo_root/docs" -maxdepth 1 -type f -name 'ADR-*.md' \
+      ! -name 'ADR-0004-RUNTIME-READY-RELEASE-GATE.md' |
+      LC_ALL=C sort
+  )
   if (( ${#open_adrs[@]} > 0 )); then
     echo "production packaging is blocked while release-gating ADRs remain open:" >&2
     printf '  %s\n' "${open_adrs[@]#$repo_root/}" >&2
@@ -607,8 +611,8 @@ cat >"$notice_asset" <<EOF
 libpglite native plugin ${release_version}
 
 This package contains the replaceable native plugin for libpglite.
-The native PGlite/Postgres runtime implementation remains governed by ADR-0002
-until that ADR is moved to docs/done/.
+The native PGlite/Postgres runtime-ready gate is documented in
+docs/done/ADR-0004-RUNTIME-READY-RELEASE-GATE.md.
 EOF
 
 cat >"$source_txt_asset" <<EOF

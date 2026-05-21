@@ -278,6 +278,10 @@ actual plugin and prefix contents.
   packaged plugin and bundled prefix, and runs the dynamic-plugin sweep that
   creates `age`, `pg_hashids`, `pg_ivm`, `pg_textsearch`, `pg_uuidv7`, `pgtap`,
   `postgis`, and `vector` from the packaged files.
+- The same package doctor self-test now also runs the high-level
+  `tokio-postgres` client transport against the extracted package, so packaged
+  runtime evidence covers both raw protocol bytes and the normal Rust
+  PostgreSQL client layer.
 - Native prepare and package diagnostics now record the failure mode that the
   full parity sweep exposed: backend export manifests must include common data
   symbols, and packaged `plpgsql` must be linked with dynamic lookup semantics.
