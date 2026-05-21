@@ -114,6 +114,35 @@ fn dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_
     );
 }
 
+#[test]
+fn dynamic_plugin_rejects_nonempty_uninitialized_data_dir_before_backend_start() {
+    let _guard = test_guard();
+    let Some(plugin_path) = std::env::var_os("LIBPGLITE_TEST_PLUGIN_PATH") else {
+        return;
+    };
+    let Some(postgres_prefix) = std::env::var_os("LIBPGLITE_TEST_POSTGRES_PREFIX") else {
+        return;
+    };
+    let plugin_path = std::fs::canonicalize(plugin_path).expect("plugin path is absolute");
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let data_dir = tempdir.path().join("pgdata");
+    std::fs::create_dir(&data_dir).expect("create invalid data dir");
+    std::fs::write(data_dir.join("not-a-cluster"), b"not postgres").expect("write marker");
+
+    let error = load_native_runtime_result_with_data_dir(
+        "dynamic-plugin-invalid-data-dir-test",
+        data_dir,
+        plugin_path,
+        postgres_prefix,
+    )
+    .expect_err("nonempty uninitialized data dir is rejected");
+    let message = error.to_string();
+    assert!(
+        message.contains("exists but is not an initialized PostgreSQL cluster"),
+        "{message}"
+    );
+}
+
 #[cfg(feature = "client-tokio-postgres")]
 #[test]
 fn dynamic_plugin_tokio_postgres_client_child() {

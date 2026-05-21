@@ -59,3 +59,6 @@ the plugin or provide an equivalent generated artifact.
   temporary data directory: the first proves the runtime can initialize a
   missing cluster using the produced prefix, and the second proves a later
   process can open the initialized cluster and read persisted data.
+- The dynamic runtime test suite also verifies that a nonempty directory without
+  `PG_VERSION` is rejected before native backend startup. That keeps invalid
+  prefix/data-dir inputs from poisoning the current single-start process.
