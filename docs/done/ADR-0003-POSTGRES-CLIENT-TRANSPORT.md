@@ -1,6 +1,6 @@
 # ADR-0003: PostgreSQL Client Transport
 
-Status: Open
+Status: Done
 Date: 2026-05-21
 
 ## Context
@@ -27,10 +27,8 @@ Rust PostgreSQL client semantics
   -> native PGlite/Postgres loop
 ```
 
-If a chosen client stack requires socket-like IO, a Unix socketpair or local
-stream shim may be used as an adapter. That shim is still transport only; it
-does not own provider selection, query semantics, row parsing, or runtime
-lifecycle.
+`tokio-postgres` exposes `Config::connect_raw`, so no socketpair is needed for
+the first client layer.
 
 ## Required Work
 
@@ -48,3 +46,23 @@ lifecycle.
 - Raw protocol execution remains available as the substrate contract.
 - The high-level client layer cannot bypass runtime lifecycle ownership.
 
+## Implementation Notes
+
+- `src/postgres_client.rs` provides `PgliteProtocolStream<R>`, an
+  `AsyncRead`/`AsyncWrite` adapter over `PgliteRuntime::exec_protocol_raw`.
+- `postgres_client::connect` hands that stream to `tokio-postgres` through
+  `Config::connect_raw`, so prepared statement messages, parameter encoding,
+  row decoding, transactions, and type handling remain owned by the standard
+  Rust PostgreSQL client stack.
+- The stream owns the runtime. Dropping or shutting down the stream shuts down
+  the underlying PGlite runtime, so the high-level client cannot outlive or
+  bypass lifecycle ownership.
+- `tests/dynamic_plugin.rs` keeps the raw protocol conformance path and adds a
+  `tokio-postgres` child-process check that runs against the real native plugin.
+  That check covers connection startup, parameterized query encoding, row
+  decoding by name, `citext` extension loading, transaction rollback, and
+  deterministic shutdown.
+- `scripts/preflight-native-plugin-release.sh` runs raw protocol conformance and
+  the `tokio-postgres` client transport as separate native checks. Separate
+  processes keep failures attributable under the current single-start lifecycle
+  contract from ADR-0011.

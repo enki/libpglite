@@ -11,6 +11,8 @@ use serde::Serialize;
 
 #[cfg(feature = "dynamic-loading")]
 pub mod dynamic;
+#[cfg(feature = "client-tokio-postgres")]
+pub mod postgres_client;
 pub mod release;
 
 pub type PgliteResult<T> = Result<T, PgliteError>;

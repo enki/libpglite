@@ -92,7 +92,9 @@ The native lane must preserve the PGlite runtime model:
   install PGlite read/write callbacks, start the single-user backend, process a
   PostgreSQL startup packet, execute raw simple query messages, exercise
   transaction rollback, recover after a backend protocol error, execute a basic
-  extended-query flow, create contrib extensions, and shut down.
+  extended-query flow, create contrib extensions, and shut down. The same
+  native plugin is also exercised through the `tokio-postgres` client transport
+  in an isolated process.
 - Broader extended-query coverage, richer transaction/error cases, full
   extension parity, packaging hardening, restart lifecycle, and Linux
   conformance remain open.

@@ -114,6 +114,78 @@ fn dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_
     );
 }
 
+#[cfg(feature = "client-tokio-postgres")]
+#[test]
+fn dynamic_plugin_tokio_postgres_client_child() {
+    if std::env::var_os("LIBPGLITE_RUN_TOKIO_POSTGRES_CHILD").is_none() {
+        return;
+    }
+
+    let _guard = test_guard();
+    let Some(runtime) = load_native_runtime("dynamic-plugin-tokio-postgres-test") else {
+        return;
+    };
+
+    let tokio = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+    let local = tokio::task::LocalSet::new();
+    local.block_on(&tokio, async move {
+        let mut config = tokio_postgres::Config::new();
+        config.user("postgres");
+        config.dbname("postgres");
+
+        let (mut client, connection) = libpglite::postgres_client::connect(runtime, &config)
+            .await
+            .expect("tokio-postgres connects through libpglite transport");
+        let connection = tokio::task::spawn_local(async move {
+            connection.await.expect("tokio-postgres connection runs");
+        });
+
+        let row = client
+            .query_one(
+                "select $1::int4 + 1 as answer, upper($2::text) as label",
+                &[&41i32, &"pglite"],
+            )
+            .await
+            .expect("parameterized query succeeds");
+        let answer: i32 = row.get("answer");
+        let label: String = row.get("label");
+        assert_eq!(answer, 42);
+        assert_eq!(label, "PGLITE");
+
+        client
+            .batch_execute("create extension citext")
+            .await
+            .expect("citext extension loads through tokio-postgres");
+
+        let transaction = client.transaction().await.expect("transaction starts");
+        transaction
+            .execute("create table tokio_pg_smoke(value int)", &[])
+            .await
+            .expect("table is created in transaction");
+        transaction
+            .execute("insert into tokio_pg_smoke values ($1)", &[&7i32])
+            .await
+            .expect("parameterized insert succeeds");
+        transaction
+            .rollback()
+            .await
+            .expect("transaction rolls back");
+
+        let row = client
+            .query_one("select to_regclass('tokio_pg_smoke') is null", &[])
+            .await
+            .expect("query after rollback succeeds");
+        let rolled_back: bool = row.get(0);
+        assert!(rolled_back);
+
+        drop(client);
+        connection.await.expect("connection task joins");
+    });
+}
+
 fn load_native_runtime(name: &str) -> Option<DynamicPgliteRuntime> {
     Some(load_native_runtime_result(name)?.expect("runtime opens"))
 }

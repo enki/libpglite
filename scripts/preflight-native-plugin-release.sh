@@ -15,6 +15,7 @@ Runs local release-boundary checks:
   - pinned postgres-pglite native PIC archive build
   - native plugin build linked against those archives
   - native plugin symbol-boundary checks
+  - native plugin raw-protocol and tokio-postgres client checks
   - native plugin package smoke test
 
 ADR-0002 still owns the real native PGlite/Postgres runtime. This preflight
@@ -71,7 +72,7 @@ echo "==> preflight ${release_version}: workspace tests"
 cargo test --all-features --workspace
 
 echo "==> preflight ${release_version}: dynamic-loading check"
-cargo check --features dynamic-loading
+cargo check --features dynamic-loading,client-tokio-postgres
 
 echo "==> preflight ${release_version}: pinned postgres-pglite native archive build"
 scripts/prepare-native-pglite-link.sh --build-postgres
@@ -161,6 +162,13 @@ echo "==> preflight ${release_version}: dynamic plugin load check"
 LIBPGLITE_TEST_PLUGIN_PATH="$plugin_binary" \
 LIBPGLITE_TEST_POSTGRES_PREFIX="$(awk -F= '$1 == "postgres_install_prefix" {print substr($0, length($1) + 2)}' "$manifest")" \
   cargo test --features dynamic-loading --test dynamic_plugin
+
+echo "==> preflight ${release_version}: tokio-postgres client transport check"
+LIBPGLITE_RUN_TOKIO_POSTGRES_CHILD=1 \
+LIBPGLITE_TEST_PLUGIN_PATH="$plugin_binary" \
+LIBPGLITE_TEST_POSTGRES_PREFIX="$(awk -F= '$1 == "postgres_install_prefix" {print substr($0, length($1) + 2)}' "$manifest")" \
+  cargo test --features dynamic-loading,client-tokio-postgres --test dynamic_plugin \
+    dynamic_plugin_tokio_postgres_client_child -- --nocapture
 
 out_dir="${LIBPGLITE_RELEASE_OUT_DIR:-"$repo_root/dist/preflight-native-plugin"}"
 rm -rf "$out_dir"

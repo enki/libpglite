@@ -83,3 +83,8 @@ PostgreSQL with an actionable Rust initialization error.
   `pgcrypto`, transaction rollback, protocol error recovery, a basic
   extended-query flow, and shutdown all work in one runtime, then verifies that
   a second open returns an actionable Rust error instead of aborting the process.
+- Native preflight runs raw protocol conformance and the `tokio-postgres`
+  high-level client transport as separate process-level checks. This is
+  intentional while the documented lifecycle remains single-start per process:
+  each check gets a fresh backend lifetime and failures point at one runtime
+  mode instead of a mixed global-state sequence.

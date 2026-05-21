@@ -17,7 +17,8 @@ PGlite release.
 ## Decision
 
 Release metadata must distinguish ABI/package artifacts from runtime-ready
-artifacts until ADR-0002 and ADR-0003 are complete.
+artifacts until the native runtime, extension, dependency, platform, and
+lifecycle gates are complete.
 
 The package manifest must carry an explicit runtime status. While ADR-0002 is
 open, package tooling may produce smoke-test artifacts, but those artifacts must
@@ -37,15 +38,16 @@ Runtime-ready release status requires:
 The macOS native smoke now covers part of this list through raw protocol tests,
 including startup, simple query, a basic extended-query flow, transaction
 rollback, protocol error recovery, contrib extension loading, and deterministic
-shutdown. Runtime-ready status remains blocked on broader conformance, high-level
-client transport, full extension parity, Linux coverage, packaging relocatability,
-and the explicit lifecycle contract in ADR-0011.
+shutdown. ADR-0003 also adds a `tokio-postgres` transport check against the real
+native plugin. Runtime-ready status remains blocked on broader conformance, full
+extension parity, Linux coverage, packaging relocatability, and the explicit
+lifecycle contract in ADR-0011.
 
 ## Required Work
 
 1. Keep package metadata explicit about `runtimeStatus`.
 2. Add runtime conformance tests from ADR-0002.
-3. Add high-level client transport tests from ADR-0003.
+3. Keep high-level client transport tests from ADR-0003 in native preflight.
 4. Make release packaging fail for production release mode unless runtime-ready
    conformance has passed.
 5. Document any ABI-only artifacts as development/preflight artifacts only.
