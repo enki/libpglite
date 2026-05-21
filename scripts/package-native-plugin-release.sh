@@ -70,6 +70,10 @@ require tar
 require zstd
 require python3
 require nm
+case "$(uname -s)" in
+  Darwin) require otool ;;
+  Linux) require ldd ;;
+esac
 
 platform="$(uname -m)-$(uname -s | tr '[:upper:]' '[:lower:]')"
 case "$platform" in
@@ -120,6 +124,42 @@ defined_symbols() {
     Darwin) nm -gU "$binary" | awk '{print $NF}' | sed 's/^_//' ;;
     Linux) nm -D --defined-only "$binary" | awk '{print $NF}' | sed 's/@@.*//' | sed 's/@.*//' ;;
     *) return 2 ;;
+  esac
+}
+
+dependency_report() {
+  local out="$1"
+  local binary="$2"
+  local postgres_lib_dir="$3"
+
+  : >"$out"
+  case "$(uname -s)" in
+    Darwin)
+      {
+        echo "format=libpglite-native-dependencies-v1"
+        echo "tool=otool -L"
+        echo "binary=$binary"
+        otool -L "$binary"
+        while IFS= read -r module; do
+          echo
+          echo "module=$module"
+          otool -L "$module"
+        done < <(find "$postgres_lib_dir" -maxdepth 1 -type f -name '*.dylib' | LC_ALL=C sort)
+      } >"$out"
+      ;;
+    Linux)
+      {
+        echo "format=libpglite-native-dependencies-v1"
+        echo "tool=ldd"
+        echo "binary=$binary"
+        ldd "$binary" || true
+        while IFS= read -r module; do
+          echo
+          echo "module=$module"
+          ldd "$module" || true
+        done < <(find "$postgres_lib_dir" -maxdepth 1 -type f -name '*.so' | LC_ALL=C sort)
+      } >"$out"
+      ;;
   esac
 }
 
@@ -224,6 +264,41 @@ mkdir -p "$binary_stage" "$source_stage"
 
 cp "$plugin_binary" "$binary_stage/"
 cp -R "$postgres_install_prefix" "$binary_stage/postgres"
+diagnostics_stage="$binary_stage/diagnostics"
+mkdir -p "$diagnostics_stage"
+
+cp "$native_manifest" "$diagnostics_stage/native-link-manifest.txt"
+extension_inventory="$(manifest_value extension_inventory)"
+if [[ -n "$extension_inventory" && -f "$extension_inventory" ]]; then
+  cp "$extension_inventory" "$diagnostics_stage/extension-inventory.txt"
+else
+  echo "native link manifest does not provide a readable extension_inventory: ${extension_inventory:-<empty>}" >&2
+  exit 1
+fi
+defined_symbols "$plugin_binary" | LC_ALL=C sort -u >"$diagnostics_stage/plugin-defined-symbols.txt"
+awk -F= '$1 == "backend_export_symbol" {print substr($0, length($1) + 2)}' "$native_manifest" \
+  | LC_ALL=C sort -u >"$diagnostics_stage/backend-export-symbols.txt"
+dependency_report "$diagnostics_stage/dependencies.txt" "$plugin_binary" "$postgres_lib_dir"
+{
+  echo "format=libpglite-native-build-provenance-v1"
+  echo "target=$platform"
+  echo "release_version=$release_version"
+  echo "release_mode=$release_mode"
+  echo "runtime_status=$runtime_status"
+  echo "libpglite_git_commit=$git_commit"
+  echo "plugin_filename=$expected_plugin"
+  echo "plugin_sha256=$plugin_checksum"
+  echo "native_manifest=$(basename "$native_manifest")"
+  echo "extension_inventory=$(basename "$extension_inventory")"
+  echo "packaged_at_utc=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  echo "uname=$(uname -a)"
+  echo "rustc_begin"
+  rustc -vV
+  echo "rustc_end"
+  echo "cc_begin"
+  "${CC:-cc}" --version 2>&1 | sed -n '1,5p'
+  echo "cc_end"
+} >"$diagnostics_stage/build-provenance.txt"
 python3 - "$binary_stage/libpglite-native-bundle.json" "$platform" "$release_version" "$git_commit" "$expected_plugin" "$plugin_checksum" "$runtime_status" "$release_mode" <<'PY'
 import json
 import pathlib
@@ -257,6 +332,15 @@ bundle = {
         "lib": "postgres/lib",
         "initdb": "postgres/bin/initdb",
         "postgres": "postgres/bin/postgres",
+    },
+    "diagnostics": {
+        "path": "diagnostics",
+        "buildProvenance": "diagnostics/build-provenance.txt",
+        "nativeLinkManifest": "diagnostics/native-link-manifest.txt",
+        "extensionInventory": "diagnostics/extension-inventory.txt",
+        "pluginDefinedSymbols": "diagnostics/plugin-defined-symbols.txt",
+        "backendExportSymbols": "diagnostics/backend-export-symbols.txt",
+        "dependencies": "diagnostics/dependencies.txt",
     },
     "sourceArchive": f"libpglite-plugin-native-{release_version}-source.tar.zst",
     "noticeFile": f"libpglite-plugin-native-{release_version}-NOTICE.txt",

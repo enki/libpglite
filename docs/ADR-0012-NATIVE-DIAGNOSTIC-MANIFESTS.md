@@ -65,3 +65,21 @@ actual plugin and prefix contents.
   current single-start lifecycle cannot hide which runtime mode failed.
 - Linux diagnostics use the same schema as macOS diagnostics, even if the
   platform-specific dependency tools differ.
+
+## Implementation Notes
+
+- Development packaging now includes a top-level `diagnostics/` directory inside
+  the native binary archive.
+- The bundle manifest points at:
+  - `diagnostics/build-provenance.txt`
+  - `diagnostics/native-link-manifest.txt`
+  - `diagnostics/extension-inventory.txt`
+  - `diagnostics/plugin-defined-symbols.txt`
+  - `diagnostics/backend-export-symbols.txt`
+  - `diagnostics/dependencies.txt`
+- `dependencies.txt` is generated with `otool -L` on macOS and `ldd` on Linux.
+  This currently exposes remaining relocatability weaknesses, including absolute
+  build paths, instead of hiding them.
+- This ADR remains open until diagnostics are generated as structured release
+  data, production packaging rejects stale or non-relocatable diagnostics, and a
+  standalone validation command can inspect a packaged plugin directory.
