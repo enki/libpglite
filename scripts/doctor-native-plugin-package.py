@@ -85,6 +85,7 @@ class Doctor:
         self.validate_plugin()
         self.validate_postgres_prefix()
         self.validate_diagnostics()
+        self.validate_build_provenance()
         self.validate_source_provenance()
         self.validate_lifecycle()
         self.validate_conformance()
@@ -269,6 +270,76 @@ class Doctor:
                         "backendExportSymbols lists symbols absent from native link manifest: "
                         f"{format_symbol_delta(stale_diagnostic_symbols)}"
                     )
+
+    def validate_build_provenance(self) -> None:
+        path = self.diagnostic_path("buildProvenance")
+        if path is None:
+            return
+
+        values = parse_key_value_file(path, self.errors)
+        expected = {
+            "target": self.bundle.get("target"),
+            "release_version": self.bundle.get("libpgliteReleaseVersion"),
+            "release_mode": self.bundle.get("releaseMode"),
+            "runtime_status": self.bundle.get("runtimeStatus"),
+            "libpglite_git_commit": self.bundle.get("libpgliteGitCommit"),
+        }
+        for key, expected_value in expected.items():
+            actual_value = values.get(key)
+            if not isinstance(expected_value, str) or not expected_value:
+                continue
+            if actual_value != expected_value:
+                self.errors.append(
+                    f"build provenance {key} mismatch: "
+                    f"bundle={expected_value!r} provenance={actual_value!r}"
+                )
+
+        plugin = self.bundle.get("plugin")
+        if isinstance(plugin, dict):
+            expected_filename = plugin.get("filename")
+            expected_sha = plugin.get("sha256")
+            if isinstance(expected_filename, str) and values.get("plugin_filename") != expected_filename:
+                self.errors.append(
+                    "build provenance plugin_filename mismatch: "
+                    f"bundle={expected_filename!r} provenance={values.get('plugin_filename')!r}"
+                )
+            if isinstance(expected_sha, str) and values.get("plugin_sha256") != expected_sha:
+                self.errors.append(
+                    "build provenance plugin_sha256 mismatch: "
+                    f"bundle={expected_sha!r} provenance={values.get('plugin_sha256')!r}"
+                )
+
+        diagnostics = self.bundle.get("diagnostics")
+        if isinstance(diagnostics, dict):
+            native_manifest = diagnostics.get("nativeLinkManifest")
+            if isinstance(native_manifest, str):
+                expected_native_manifest = pathlib.PurePosixPath(native_manifest).name
+                if values.get("native_manifest") != expected_native_manifest:
+                    self.errors.append(
+                        "build provenance native_manifest mismatch: "
+                        f"bundle={expected_native_manifest!r} "
+                        f"provenance={values.get('native_manifest')!r}"
+                    )
+
+            extension_inventory = diagnostics.get("extensionInventory")
+            if isinstance(extension_inventory, str):
+                expected_extension_inventory = pathlib.PurePosixPath(extension_inventory).name
+                if values.get("extension_inventory") != expected_extension_inventory:
+                    self.errors.append(
+                        "build provenance extension_inventory mismatch: "
+                        f"bundle={expected_extension_inventory!r} "
+                        f"provenance={values.get('extension_inventory')!r}"
+                    )
+
+        packaged_at = values.get("packaged_at_utc")
+        if not isinstance(packaged_at, str) or not re.fullmatch(
+            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", packaged_at
+        ):
+            self.errors.append("build provenance packaged_at_utc is missing or invalid")
+
+        for key in ["uname", "rustc_begin", "rustc_end", "cc_begin", "cc_end"]:
+            if key not in values:
+                self.errors.append(f"build provenance is missing {key}")
 
     def validate_source_provenance(self) -> None:
         path = self.diagnostic_path("sourceProvenance")
@@ -606,6 +677,17 @@ def read_text(path: pathlib.Path, errors: list[str]) -> str:
 
 def nonempty_lines(path: pathlib.Path, errors: list[str]) -> list[str]:
     return [line.strip() for line in read_text(path, errors).splitlines() if line.strip()]
+
+
+def parse_key_value_file(path: pathlib.Path, errors: list[str]) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in nonempty_lines(path, errors):
+        if "=" not in line:
+            values.setdefault(line, "")
+            continue
+        key, value = line.split("=", 1)
+        values[key] = value
+    return values
 
 
 def manifest_values(path: pathlib.Path, key: str, errors: list[str]) -> list[str]:

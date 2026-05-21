@@ -50,6 +50,9 @@ still need an explicitly documented Linux baseline.
 - The native build fingerprint includes the deployment target and forces a
   Postgres rebuild when it changes.
 - The native link manifest records `macos_deployment_target`.
+- Packaged build provenance records the release target, and the package doctor
+  verifies that this target agrees with the bundle manifest so stale or
+  cross-target provenance cannot satisfy the diagnostic gate.
 - Linux baseline selection remains open, but local Linux testing should use the
   Ubuntu environment in `../smolvm/` until CI or release containers cover the
   same path.
