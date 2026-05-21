@@ -900,6 +900,22 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         self.assertIn("dependency prefix manifest is not complete", errors)
         self.assertIn("dependency prefix manifest dependencies must be nonempty", errors)
 
+    def test_production_package_requires_dependency_prefix_diagnostic(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        doctor.bundle["releaseMode"] = "production"
+        with tempdir:
+            doctor.validate_dependencies()
+
+        self.assertIn(
+            "production package is missing diagnostics.dependencyPrefix",
+            "\n".join(doctor.errors),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -119,9 +119,10 @@ actual plugin and prefix contents.
   missing, unknown, build-machine, local-provider, or external dependencies in
   strict/production mode.
 - Dependency-prefix diagnostics are optional only for the current host-pkg-config
-  development lane. When present, build provenance must name the prefix
-  diagnostic and the package doctor requires it to be a complete
-  `libpglite-native-dependency-prefix-v1` manifest.
+  development lane. Production packages must carry `diagnostics.dependencyPrefix`;
+  when present, build provenance must name the prefix diagnostic and the package
+  doctor requires it to be a complete `libpglite-native-dependency-prefix-v1`
+  manifest.
 - The dependency-prefixed macOS prepare path now writes a native link manifest
   that names the controlled prefix, the copied prefix diagnostic, and the
   diagnostic SHA-256. That proves the prepare stage can make a falsifiable
@@ -131,6 +132,9 @@ actual plugin and prefix contents.
   manifest path by default, so the final package doctor sees the controlled
   prefix diagnostic during the normal macOS release gate instead of only in a
   manual smoke command.
+- `scripts/test-doctor-native-plugin-package.py` now pins the production rule:
+  a package with `releaseMode=production` and no `diagnostics.dependencyPrefix`
+  is rejected by the doctor.
 - The macOS `v0.1.0` preflight passed with that default path. The produced
   package contains `diagnostics/native-dependency-prefix.json`, the bundle
   manifest references it, and the strict package doctor/self-test accepted the

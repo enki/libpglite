@@ -954,6 +954,11 @@ class Doctor:
                 self.warnings.append(message)
 
         prefix_manifest = self.diagnostic_path_if_present("dependencyPrefix")
+        if prefix_manifest is None and self.bundle.get("releaseMode") == "production":
+            self.errors.append(
+                "production package is missing diagnostics.dependencyPrefix"
+            )
+            return
         if prefix_manifest is not None:
             try:
                 with prefix_manifest.open() as handle:

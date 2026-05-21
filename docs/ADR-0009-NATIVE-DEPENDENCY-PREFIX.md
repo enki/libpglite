@@ -193,6 +193,10 @@ libraries or runtime data.
   the package doctor requires that prefix diagnostic to be complete. This keeps
   future release artifacts from losing their dependency-prefix evidence while
   still allowing today's host-pkg-config development build to remain explicit.
+- Production package diagnostics now require a controlled dependency-prefix
+  diagnostic. Development packages may still exercise the explicit host-provider
+  path, but a production package without `diagnostics.dependencyPrefix` is a
+  package-doctor error.
 - Preflight extracts the final `.tar.zst` package and runs the native raw
   protocol/contrib smoke against the packaged plugin and packaged Postgres
   prefix. This verifies that the repaired install names work behaviorally, not

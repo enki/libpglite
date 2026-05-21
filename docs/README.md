@@ -84,7 +84,8 @@ Current closure frontier:
   dependency prefix under strict package diagnostics. The Ubuntu lane now
   applies package-local RUNPATH repair with `patchelf` and passes strict package
   diagnostics. The Linux controlled-prefix release policy is now documented and
-  pinned to the local Ubuntu preflight test. Remaining closure is keeping strict
+  pinned to the local Ubuntu preflight test. Production packages now require a
+  controlled dependency-prefix diagnostic. Remaining closure is keeping strict
   dependency-regression coverage in place across package layouts.
 - ADR-0010: macOS release preflight now generates backend exports from the full
   packaged parity set, including common data symbols, and proves the modules
@@ -106,6 +107,7 @@ Current closure frontier:
   source/patch provenance, symbol manifests, conformance logs, and full
   extension package claims into the final-artifact doctor. Linux now uses the
   same dependency schema, the platform baseline diagnostic has joined the
-  package doctor gate, patch-apply reproducibility is now a prepare-time gate
-  rather than only a checksum claim, and the ADR audit now fails if any focused
+  package doctor gate, production packages require a dependency-prefix
+  diagnostic, patch-apply reproducibility is now a prepare-time gate rather than
+  only a checksum claim, and the ADR audit now fails if any focused
   `scripts/test-*.py` regression is not wired into native release preflight.
