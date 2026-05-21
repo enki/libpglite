@@ -37,6 +37,31 @@ class PrepareNativePgliteLinkTests(unittest.TestCase):
         )
         self.assertNotIn('patch -d "$patched_source" -p1 <"$patch_file"', text)
 
+    def test_macos_deployment_target_invalidates_native_build_cache(self):
+        text = SCRIPT.read_text()
+        self.assertIn("build_env_fingerprint=\"source_commit=$source_commit", text)
+        self.assertIn("macos_deployment_target=${MACOSX_DEPLOYMENT_TARGET:-}", text)
+        self.assertIn('build_env_file="$postgres_build_dir/.libpglite-native-build-env"', text)
+        self.assertIn(
+            'if [[ ! -f "$build_env_file" || "$(cat "$build_env_file")" != "$build_env_fingerprint" ]]; then',
+            text,
+        )
+        self.assertIn('rm -rf "$postgres_build_dir"', text)
+        self.assertIn('printf \'%s\\n\' "$build_env_fingerprint" >"$build_env_file"', text)
+        self.assertIn('echo "macos_deployment_target=$MACOSX_DEPLOYMENT_TARGET"', text)
+        self.assertLess(
+            text.index("macos_deployment_target=${MACOSX_DEPLOYMENT_TARGET:-}"),
+            text.index('build_env_file="$postgres_build_dir/.libpglite-native-build-env"'),
+        )
+        self.assertLess(
+            text.index('build_env_file="$postgres_build_dir/.libpglite-native-build-env"'),
+            text.index('rm -rf "$postgres_build_dir"'),
+        )
+        self.assertLess(
+            text.index('rm -rf "$postgres_build_dir"'),
+            text.index('printf \'%s\\n\' "$build_env_fingerprint" >"$build_env_file"'),
+        )
+
     def test_backend_export_scanner_includes_common_and_readonly_data_symbols(self):
         text = SCRIPT.read_text()
         self.assertIn("awk '$2 ~ /^[TDBSCR]$/ {print $3}'", text)

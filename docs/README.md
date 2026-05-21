@@ -53,10 +53,11 @@ Current closure frontier:
   closure is the final carry/upstream decision plus keeping the patch-apply and
   shim-prototype regressions in the preflight path.
 - ADR-0006: the full Ubuntu preflight now passes through `../smolvm/`, and
-  packages now carry a doctor-validated `platform-baseline.json`. Remaining
-  closure is macOS floor-mismatch regression coverage, build-fingerprint
-  invalidation proof for deployment-target changes, and a final preflight pass
-  after the new baseline diagnostic.
+  packages now carry a doctor-validated `platform-baseline.json`. The prepare
+  regression suite now pins deployment-target build-cache invalidation.
+  Remaining closure is treating the Linux baseline as production release policy
+  and keeping both supported final-artifact preflights current after platform
+  diagnostic changes.
 - ADR-0007: macOS package doctor self-tests the packaged `postgres/` prefix,
   including the full extension/runtime data surface. The Ubuntu lane now passes
   the same package doctor self-test with Linux RUNPATH repair. Remaining

@@ -50,8 +50,6 @@ still need an explicitly documented Linux baseline.
   native link manifest, `platform-baseline.json`, and build provenance agree on
   the deployment target. On Linux that means the package records and validates
   the selected distro/libc baseline.
-- A focused regression proves changing `MACOSX_DEPLOYMENT_TARGET` invalidates
-  the native Postgres/PGlite build fingerprint instead of reusing stale objects.
 - The Linux baseline is treated as release policy, not only a local preflight
   habit: production packages must reject artifacts that were not built on the
   documented Ubuntu baseline or an explicitly documented successor baseline.
@@ -64,6 +62,11 @@ still need an explicitly documented Linux baseline.
   `MACOSX_DEPLOYMENT_TARGET=11.0` on Darwin.
 - The native build fingerprint includes the deployment target and forces a
   Postgres rebuild when it changes.
+- `scripts/test-prepare-native-pglite-link.py` pins that cache-invalidation
+  contract: `MACOSX_DEPLOYMENT_TARGET` participates in the native build
+  fingerprint, the fingerprint mismatch removes the native Postgres build
+  directory before reuse, the new fingerprint is written after rebuild, and the
+  native link manifest records the selected deployment target.
 - The native link manifest records `macos_deployment_target`.
 - Packaged build provenance records the release target, and the package doctor
   verifies that this target agrees with the bundle manifest so stale or
