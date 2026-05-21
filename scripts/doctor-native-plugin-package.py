@@ -297,6 +297,7 @@ class Doctor:
                         "backendExportSymbols lists symbols not exported by plugin: "
                         f"{format_symbol_delta(missing_exports)}"
                     )
+                self.validate_extension_backend_symbol_claims(backend_symbols)
             if native_manifest_path is not None:
                 manifest_symbols = set(
                     manifest_values(native_manifest_path, "backend_export_symbol", self.errors)
@@ -313,6 +314,27 @@ class Doctor:
                         "backendExportSymbols lists symbols absent from native link manifest: "
                         f"{format_symbol_delta(stale_diagnostic_symbols)}"
                     )
+
+    def validate_extension_backend_symbol_claims(self, backend_symbols: set[str]) -> None:
+        if self.actual_plugin_symbols is None:
+            return
+        lib_dir = self.root / "postgres" / "lib"
+        if not lib_dir.is_dir():
+            return
+        missing_claims: list[str] = []
+        for module in native_extension_modules(lib_dir):
+            rel = module.relative_to(self.root).as_posix()
+            for symbol in sorted(undefined_symbols(module)):
+                if symbol in ABI_SYMBOLS:
+                    continue
+                if symbol in self.actual_plugin_symbols and symbol not in backend_symbols:
+                    missing_claims.append(f"{rel}: {symbol}")
+        if missing_claims:
+            self.errors.append(
+                "extension modules reference plugin-exported backend symbols missing "
+                "from backendExportSymbols: "
+                + "; ".join(missing_claims[:10])
+            )
 
     def validate_build_provenance(self) -> None:
         path = self.diagnostic_path("buildProvenance")
@@ -1071,6 +1093,30 @@ def defined_symbols(binary: pathlib.Path) -> set[str]:
             continue
         symbols.add(symbol)
     return symbols
+
+
+def undefined_symbols(binary: pathlib.Path) -> set[str]:
+    result = subprocess.run(
+        ["nm", "-u", str(binary)], text=True, capture_output=True, check=False
+    )
+    symbols: set[str] = set()
+    for line in result.stdout.splitlines():
+        parts = line.split()
+        if not parts:
+            continue
+        symbol = parts[-1].removeprefix("_")
+        symbol = symbol.split("@", 1)[0]
+        if symbol:
+            symbols.add(symbol)
+    return symbols
+
+
+def native_extension_modules(lib_dir: pathlib.Path) -> list[pathlib.Path]:
+    return sorted(
+        path
+        for path in lib_dir.iterdir()
+        if path.is_file() and path.suffix.lower() in {".dylib", ".so"}
+    )
 
 
 def read_text(path: pathlib.Path, errors: list[str]) -> str:

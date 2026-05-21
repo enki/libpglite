@@ -93,8 +93,11 @@ Current closure frontier:
   the final-link boundary. The Ubuntu lane now reaches the package doctor after
   raw-protocol extension conformance; `pg_ivm` exposed the need to export
   read-only backend data symbols such as `InvalidObjectAddress`, so the scanner
-  now includes `R` symbols. The Ubuntu packaged-runtime proof now passes; this
-  ADR still needs full-set stale-symbol regression coverage before it can close.
+  now includes `R` symbols. The doctor now rejects stale backend-symbol
+  diagnostics by scanning packaged extension modules for plugin-exported backend
+  references missing from `backend-export-symbols.txt`, with full pinned
+  `other_extensions` regression coverage. Remaining closure is keeping that
+  strictness under the final packaged parity set.
 - ADR-0012: still needs production package enforcement for every
   release-critical diagnostic and Linux schema parity before it can close. The
   normal macOS preflight package path now carries controlled-prefix diagnostics,

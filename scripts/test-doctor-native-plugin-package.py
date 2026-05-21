@@ -301,6 +301,40 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "\n".join(doctor.errors),
         )
 
+    def test_backend_symbol_diagnostic_must_cover_full_extension_references(self):
+        extension_backend_symbols = {
+            extension: f"Backend_{extension}"
+            for extension in PGLITE_OTHER_EXTENSIONS
+        }
+        actual_symbols = ABI_SYMBOLS | {"ManifestBackend"} | set(extension_backend_symbols.values())
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=actual_symbols,
+            plugin_manifest_symbols=actual_symbols,
+            native_manifest_backend_symbols={"ManifestBackend"},
+            backend_manifest_symbols={"ManifestBackend"},
+        )
+        lib_dir = pathlib.Path(tempdir.name) / "postgres" / "lib"
+        lib_dir.mkdir(parents=True)
+        for extension in PGLITE_OTHER_EXTENSIONS:
+            (lib_dir / f"{extension}.dylib").write_text("")
+
+        def module_undefined_symbols(path: pathlib.Path) -> set[str]:
+            return {extension_backend_symbols[path.stem]}
+
+        with tempdir:
+            with mock.patch.object(
+                doctor_module, "undefined_symbols", side_effect=module_undefined_symbols
+            ):
+                doctor.validate_diagnostics()
+
+        errors = "\n".join(doctor.errors)
+        self.assertIn(
+            "extension modules reference plugin-exported backend symbols missing from backendExportSymbols",
+            errors,
+        )
+        for extension, symbol in extension_backend_symbols.items():
+            self.assertIn(f"postgres/lib/{extension}.dylib: {symbol}", errors)
+
     def test_native_package_rejects_wasm_and_javascript_payloads(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS,

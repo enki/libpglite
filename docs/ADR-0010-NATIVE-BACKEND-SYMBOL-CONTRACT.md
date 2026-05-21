@@ -75,7 +75,7 @@ set changes.
 
 - The package doctor keeps failing on stale backend-symbol diagnostics, missing
   exported backend symbols, and extension modules with unresolved backend
-  references, with regression coverage for the full parity set.
+  references under the full packaged parity set.
 - Linux symbol-boundary checks tolerate only the GNU version node plus the
   stable host ABI and generated backend-symbol set; they must not accept
   accidental exports from Rust, PostgreSQL, or dependency archives.
@@ -143,6 +143,12 @@ set changes.
   package doctor verifies that the diagnostic set agrees with the native link
   manifest and that every recorded backend export is actually exported by the
   packaged plugin.
+- The package doctor now also scans packaged extension modules for undefined
+  references to symbols that are exported by the packaged plugin. If any such
+  backend reference is absent from `backend-export-symbols.txt`, the package is
+  rejected as a stale backend-symbol diagnostic. The focused regression covers
+  the full pinned PGlite `other_extensions` set rather than one representative
+  module.
 - Linux now builds the plugin through a Rust `staticlib` and one final GNU ld
   link step with the generated version script owning both the host ABI and the
   backend export set. The package symbol diagnostic filters the expected GNU
