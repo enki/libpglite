@@ -53,7 +53,9 @@ the plugin or provide an equivalent generated artifact.
 - Strict package diagnostics keep rejecting build-machine absolute paths in
   prefix metadata, extension SQL/control files, loadable module paths, and
   runtime data references across both supported package layouts.
-- The prefix layout remains stable across macOS and Linux packages.
+- The prefix layout remains stable across macOS and Linux packages; the bundle
+  must continue to expose `postgres/`, `postgres/bin`, `postgres/share`,
+  `postgres/lib`, `postgres/bin/initdb`, and `postgres/bin/postgres`.
 
 ## Implementation Notes
 
@@ -98,3 +100,6 @@ the plugin or provide an equivalent generated artifact.
   paths. In strict/preflight or production mode those leaks are package errors;
   `scripts/test-doctor-native-plugin-package.py` pins both control-file and SQL
   leak failures.
+- The package doctor now enforces the canonical `postgresPrefix` bundle layout
+  exactly instead of accepting any existing relative path map. That makes the
+  package contract self-diagnosing when macOS and Linux packaging drift apart.

@@ -173,6 +173,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "releaseMode": "development",
             "runtimeStatus": "native-runtime-pending-adr-0002",
             "libpgliteGitCommit": SOURCE_COMMIT,
+            "postgresPrefix": dict(doctor_module.POSTGRES_PREFIX_LAYOUT),
             "plugin": {
                 "filename": "liblibpglite_plugin_native.dylib",
                 "sha256": "abc123",
@@ -413,6 +414,22 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         self.assertIn(
             "native package contains non-native payload: postgres/lib/backend-wasm2c-fallback.a",
             errors,
+        )
+
+    def test_postgres_prefix_layout_must_match_package_contract(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        doctor.bundle["postgresPrefix"]["share"] = "share"
+        with tempdir:
+            doctor.validate_postgres_prefix()
+
+        self.assertIn(
+            "bundle postgresPrefix.share must be 'postgres/share', got 'share'",
+            "\n".join(doctor.errors),
         )
 
     def test_postgres_prefix_text_metadata_rejects_build_machine_paths(self):

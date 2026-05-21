@@ -29,6 +29,14 @@ RAW_PROTOCOL_CASES = {
     "parameterized-extended-query",
     "deterministic-shutdown",
 }
+POSTGRES_PREFIX_LAYOUT = {
+    "path": "postgres",
+    "bin": "postgres/bin",
+    "share": "postgres/share",
+    "lib": "postgres/lib",
+    "initdb": "postgres/bin/initdb",
+    "postgres": "postgres/bin/postgres",
+}
 
 
 def main() -> int:
@@ -184,6 +192,11 @@ class Doctor:
         if not isinstance(prefix, dict):
             self.errors.append("bundle postgresPrefix field must be an object")
             return
+        for key, expected in POSTGRES_PREFIX_LAYOUT.items():
+            if prefix.get(key) != expected:
+                self.errors.append(
+                    f"bundle postgresPrefix.{key} must be {expected!r}, got {prefix.get(key)!r}"
+                )
         for key in ["path", "bin", "share", "lib", "initdb", "postgres"]:
             value = prefix.get(key)
             if not isinstance(value, str) or not value:
