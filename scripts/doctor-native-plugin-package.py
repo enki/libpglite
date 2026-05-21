@@ -77,6 +77,7 @@ class Doctor:
         self.errors: list[str] = []
         self.warnings: list[str] = []
         self.bundle: dict = {}
+        self.actual_plugin_symbols: set[str] | None = None
 
     def run(self) -> None:
         self.bundle = self.read_bundle()
@@ -160,6 +161,7 @@ class Doctor:
             )
 
         actual_symbols = defined_symbols(plugin_path)
+        self.actual_plugin_symbols = actual_symbols
         missing = sorted(ABI_SYMBOLS - actual_symbols)
         if missing:
             self.errors.append(f"plugin binary is missing ABI symbols: {', '.join(missing)}")
@@ -225,6 +227,48 @@ class Doctor:
                 self.errors.append(
                     f"pluginDefinedSymbols is missing ABI symbols: {', '.join(missing)}"
                 )
+            actual_symbols = self.actual_plugin_symbols
+            if actual_symbols is not None:
+                missing_from_manifest = sorted(actual_symbols - symbols)
+                stale_manifest_symbols = sorted(symbols - actual_symbols)
+                if missing_from_manifest:
+                    self.errors.append(
+                        "pluginDefinedSymbols is stale; missing actual plugin symbols: "
+                        f"{format_symbol_delta(missing_from_manifest)}"
+                    )
+                if stale_manifest_symbols:
+                    self.errors.append(
+                        "pluginDefinedSymbols is stale; lists symbols absent from plugin: "
+                        f"{format_symbol_delta(stale_manifest_symbols)}"
+                    )
+
+        backend_symbols_path = self.diagnostic_path("backendExportSymbols")
+        native_manifest_path = self.diagnostic_path("nativeLinkManifest")
+        if backend_symbols_path is not None:
+            backend_symbols = set(nonempty_lines(backend_symbols_path, self.errors))
+            if self.actual_plugin_symbols is not None:
+                missing_exports = sorted(backend_symbols - self.actual_plugin_symbols)
+                if missing_exports:
+                    self.errors.append(
+                        "backendExportSymbols lists symbols not exported by plugin: "
+                        f"{format_symbol_delta(missing_exports)}"
+                    )
+            if native_manifest_path is not None:
+                manifest_symbols = set(
+                    manifest_values(native_manifest_path, "backend_export_symbol", self.errors)
+                )
+                missing_from_diagnostic = sorted(manifest_symbols - backend_symbols)
+                stale_diagnostic_symbols = sorted(backend_symbols - manifest_symbols)
+                if missing_from_diagnostic:
+                    self.errors.append(
+                        "backendExportSymbols is missing native link manifest symbols: "
+                        f"{format_symbol_delta(missing_from_diagnostic)}"
+                    )
+                if stale_diagnostic_symbols:
+                    self.errors.append(
+                        "backendExportSymbols lists symbols absent from native link manifest: "
+                        f"{format_symbol_delta(stale_diagnostic_symbols)}"
+                    )
 
     def validate_source_provenance(self) -> None:
         path = self.diagnostic_path("sourceProvenance")
@@ -562,6 +606,22 @@ def read_text(path: pathlib.Path, errors: list[str]) -> str:
 
 def nonempty_lines(path: pathlib.Path, errors: list[str]) -> list[str]:
     return [line.strip() for line in read_text(path, errors).splitlines() if line.strip()]
+
+
+def manifest_values(path: pathlib.Path, key: str, errors: list[str]) -> list[str]:
+    values: list[str] = []
+    for line in nonempty_lines(path, errors):
+        if not line.startswith(f"{key}="):
+            continue
+        values.append(line.split("=", 1)[1])
+    return values
+
+
+def format_symbol_delta(symbols: list[str], limit: int = 20) -> str:
+    if len(symbols) <= limit:
+        return ", ".join(symbols)
+    shown = ", ".join(symbols[:limit])
+    return f"{shown}, ... ({len(symbols) - limit} more)"
 
 
 def parse_inventory_line(line: str) -> tuple[str, dict[str, str]]:

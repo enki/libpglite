@@ -101,3 +101,7 @@ set changes.
   PostgreSQL global-state lifecycle. Runtime conformance should exercise
   multiple SQL operations in a single runtime until lifecycle reset is
   deliberately implemented.
+- Packaged diagnostics now carry the generated backend export set, and the
+  package doctor verifies that the diagnostic set agrees with the native link
+  manifest and that every recorded backend export is actually exported by the
+  packaged plugin.

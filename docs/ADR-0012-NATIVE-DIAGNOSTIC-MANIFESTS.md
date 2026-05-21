@@ -119,6 +119,11 @@ actual plugin and prefix contents.
   source provenance for the pinned `postgres-pglite` repository/ref/commit and
   SHA-256 checksums for every downstream patch. The doctor validates that the
   packaged source provenance and native link manifest agree on the patch set.
+- The doctor now treats symbol diagnostics as package claims rather than
+  presence checks: `plugin-defined-symbols.txt` must match the actual plugin
+  exports, `backend-export-symbols.txt` must match the native link manifest, and
+  every recorded backend export must be present in the packaged plugin. Preflight
+  runs regression tests for these stale-diagnostic failures.
 - This ADR remains open until diagnostics are generated as structured release
   data across all required gates and production packaging rejects stale
   diagnostics.
