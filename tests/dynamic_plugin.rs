@@ -156,6 +156,18 @@ fn dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_
     assert_message_type(&extended_param_response, b'C');
     assert_message_type(&extended_param_response, b'Z');
 
+    let named_statement_response = runtime
+        .exec_protocol_raw(&named_prepared_statement_reuse_message())
+        .expect("named prepared statement reuse succeeds");
+    assert_no_error_message(&named_statement_response);
+    assert_message_type(&named_statement_response, b'1');
+    assert_message_type_count(&named_statement_response, b'2', 2);
+    assert_message_type(&named_statement_response, b'3');
+    assert_message_type(&named_statement_response, b'T');
+    assert_message_type_count(&named_statement_response, b'D', 2);
+    assert_message_type(&named_statement_response, b'C');
+    assert_message_type(&named_statement_response, b'Z');
+
     assert_query_ok(
         &mut runtime,
         "citext",
@@ -667,6 +679,50 @@ fn extended_query_message_with_text_param(sql: &str, value: &str) -> Vec<u8> {
     message
 }
 
+fn named_prepared_statement_reuse_message() -> Vec<u8> {
+    let mut message = Vec::new();
+
+    let mut parse = Vec::new();
+    push_cstr(&mut parse, "pglite_stmt");
+    push_cstr(&mut parse, "select $1::int4 * 2");
+    parse.extend_from_slice(&0u16.to_be_bytes());
+    push_tagged_message(&mut message, b'P', &parse);
+
+    push_text_param_bind_describe_execute(&mut message, "pglite_stmt", "11");
+    push_text_param_bind_describe_execute(&mut message, "pglite_stmt", "13");
+
+    let mut close = Vec::new();
+    close.push(b'S');
+    push_cstr(&mut close, "pglite_stmt");
+    push_tagged_message(&mut message, b'C', &close);
+
+    push_tagged_message(&mut message, b'S', &[]);
+    message
+}
+
+fn push_text_param_bind_describe_execute(message: &mut Vec<u8>, statement: &str, value: &str) {
+    let mut bind = Vec::new();
+    push_cstr(&mut bind, "");
+    push_cstr(&mut bind, statement);
+    bind.extend_from_slice(&1u16.to_be_bytes());
+    bind.extend_from_slice(&0u16.to_be_bytes());
+    bind.extend_from_slice(&1u16.to_be_bytes());
+    bind.extend_from_slice(&(value.len() as u32).to_be_bytes());
+    bind.extend_from_slice(value.as_bytes());
+    bind.extend_from_slice(&0u16.to_be_bytes());
+    push_tagged_message(message, b'B', &bind);
+
+    let mut describe = Vec::new();
+    describe.push(b'P');
+    push_cstr(&mut describe, "");
+    push_tagged_message(message, b'D', &describe);
+
+    let mut execute = Vec::new();
+    push_cstr(&mut execute, "");
+    execute.extend_from_slice(&0u32.to_be_bytes());
+    push_tagged_message(message, b'E', &execute);
+}
+
 fn push_tagged_message(buffer: &mut Vec<u8>, tag: u8, body: &[u8]) {
     buffer.push(tag);
     buffer.extend_from_slice(&((body.len() + 4) as u32).to_be_bytes());
@@ -695,6 +751,29 @@ fn assert_message_type(response: &[u8], expected: u8) {
     }
     panic!(
         "response did not contain message type {} in {:?}",
+        expected as char, response
+    );
+}
+
+fn assert_message_type_count(response: &[u8], expected: u8, expected_count: usize) {
+    let mut offset = 0;
+    let mut actual_count = 0;
+    while offset + 5 <= response.len() {
+        let tag = response[offset];
+        let len = u32::from_be_bytes(
+            response[offset + 1..offset + 5]
+                .try_into()
+                .expect("message length"),
+        ) as usize;
+        assert!(len >= 4, "invalid protocol message length {len}");
+        if tag == expected {
+            actual_count += 1;
+        }
+        offset += 1 + len;
+    }
+    assert_eq!(
+        actual_count, expected_count,
+        "response contained message type {} {actual_count} times in {:?}",
         expected as char, response
     );
 }

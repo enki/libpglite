@@ -174,7 +174,9 @@ actual plugin and prefix contents.
   partial raw-protocol diagnostics that omit any required case, so a passing
   conformance file cannot hide a narrowed test command. The required case list
   now includes the empty-query path so PostgreSQL `EmptyQueryResponse` behavior
-  is part of the named raw protocol evidence.
+  is part of the named raw protocol evidence, and it includes named
+  prepared-statement reuse so extended-protocol evidence is not limited to
+  unnamed one-shot statements.
 - Conformance result JSON records a SHA-256 checksum of its log, and the package
   doctor verifies the checksum. This prevents stale or mismatched logs from
   satisfying a release diagnostic gate.

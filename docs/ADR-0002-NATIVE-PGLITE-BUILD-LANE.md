@@ -62,8 +62,9 @@ The native lane must preserve the PGlite runtime model:
 ## Remaining Closure Criteria
 
 - Raw protocol conformance covers startup, simple query, extended query,
-  transaction success, transaction rollback, recoverable protocol error, and
-  deterministic shutdown from the dynamic plugin.
+  parameter-bound extended query, named prepared-statement reuse, transaction
+  success, transaction rollback, recoverable protocol error, and deterministic
+  shutdown from the dynamic plugin.
 - The high-level Rust client transport runs against the same dynamic plugin and
   packaged prefix used by the raw protocol checks.
 - Linux and macOS preflight keep proving the same final-package path whenever
@@ -104,9 +105,10 @@ The native lane must preserve the PGlite runtime model:
   PostgreSQL startup packet, execute raw simple query and empty-query messages,
   exercise
   transaction rollback and transaction commit, recover after a backend protocol
-  error, execute basic and parameter-bound extended-query flows, create contrib
-  extensions, and shut down. The same native plugin is also exercised through
-  the `tokio-postgres` client transport in an isolated process.
+  error, execute basic extended-query, parameter-bound extended-query, and named
+  prepared-statement reuse flows, create contrib extensions, and shut down. The
+  same native plugin is also exercised through the `tokio-postgres` client
+  transport in an isolated process.
 - `scripts/preflight-native-plugin-release.sh v0.1.0` now passes on macOS with
   native Postgres/PGlite linked, the full materialized PGlite extension parity
   set built into the packaged prefix, and the package doctor self-test

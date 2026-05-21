@@ -116,6 +116,7 @@ if name == "raw-protocol":
         "recoverable-protocol-error",
         "extended-query",
         "parameterized-extended-query",
+        "named-prepared-statement",
         "deterministic-shutdown",
     ]
 pathlib.Path(out).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")

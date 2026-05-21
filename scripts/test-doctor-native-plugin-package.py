@@ -319,6 +319,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         self.assertIn("empty-query", errors)
         self.assertIn("transaction-commit", errors)
         self.assertIn("parameterized-extended-query", errors)
+        self.assertIn("named-prepared-statement", errors)
         self.assertIn("deterministic-shutdown", errors)
 
     def test_conformance_result_requires_command_and_valid_timestamps(self):
