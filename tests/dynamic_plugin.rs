@@ -95,11 +95,21 @@ fn dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_
         .exec_protocol_raw(&query_message(
             "begin; create table tx_smoke(value int); insert into tx_smoke values (7); rollback; select to_regclass('tx_smoke') is null",
         ))
-        .expect("transaction query succeeds");
+        .expect("transaction rollback query succeeds");
     assert_no_error_message(&transaction_response);
     assert_message_type(&transaction_response, b'D');
     assert_message_type(&transaction_response, b'C');
     assert_message_type(&transaction_response, b'Z');
+
+    let transaction_commit_response = runtime
+        .exec_protocol_raw(&query_message(
+            "begin; create table tx_commit_smoke(value int); insert into tx_commit_smoke values (9); commit; select value from tx_commit_smoke",
+        ))
+        .expect("transaction commit query succeeds");
+    assert_no_error_message(&transaction_commit_response);
+    assert_message_type(&transaction_commit_response, b'D');
+    assert_message_type(&transaction_commit_response, b'C');
+    assert_message_type(&transaction_commit_response, b'Z');
 
     let error_response = runtime
         .exec_protocol_raw(&query_message("select missing_column from missing_table"))
@@ -124,6 +134,17 @@ fn dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_
     assert_message_type(&extended_response, b'D');
     assert_message_type(&extended_response, b'C');
     assert_message_type(&extended_response, b'Z');
+
+    let extended_param_response = runtime
+        .exec_protocol_raw(&extended_query_message_with_text_param("select $1::int4 + 1", "6"))
+        .expect("parameterized extended query succeeds");
+    assert_no_error_message(&extended_param_response);
+    assert_message_type(&extended_param_response, b'1');
+    assert_message_type(&extended_param_response, b'2');
+    assert_message_type(&extended_param_response, b'T');
+    assert_message_type(&extended_param_response, b'D');
+    assert_message_type(&extended_param_response, b'C');
+    assert_message_type(&extended_param_response, b'Z');
 
     assert_query_ok(
         &mut runtime,
@@ -585,6 +606,40 @@ fn extended_query_message(sql: &str) -> Vec<u8> {
     push_cstr(&mut bind, "");
     bind.extend_from_slice(&0u16.to_be_bytes());
     bind.extend_from_slice(&0u16.to_be_bytes());
+    bind.extend_from_slice(&0u16.to_be_bytes());
+    push_tagged_message(&mut message, b'B', &bind);
+
+    let mut describe = Vec::new();
+    describe.push(b'P');
+    push_cstr(&mut describe, "");
+    push_tagged_message(&mut message, b'D', &describe);
+
+    let mut execute = Vec::new();
+    push_cstr(&mut execute, "");
+    execute.extend_from_slice(&0u32.to_be_bytes());
+    push_tagged_message(&mut message, b'E', &execute);
+
+    push_tagged_message(&mut message, b'S', &[]);
+    message
+}
+
+fn extended_query_message_with_text_param(sql: &str, value: &str) -> Vec<u8> {
+    let mut message = Vec::new();
+
+    let mut parse = Vec::new();
+    push_cstr(&mut parse, "");
+    push_cstr(&mut parse, sql);
+    parse.extend_from_slice(&0u16.to_be_bytes());
+    push_tagged_message(&mut message, b'P', &parse);
+
+    let mut bind = Vec::new();
+    push_cstr(&mut bind, "");
+    push_cstr(&mut bind, "");
+    bind.extend_from_slice(&1u16.to_be_bytes());
+    bind.extend_from_slice(&0u16.to_be_bytes());
+    bind.extend_from_slice(&1u16.to_be_bytes());
+    bind.extend_from_slice(&(value.len() as u32).to_be_bytes());
+    bind.extend_from_slice(value.as_bytes());
     bind.extend_from_slice(&0u16.to_be_bytes());
     push_tagged_message(&mut message, b'B', &bind);
 

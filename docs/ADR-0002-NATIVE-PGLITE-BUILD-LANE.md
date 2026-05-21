@@ -102,10 +102,10 @@ The native lane must preserve the PGlite runtime model:
   plugin: initialize a clean data directory with the generated Postgres prefix,
   install PGlite read/write callbacks, start the single-user backend, process a
   PostgreSQL startup packet, execute raw simple query messages, exercise
-  transaction rollback, recover after a backend protocol error, execute a basic
-  extended-query flow, create contrib extensions, and shut down. The same
-  native plugin is also exercised through the `tokio-postgres` client transport
-  in an isolated process.
+  transaction rollback and transaction commit, recover after a backend protocol
+  error, execute basic and parameter-bound extended-query flows, create contrib
+  extensions, and shut down. The same native plugin is also exercised through
+  the `tokio-postgres` client transport in an isolated process.
 - `scripts/preflight-native-plugin-release.sh v0.1.0` now passes on macOS with
   native Postgres/PGlite linked, the full materialized PGlite extension parity
   set built into the packaged prefix, and the package doctor self-test
@@ -116,7 +116,8 @@ The native lane must preserve the PGlite runtime model:
   or bitcode inputs. `scripts/test-doctor-native-plugin-package.py` pins those
   failures so the native package cannot silently regress to a WASM or wasm2c
   fallback shape.
-- Broader extended-query coverage and richer transaction/error cases remain
-  open. Full extension parity, packaging hardening, and the current restart
-  lifecycle now have macOS and Ubuntu final-package evidence and remain tracked
-  in their owning ADRs until production gates close.
+- Broader protocol coverage still remains open, but the raw conformance path now
+  covers both rollback and commit transactions plus parameter binding through
+  the extended-query protocol. Full extension parity, packaging hardening, and
+  the current restart lifecycle now have macOS and Ubuntu final-package evidence
+  and remain tracked in their owning ADRs until production gates close.
