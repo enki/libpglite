@@ -11,7 +11,7 @@ index 7294dce..b349188 100644
  #endif
  
  /* GUCs */
-@@ -47,7 +49,7 @@ bool		Trace_connection_negotiation = false;
+@@ -47,7 +49,7 @@
  static void BackendInitialize(ClientSocket *client_sock, CAC_state cac);
  static int	ProcessSSLStartup(Port *port);
  
@@ -20,7 +20,7 @@ index 7294dce..b349188 100644
  int	ProcessStartupPacket(Port *port, bool ssl_done, bool gss_done);
  #else
  static int	ProcessStartupPacket(Port *port, bool ssl_done, bool gss_done);
-@@ -459,7 +461,7 @@ process_startup_packet_die(SIGNAL_ARGS)
+@@ -459,7 +461,7 @@
   * should make no assumption here about the order in which the client may make
   * requests.
   */
@@ -29,3 +29,36 @@ index 7294dce..b349188 100644
  int EMSCRIPTEN_KEEPALIVE
  #else
  static int
+diff --git a/src/backend/tcop/postgres.c b/src/backend/tcop/postgres.c
+index 1344d22..f9e16f1 100644
+--- a/src/backend/tcop/postgres.c
++++ b/src/backend/tcop/postgres.c
+@@ -252,7 +252,11 @@
+     ExitOnAnyError = false;
+     MyBackendType = B_BACKEND;
+ 	IsPostmasterEnvironment = true;
++#if defined(__EMSCRIPTEN__)
+ 	IsUnderPostmaster = true;
++#else
++	IsUnderPostmaster = false;
++#endif
+ 
+ 	if (!load_hba())
+ 	{
+diff --git a/src/include/storage/pmsignal.h b/src/include/storage/pmsignal.h
+index 0e0c992..2fc99fa 100644
+--- a/src/include/storage/pmsignal.h
++++ b/src/include/storage/pmsignal.h
+@@ -98,6 +98,12 @@
+ 		return true;
+ 	return PostmasterIsAliveInternal();
+ }
++#elif defined(__PGLITE__)
++static inline bool
++PostmasterIsAlive(void)
++{
++	return true;
++}
+ #else
+ #define PostmasterIsAlive() PostmasterIsAliveInternal()
+ #endif

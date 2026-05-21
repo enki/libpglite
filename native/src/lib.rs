@@ -9,19 +9,26 @@ compile_error!(
      plugin instead of statically linking this crate into a downstream host."
 );
 
+#[cfg(libpglite_native_link_pglite)]
 use std::ffi::CString;
+#[cfg(libpglite_native_link_pglite)]
 use std::ffi::c_void;
-use std::path::Path;
-use std::path::PathBuf;
+#[cfg(libpglite_native_link_pglite)]
+use std::path::{Path, PathBuf};
+#[cfg(libpglite_native_link_pglite)]
 use std::process::Command;
+#[cfg(libpglite_native_link_pglite)]
 use std::ptr;
-use std::sync::atomic::AtomicPtr;
-use std::sync::atomic::Ordering;
+#[cfg(libpglite_native_link_pglite)]
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 use libpglite::{PgliteConfig, PgliteError, PgliteResult, PgliteRuntime};
 
+#[cfg(libpglite_native_link_pglite)]
 const POSTGRES_PREFIX_ENV: &str = "LIBPGLITE_POSTGRES_PREFIX";
+#[cfg(libpglite_native_link_pglite)]
 const PGLITE_EXIT_ALIVE: i32 = 99;
+#[cfg(libpglite_native_link_pglite)]
 const POSTGRES_MAIN_LONGJMP: i32 = 100;
 
 #[cfg(libpglite_native_link_pglite)]
@@ -76,11 +83,14 @@ mod ffi {
 
 #[derive(Debug)]
 pub struct NativePgliteRuntime {
+    #[cfg(libpglite_native_link_pglite)]
     config: PgliteConfig,
+    #[cfg(libpglite_native_link_pglite)]
     transport: Box<NativeTransport>,
     shutdown: bool,
 }
 
+#[cfg(libpglite_native_link_pglite)]
 #[derive(Debug, Default)]
 struct NativeTransport {
     input: Vec<u8>,
@@ -88,6 +98,7 @@ struct NativeTransport {
     output: Vec<u8>,
 }
 
+#[cfg(libpglite_native_link_pglite)]
 impl NativeTransport {
     fn begin(&mut self, message: &[u8]) {
         self.input.clear();
@@ -101,6 +112,7 @@ impl NativeTransport {
     }
 }
 
+#[cfg(libpglite_native_link_pglite)]
 static ACTIVE_TRANSPORT: AtomicPtr<NativeTransport> = AtomicPtr::new(ptr::null_mut());
 
 impl PgliteRuntime for NativePgliteRuntime {
@@ -229,8 +241,13 @@ impl NativePgliteRuntime {
         let user = CString::new(self.config.user.as_str())
             .map_err(|_| PgliteError::initialize("database user contains a NUL byte"))?;
         let data_dir = self.config.data_dir.to_string_lossy().into_owned();
+        let postgres = postgres_prefix(&self.config)?
+            .join("bin")
+            .join("postgres")
+            .to_string_lossy()
+            .into_owned();
         let args = [
-            "postgres",
+            postgres.as_str(),
             "--single",
             "-F",
             "-O",
@@ -287,6 +304,7 @@ impl NativePgliteRuntime {
     }
 }
 
+#[cfg(libpglite_native_link_pglite)]
 fn postgres_prefix(config: &PgliteConfig) -> PgliteResult<PathBuf> {
     config
         .environment
@@ -299,6 +317,7 @@ fn postgres_prefix(config: &PgliteConfig) -> PgliteResult<PathBuf> {
         })
 }
 
+#[cfg(libpglite_native_link_pglite)]
 fn ensure_data_dir(postgres_prefix: &Path, data_dir: &Path) -> PgliteResult<()> {
     if data_dir.join("PG_VERSION").is_file() {
         return Ok(());

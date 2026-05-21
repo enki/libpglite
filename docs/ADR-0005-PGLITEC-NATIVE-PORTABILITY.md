@@ -54,3 +54,7 @@ clear preprocessor gates.
 - The native build compiles the patched `pglitec.c` as PIC and fingerprints the
   patch in the generated link manifest so source-substrate changes force a
   rebuild.
+- A second native patch exports PGlite runtime symbols needed outside the
+  Emscripten build, keeps native embedded mode from probing a nonexistent
+  postmaster-death pipe, and preserves Emscripten behavior behind explicit
+  preprocessor gates.

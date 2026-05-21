@@ -66,6 +66,7 @@ require cc
 require patch
 require make
 require ar
+require tar
 
 pin_file="$repo_root/PGLITE_POSTGRES_SOURCE"
 if [[ ! -f "$pin_file" ]]; then
@@ -143,13 +144,22 @@ fi
 build_dir="$(dirname "$out")"
 patched_source="$build_dir/patched-postgres-pglite"
 object_dir="$build_dir/objects"
-mkdir -p "$patched_source/pglite/src/pglitec" "$object_dir"
+mkdir -p "$build_dir" "$object_dir"
 
-cp "$source_dir/pglite/src/pglitec/pglitec.c" "$patched_source/pglite/src/pglitec/pglitec.c"
-for patch_file in "$repo_root"/patches/postgres-pglite/*.patch; do
-  [[ -e "$patch_file" ]] || continue
-  patch -d "$patched_source" -p1 <"$patch_file" >/dev/null
-done
+patch_fingerprint="$(cd "$repo_root" && git hash-object patches/postgres-pglite/*.patch | git hash-object --stdin)"
+patched_source_fingerprint="source_commit=$source_commit
+patch_fingerprint=$patch_fingerprint"
+patched_source_fingerprint_file="$patched_source/.libpglite-patched-source-fingerprint"
+if [[ ! -f "$patched_source_fingerprint_file" || "$(cat "$patched_source_fingerprint_file")" != "$patched_source_fingerprint" ]]; then
+  rm -rf "$patched_source"
+  mkdir -p "$patched_source"
+  git -C "$source_dir" archive --format=tar HEAD | tar -xf - -C "$patched_source"
+  for patch_file in "$repo_root"/patches/postgres-pglite/*.patch; do
+    [[ -e "$patch_file" ]] || continue
+    patch -d "$patched_source" -p1 <"$patch_file" >/dev/null
+  done
+  printf '%s\n' "$patched_source_fingerprint" >"$patched_source_fingerprint_file"
+fi
 
 pglitec_object="$object_dir/pglitec.o"
 cc -fPIC -O2 -DNDEBUG \
@@ -195,7 +205,6 @@ backend_archive="$build_dir/libpglite_postgres_backend.a"
 timezone_archive="$build_dir/libpglite_postgres_timezone.a"
 common_archive="$postgres_build_dir/src/common/libpgcommon_srv.a"
 port_archive="$postgres_build_dir/src/port/libpgport_srv.a"
-patch_fingerprint="$(cd "$repo_root" && git hash-object patches/postgres-pglite/*.patch | git hash-object --stdin)"
 native_trap_fingerprint="$(git -C "$repo_root" hash-object "$repo_root/native/c/libpglite_native_trap.c")"
 
 if [[ "$build_postgres" == "1" ]]; then
@@ -213,7 +222,7 @@ pglite_copt=$pglite_copt"
   if [[ ! -x "$postgres_build_dir/config.status" ]]; then
     (
       cd "$postgres_build_dir"
-      "$source_dir/configure" \
+      "$patched_source/configure" \
         --without-readline \
         --without-icu \
         --without-llvm \
@@ -297,6 +306,7 @@ fi
   echo "source_ref=$pinned_ref"
   echo "source_commit=$source_commit"
   echo "source_dir=$source_dir"
+  echo "patched_source_dir=$patched_source"
   if [[ "$build_postgres" == "1" ]]; then
     echo "status=native-postgres-archive-built"
   else

@@ -81,6 +81,10 @@ The native lane must preserve the PGlite runtime model:
 - On macOS the release plugin links the native Postgres/PGlite objects while
   exporting only the `libpglite_plugin_*` ABI symbols; Postgres and
   `libpglite_native_*` symbols remain local implementation details.
-- The Rust runtime lifecycle still returns a deliberate initialization error;
-  startup, data directory initialization, callback transport, recovery, and
-  shutdown remain owned by this ADR and ADR-0003.
+- The native runtime now has a macOS smoke path through the dynamic plugin:
+  initialize a clean data directory with the generated Postgres prefix, install
+  PGlite read/write callbacks, start the single-user backend, process a
+  PostgreSQL startup packet, execute a raw simple query protocol message, and
+  shut down.
+- Runtime recovery, extended query protocol, transaction, error recovery,
+  extension, packaging, and Linux conformance remain open.

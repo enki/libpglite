@@ -2,10 +2,13 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #if defined(LIBPGLITE_NATIVE_BACKEND_TRAMPOLINES)
 typedef void (*libpglite_native_void_fn)(void);
 
+extern int MyProcPid;
+extern void MemoryContextInit(void);
 extern void PostgresMainLongJmp(void);
 extern void PostgresMainLoopOnce(void);
 extern void PostgresSendReadyForQueryIfNecessary(void);
@@ -21,6 +24,7 @@ extern ssize_t pq_buffer_remaining_data(void);
 
 static jmp_buf libpglite_native_exit_jmp;
 static int libpglite_native_exit_trap_active = 0;
+static int libpglite_native_postgres_preinitialized = 0;
 #endif
 
 void libpglite_native_exit(int status) {
@@ -52,6 +56,11 @@ int libpglite_native_postgres_single_user_main(
 ) {
     int status = setjmp(libpglite_native_exit_jmp);
     if (status == 0) {
+        if (!libpglite_native_postgres_preinitialized) {
+            MyProcPid = getpid();
+            MemoryContextInit();
+            libpglite_native_postgres_preinitialized = 1;
+        }
         libpglite_native_exit_trap_active = 1;
         PostgresSingleUserMain(argc, argv, username);
         libpglite_native_exit_trap_active = 0;
