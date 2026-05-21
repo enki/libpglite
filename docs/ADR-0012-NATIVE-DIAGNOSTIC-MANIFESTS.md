@@ -181,6 +181,13 @@ actual plugin and prefix contents.
   `other_extensions`: missing materialized sources remain development warnings
   and production failures, while present sources must also have their packaged
   control files, install SQL, and referenced native modules.
+- A macOS controlled-prefix opt-in prepare has now exercised that distinction:
+  all eight pinned `other_extensions` were materialized and the non-PostGIS set
+  was installed into the generated prefix, so the inventory can move from
+  `status=missing` to `status=present` with concrete files behind the claim.
+  This remains a build-stage diagnostic proof until the normal preflight package
+  carries those present-source claims and the doctor validates them from the
+  final artifact.
 - The package now includes a structured runtime lifecycle diagnostic. The doctor
   validates that it matches the current single-start-per-process contract and
   cites raw protocol conformance as evidence.

@@ -95,6 +95,11 @@ libraries or runtime data.
   dependency-prefix diagnostic, and `macos_deployment_target=11.0`; the packaged
   artifact includes `diagnostics/native-dependency-prefix.json` and passed the
   strict package doctor/self-test.
+- A macOS controlled-prefix opt-in prepare also materialized PGlite
+  `other_extensions` and built the non-PostGIS PGXS set against the same prefix,
+  including `vector`. This proves the prefix handoff is not limited to core
+  `contrib`, but it does not close this ADR until `pgcrypto` and PostGIS are
+  proven from the packaged artifact with strict dependency diagnostics.
 
 ## Implementation Notes
 

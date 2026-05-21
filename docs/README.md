@@ -47,11 +47,13 @@ Current closure frontier:
   environment in `../smolvm/` or an equivalent release container.
 - ADR-0007: still needs final relocatable prefix closure after extension parity
   expands the prefix beyond current contrib coverage.
-- ADR-0008: still needs materialized PGlite `other_extensions`, PostGIS
-  native dependency/data packaging, full `CREATE EXTENSION` conformance from
-  packaged artifacts, and promotion of the opt-in extension build into release
-  preflight. The dependency-prefixed macOS prepare now builds PostgreSQL
-  `contrib` modules including `pgcrypto`, `uuid-ossp`, and `xml2`.
+- ADR-0008: still needs release-path PGlite `other_extensions` materialization,
+  PostGIS native dependency/data packaging, full `CREATE EXTENSION` conformance
+  from packaged artifacts, and promotion of the opt-in extension build into
+  release preflight. The dependency-prefixed macOS prepare now builds PostgreSQL
+  `contrib` modules including `pgcrypto`, `uuid-ossp`, and `xml2`; the
+  controlled-prefix opt-in prepare also materializes all pinned PGlite
+  `other_extensions` and builds the non-PostGIS set, including `vector`.
 - ADR-0009: still needs packaged `pgcrypto` and PostGIS proof, strict
   dependency diagnostics across the final extension surface, and the Linux
   prefix contract. The macOS preflight path now builds the clean controlled
@@ -59,9 +61,13 @@ Current closure frontier:
   the complete static-only prefix diagnostic, and passes the strict package
   doctor/self-test.
 - ADR-0010: still needs stale-symbol checks against the full extension parity
-  set and Linux export/version-script coverage.
+  set and Linux export/version-script coverage. The macOS symbol scanner has now
+  seen the non-PostGIS PGlite `other_extensions` build, but the packaged parity
+  set still needs to drive the release gate.
 - ADR-0012: still needs production package enforcement for every
   release-critical diagnostic and Linux schema parity before it can close. The
   normal macOS preflight package path now carries the controlled prefix
   diagnostic and checksum into the final-artifact doctor, and the `v0.1.0`
-  macOS preflight proved that path end to end.
+  macOS preflight proved that path end to end. The opt-in non-PostGIS
+  `other_extensions` build is diagnostic substrate evidence until promoted into
+  packaged preflight.

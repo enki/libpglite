@@ -118,3 +118,9 @@ set changes.
   package doctor verifies that the diagnostic set agrees with the native link
   manifest and that every recorded backend export is actually exported by the
   packaged plugin.
+- A macOS controlled-prefix opt-in prepare has generated the backend export set
+  after building the non-PostGIS PGlite `other_extensions`, including `vector`.
+  That is useful evidence that the scanner can see beyond `contrib`, but this
+  ADR stays open until the final packaged parity set, including PostGIS, drives
+  the export set and packaged conformance proves those modules load through the
+  plugin.
