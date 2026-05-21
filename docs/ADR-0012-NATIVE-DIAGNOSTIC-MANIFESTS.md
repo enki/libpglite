@@ -118,7 +118,8 @@ actual plugin and prefix contents.
   code, object path, and dependency classifications. The package doctor rejects
   missing, unknown, build-machine, local-provider, or external dependencies in
   strict/production mode, and it rejects dependency diagnostics whose recorded
-  platform does not match the package target.
+  platform does not match the package target or whose tool is not the native
+  scanner for that platform (`otool -L` for `Darwin`, `ldd` for `Linux`).
 - Dependency-prefix diagnostics are optional only for the current host-pkg-config
   development lane. Production packages must carry `diagnostics.dependencyPrefix`
   sourced from `native_dependency_prefix_manifest` in the native link manifest;

@@ -957,6 +957,16 @@ class Doctor:
         tool = manifest.get("tool")
         if tool not in {"otool -L", "ldd"}:
             self.errors.append(f"dependency manifest has unsupported tool: {tool!r}")
+        elif manifest_platform == "Darwin" and tool != "otool -L":
+            self.errors.append(
+                "dependency manifest tool mismatch: platform='Darwin' "
+                f"tool={tool!r}"
+            )
+        elif manifest_platform == "Linux" and tool != "ldd":
+            self.errors.append(
+                "dependency manifest tool mismatch: platform='Linux' "
+                f"tool={tool!r}"
+            )
         objects = manifest.get("objects")
         if not isinstance(objects, list) or not objects:
             self.errors.append("dependency manifest objects must be a nonempty list")

@@ -98,9 +98,9 @@ Current closure frontier:
   pinned to the local Ubuntu preflight test. Production packages now require a
   controlled dependency-prefix diagnostic, and the doctor rejects
   loader-relative dependency paths that escape the package with `..` as well as
-  dependency manifests whose platform contradicts the package target. Remaining
-  closure is keeping strict dependency-regression coverage in place across
-  package layouts.
+  dependency manifests whose platform contradicts the package target or whose
+  scanner tool does not match that platform. Remaining closure is keeping strict
+  dependency-regression coverage in place across package layouts.
 - ADR-0010: macOS release preflight now generates backend exports from the full
   packaged parity set, including common data symbols, and proves the modules
   load through the globally loaded plugin. Linux now uses a Rust staticlib plus
@@ -127,5 +127,6 @@ Current closure frontier:
   package errors, build provenance now names every release-critical packaged
   diagnostic, raw-protocol diagnostics must name their covered protocol cases,
   patch-apply reproducibility is now a prepare-time gate rather than only a
-  checksum claim, and the ADR audit now fails if any focused
-  `scripts/test-*.py` regression is not wired into native release preflight.
+  checksum claim, dependency manifests must use the platform-native scanner
+  they claim, and the ADR audit now fails if any focused `scripts/test-*.py`
+  regression is not wired into native release preflight.
