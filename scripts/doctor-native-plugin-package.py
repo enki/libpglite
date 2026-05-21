@@ -84,6 +84,7 @@ class Doctor:
         self.validate_plugin()
         self.validate_postgres_prefix()
         self.validate_diagnostics()
+        self.validate_lifecycle()
         self.validate_conformance()
         self.validate_extensions()
         self.validate_dependencies()
@@ -223,6 +224,35 @@ class Doctor:
                 self.errors.append(
                     f"pluginDefinedSymbols is missing ABI symbols: {', '.join(missing)}"
                 )
+
+    def validate_lifecycle(self) -> None:
+        path = self.diagnostic_path("runtimeLifecycle")
+        if path is None:
+            return
+        try:
+            with path.open() as handle:
+                lifecycle = json.load(handle)
+        except Exception as err:
+            self.errors.append(f"runtime lifecycle diagnostic is not readable: {err}")
+            return
+        if not isinstance(lifecycle, dict):
+            self.errors.append("runtime lifecycle diagnostic root must be an object")
+            return
+        expected = {
+            "format": "libpglite-native-runtime-lifecycle-v1",
+            "contract": "single-start-per-process",
+            "restartSupported": False,
+            "concurrentRuntimeSupported": False,
+            "secondStartupBehavior": "fails-before-entering-postgres",
+        }
+        for key, value in expected.items():
+            if lifecycle.get(key) != value:
+                self.errors.append(f"runtime lifecycle diagnostic has wrong {key}")
+        proven_by = lifecycle.get("provenByConformance")
+        if not isinstance(proven_by, list) or "raw-protocol" not in proven_by:
+            self.errors.append(
+                "runtime lifecycle diagnostic must cite raw-protocol conformance"
+            )
 
     def validate_conformance(self) -> None:
         diagnostics = self.bundle.get("diagnostics")

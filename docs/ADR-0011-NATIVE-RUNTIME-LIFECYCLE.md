@@ -88,3 +88,8 @@ PostgreSQL with an actionable Rust initialization error.
   intentional while the documented lifecycle remains single-start per process:
   each check gets a fresh backend lifetime and failures point at one runtime
   mode instead of a mixed global-state sequence.
+- Native packages now carry `diagnostics/runtime-lifecycle.json`, which records
+  the current single-start-per-process contract, lack of restart/concurrency
+  support, second-start failure behavior, shutdown behavior, and the conformance
+  result that proves it. The package doctor validates this manifest so release
+  artifacts cannot silently drift from the implemented lifecycle contract.

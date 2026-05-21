@@ -77,6 +77,7 @@ actual plugin and prefix contents.
   - `diagnostics/plugin-defined-symbols.txt`
   - `diagnostics/backend-export-symbols.txt`
   - `diagnostics/dependencies.txt`
+  - `diagnostics/runtime-lifecycle.json`
 - `dependencies.txt` is generated with `otool -L` on macOS and `ldd` on Linux.
   This currently exposes remaining relocatability weaknesses, including absolute
   build paths, instead of hiding them.
@@ -108,6 +109,9 @@ actual plugin and prefix contents.
   control files, default-version SQL, and referenced native modules. It also
   makes missing PGlite `other_extensions` production-fatal while keeping them
   visible as development warnings.
+- The package now includes a structured runtime lifecycle diagnostic. The doctor
+  validates that it matches the current single-start-per-process contract and
+  cites raw protocol conformance as evidence.
 - This ADR remains open until diagnostics are generated as structured release
   data across all required gates and production packaging rejects stale
   diagnostics.

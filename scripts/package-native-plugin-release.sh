@@ -351,6 +351,22 @@ defined_symbols "$binary_stage/$expected_plugin" | LC_ALL=C sort -u >"$diagnosti
 awk -F= '$1 == "backend_export_symbol" {print substr($0, length($1) + 2)}' "$native_manifest" \
   | LC_ALL=C sort -u >"$diagnostics_stage/backend-export-symbols.txt"
 dependency_report "$diagnostics_stage/dependencies.txt" "$binary_stage" "$binary_stage/$expected_plugin" "$binary_stage/postgres/lib"
+python3 - "$diagnostics_stage/runtime-lifecycle.json" <<'PY'
+import json
+import pathlib
+import sys
+
+lifecycle = {
+    "format": "libpglite-native-runtime-lifecycle-v1",
+    "contract": "single-start-per-process",
+    "restartSupported": False,
+    "concurrentRuntimeSupported": False,
+    "secondStartupBehavior": "fails-before-entering-postgres",
+    "shutdownBehavior": "runs-postgres-pglite-shutdown-hooks-once",
+    "provenByConformance": ["raw-protocol"],
+}
+pathlib.Path(sys.argv[1]).write_text(json.dumps(lifecycle, indent=2, sort_keys=True) + "\n")
+PY
 {
   echo "format=libpglite-native-build-provenance-v1"
   echo "target=$platform"
@@ -413,6 +429,7 @@ bundle = {
         "pluginDefinedSymbols": "diagnostics/plugin-defined-symbols.txt",
         "backendExportSymbols": "diagnostics/backend-export-symbols.txt",
         "dependencies": "diagnostics/dependencies.txt",
+        "runtimeLifecycle": "diagnostics/runtime-lifecycle.json",
         "conformanceResults": "diagnostics/conformance",
     },
     "sourceArchive": f"libpglite-plugin-native-{release_version}-source.tar.zst",
