@@ -121,3 +121,9 @@ The native lane must preserve the PGlite runtime model:
   the extended-query protocol. Full extension parity, packaging hardening, and
   the current restart lifecycle now have macOS and Ubuntu final-package evidence
   and remain tracked in their owning ADRs until production gates close.
+- Raw-protocol conformance diagnostics now carry an explicit case inventory:
+  startup, simple query, transaction rollback, transaction commit, recoverable
+  protocol error, extended query, parameterized extended query, and deterministic
+  shutdown. The package doctor rejects raw-protocol conformance results that do
+  not name all of those cases, so packaged diagnostics can explain what the
+  passing result actually proved.

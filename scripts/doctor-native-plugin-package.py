@@ -19,6 +19,16 @@ ABI_SYMBOLS = {
     "libpglite_plugin_runtime_exec_protocol_raw",
     "libpglite_plugin_runtime_shutdown",
 }
+RAW_PROTOCOL_CASES = {
+    "startup",
+    "simple-query",
+    "transaction-rollback",
+    "transaction-commit",
+    "recoverable-protocol-error",
+    "extended-query",
+    "parameterized-extended-query",
+    "deterministic-shutdown",
+}
 
 
 def main() -> int:
@@ -746,6 +756,19 @@ class Doctor:
                 self.errors.append(f"conformance result {name}.json is missing logSha256")
             elif log_path.is_file() and expected_log_sha != sha256(log_path):
                 self.errors.append(f"conformance result {name}.json logSha256 mismatch")
+            if name == "raw-protocol":
+                cases = result.get("cases")
+                if not isinstance(cases, list) or not all(
+                    isinstance(case, str) for case in cases
+                ):
+                    self.errors.append("raw-protocol conformance result is missing cases")
+                else:
+                    missing_cases = sorted(RAW_PROTOCOL_CASES - set(cases))
+                    if missing_cases:
+                        self.errors.append(
+                            "raw-protocol conformance result is missing cases: "
+                            + ", ".join(missing_cases)
+                        )
 
     def validate_extensions(self) -> None:
         inventory = self.diagnostic_path("extensionInventory")

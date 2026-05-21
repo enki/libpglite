@@ -106,6 +106,17 @@ result = {
     "log": log_file,
     "logSha256": log_sha256,
 }
+if name == "raw-protocol":
+    result["cases"] = [
+        "startup",
+        "simple-query",
+        "transaction-rollback",
+        "transaction-commit",
+        "recoverable-protocol-error",
+        "extended-query",
+        "parameterized-extended-query",
+        "deterministic-shutdown",
+    ]
 pathlib.Path(out).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
 PY
 }

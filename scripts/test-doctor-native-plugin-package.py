@@ -245,6 +245,40 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         self.assertIn("conformance result raw-protocol.json logSha256 mismatch", errors)
         self.assertIn("conformance result is missing: tokio-postgres-client.json", errors)
 
+    def test_raw_protocol_conformance_must_name_required_cases(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        doctor.bundle["diagnostics"]["conformanceResults"] = "diagnostics/conformance"
+        conformance = pathlib.Path(tempdir.name) / "diagnostics" / "conformance"
+        conformance.mkdir()
+        (conformance / "raw-protocol.log").write_text("raw ok\n")
+        (conformance / "raw-protocol.json").write_text(
+            json.dumps(
+                {
+                    "format": "libpglite-native-conformance-result-v1",
+                    "name": "raw-protocol",
+                    "status": "passed",
+                    "exitCode": 0,
+                    "log": "raw-protocol.log",
+                    "logSha256": hashlib.sha256(b"raw ok\n").hexdigest(),
+                    "cases": ["startup", "simple-query"],
+                }
+            )
+            + "\n"
+        )
+        with tempdir:
+            doctor.validate_conformance()
+
+        errors = "\n".join(doctor.errors)
+        self.assertIn("raw-protocol conformance result is missing cases", errors)
+        self.assertIn("transaction-commit", errors)
+        self.assertIn("parameterized-extended-query", errors)
+        self.assertIn("deterministic-shutdown", errors)
+
     def test_plugin_symbol_diagnostic_must_match_actual_exports(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS | {"ActualBackendSymbol"},

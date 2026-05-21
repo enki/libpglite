@@ -51,6 +51,20 @@ class PreflightNativePluginReleaseTest(unittest.TestCase):
         self.assertIn("last 200 log lines from $log_file", text)
         self.assertIn('tail -n 200 "$log_file"', text)
 
+    def test_raw_protocol_conformance_records_case_inventory(self):
+        text = SCRIPT.read_text()
+        for case in [
+            "startup",
+            "simple-query",
+            "transaction-rollback",
+            "transaction-commit",
+            "recoverable-protocol-error",
+            "extended-query",
+            "parameterized-extended-query",
+            "deterministic-shutdown",
+        ]:
+            self.assertIn(f'"{case}"', text)
+
 
 if __name__ == "__main__":
     unittest.main()
