@@ -73,7 +73,7 @@ actual plugin and prefix contents.
 - This ADR moves to `docs/done/` only after the package doctor owns all
   release-critical manifest checks that preflight depends on.
 
-## Remaining Closure Criteria
+## Closure Criteria
 
 - Every release-critical gate emits structured diagnostics copied into the
   package, including source provenance, patches, platform floor, dependency

@@ -106,7 +106,7 @@ PGlite-shipped extension.
 - This ADR moves to `docs/done/` only after the full inventoried parity set is
   built, packaged, and exercised from the packaged artifact.
 
-## Remaining Closure Criteria
+## Closure Criteria
 
 - The package doctor must keep rejecting any extension whose control file,
   default-version SQL, loadable module, dependency library, or required data

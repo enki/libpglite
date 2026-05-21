@@ -43,7 +43,7 @@ still need an explicitly documented Linux baseline.
 - Changing the deployment target forces a native Postgres rebuild.
 - Linux release preflight runs in a documented baseline environment.
 
-## Remaining Closure Criteria
+## Closure Criteria
 
 - The package doctor rejects missing, empty, stale, or contradictory
   platform-floor diagnostics for both supported targets. On macOS that means the

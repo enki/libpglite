@@ -46,7 +46,7 @@ clear preprocessor gates.
   calls that PGlite is expected to emulate through `pglitec.c`.
 - ADR-0002 can consume PGlite C support as a real native link input.
 
-## Remaining Closure Criteria
+## Closure Criteria
 
 - The carried PGlite native patch set is reduced to documented, fingerprinted
   source patches applied by `scripts/prepare-native-pglite-link.sh`.

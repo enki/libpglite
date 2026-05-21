@@ -45,7 +45,7 @@ the plugin or provide an equivalent generated artifact.
 - Runtime open can initialize a missing data directory and resume an existing
   one.
 
-## Remaining Closure Criteria
+## Closure Criteria
 
 - Keep package doctor self-tests initializing a missing data directory from the
   packaged prefix and resuming it from a later process without build-tree

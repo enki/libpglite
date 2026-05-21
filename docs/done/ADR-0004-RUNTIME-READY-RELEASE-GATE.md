@@ -88,7 +88,7 @@ not claim that status.
 - ADR-0004 moves to `docs/done/` only after runtime-ready release gating is
   enforced by commands, not by convention.
 
-## Remaining Closure Criteria
+## Closure Criteria
 
 - All root `docs/ADR-*.md` records have moved to `docs/done/` with their own
   acceptance evidence intact, except this final ADR while it is collecting its

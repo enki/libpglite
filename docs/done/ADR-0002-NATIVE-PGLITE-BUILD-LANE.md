@@ -59,7 +59,7 @@ The native lane must preserve the PGlite runtime model:
 - No JavaScript, Emscripten module object, or wasm runtime is required by the
   production native plugin.
 
-## Remaining Closure Criteria
+## Closure Criteria
 
 - Raw protocol conformance covers startup, simple query, extended query,
   parameter-bound extended query, named prepared-statement reuse, transaction

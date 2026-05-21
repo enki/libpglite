@@ -71,7 +71,7 @@ set changes.
 - Release preflight fails if the generated backend-symbol set is stale relative
   to the packaged extension modules.
 
-## Remaining Closure Criteria
+## Closure Criteria
 
 - The package doctor keeps failing on stale backend-symbol diagnostics, missing
   exported backend symbols, and extension modules with unresolved backend

@@ -76,6 +76,8 @@ def main() -> int:
             errors.append(f"{rel} is missing Closing Evidence")
         elif not has_bullet(text, "Closing Evidence"):
             errors.append(f"{rel} Closing Evidence has no concrete bullets")
+        if has_section(text, "Remaining Closure Criteria"):
+            errors.append(f"{rel} must not have Remaining Closure Criteria after it is done")
 
     for path in sorted((REPO_ROOT / "scripts").glob("test-*.py")):
         rel = path.relative_to(REPO_ROOT).as_posix()

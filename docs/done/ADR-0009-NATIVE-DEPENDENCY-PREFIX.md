@@ -58,7 +58,7 @@ libraries or runtime data.
 - Release preflight rejects absolute build-machine dependency paths in plugin,
   extension, and metadata artifacts.
 
-## Remaining Closure Criteria
+## Closure Criteria
 
 - Linux packaged-artifact conformance continues to prove `pgcrypto` and PostGIS
   work with controlled OpenSSL, GEOS, PROJ, json-c, SQLite, related dependency
