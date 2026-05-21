@@ -434,6 +434,35 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "\n".join(doctor.errors),
         )
 
+    def test_dependency_prefix_manifest_must_be_complete_when_present(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        diagnostics = pathlib.Path(tempdir.name) / "diagnostics"
+        (diagnostics / "native-dependency-prefix.json").write_text(
+            json.dumps(
+                {
+                    "format": "libpglite-native-dependency-prefix-v1",
+                    "complete": False,
+                    "missing": ["openssl:lib/libcrypto.a"],
+                    "dependencies": [],
+                }
+            )
+            + "\n"
+        )
+        doctor.bundle["diagnostics"]["dependencyPrefix"] = (
+            "diagnostics/native-dependency-prefix.json"
+        )
+        with tempdir:
+            doctor.validate_dependencies()
+
+        errors = "\n".join(doctor.errors)
+        self.assertIn("dependency prefix manifest is not complete", errors)
+        self.assertIn("dependency prefix manifest dependencies must be nonempty", errors)
+
 
 if __name__ == "__main__":
     unittest.main()

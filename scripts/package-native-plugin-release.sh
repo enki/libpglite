@@ -326,6 +326,16 @@ else
   echo "native link manifest does not provide a readable extension_inventory: ${extension_inventory:-<empty>}" >&2
   exit 1
 fi
+dependency_prefix_manifest="$(manifest_value native_dependency_prefix_manifest)"
+dependency_prefix_diagnostic=""
+if [[ -n "$dependency_prefix_manifest" ]]; then
+  if [[ ! -f "$dependency_prefix_manifest" ]]; then
+    echo "native link manifest provides unreadable native_dependency_prefix_manifest: $dependency_prefix_manifest" >&2
+    exit 1
+  fi
+  cp "$dependency_prefix_manifest" "$diagnostics_stage/native-dependency-prefix.json"
+  dependency_prefix_diagnostic="diagnostics/native-dependency-prefix.json"
+fi
 defined_symbols "$binary_stage/$expected_plugin" | LC_ALL=C sort -u >"$diagnostics_stage/plugin-defined-symbols.txt"
 awk -F= '$1 == "backend_export_symbol" {print substr($0, length($1) + 2)}' "$native_manifest" \
   | LC_ALL=C sort -u >"$diagnostics_stage/backend-export-symbols.txt"
@@ -398,6 +408,9 @@ PY
   echo "native_manifest=native-link-manifest.txt"
   echo "extension_inventory=extension-inventory.txt"
   echo "dependency_manifest=dependencies.json"
+  if [[ -n "$dependency_prefix_diagnostic" ]]; then
+    echo "dependency_prefix=$(basename "$dependency_prefix_diagnostic")"
+  fi
   echo "packaged_at_utc=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   echo "uname=$(uname -a)"
   echo "rustc_begin"
@@ -407,7 +420,7 @@ PY
   "${CC:-cc}" --version 2>&1 | sed -n '1,5p'
   echo "cc_end"
 } >"$diagnostics_stage/build-provenance.txt"
-python3 - "$binary_stage/libpglite-native-bundle.json" "$platform" "$release_version" "$git_commit" "$expected_plugin" "$plugin_checksum" "$runtime_status" "$release_mode" <<'PY'
+python3 - "$binary_stage/libpglite-native-bundle.json" "$platform" "$release_version" "$git_commit" "$expected_plugin" "$plugin_checksum" "$runtime_status" "$release_mode" "$dependency_prefix_diagnostic" <<'PY'
 import json
 import pathlib
 import sys
@@ -421,7 +434,23 @@ import sys
     plugin_checksum,
     runtime_status,
     release_mode,
-) = sys.argv[1:9]
+    dependency_prefix_diagnostic,
+) = sys.argv[1:10]
+diagnostics = {
+    "path": "diagnostics",
+    "buildProvenance": "diagnostics/build-provenance.txt",
+    "nativeLinkManifest": "diagnostics/native-link-manifest.txt",
+    "extensionInventory": "diagnostics/extension-inventory.txt",
+    "pluginDefinedSymbols": "diagnostics/plugin-defined-symbols.txt",
+    "backendExportSymbols": "diagnostics/backend-export-symbols.txt",
+    "dependencies": "diagnostics/dependencies.txt",
+    "dependencyManifest": "diagnostics/dependencies.json",
+    "sourceProvenance": "diagnostics/source-provenance.json",
+    "runtimeLifecycle": "diagnostics/runtime-lifecycle.json",
+    "conformanceResults": "diagnostics/conformance",
+}
+if dependency_prefix_diagnostic:
+    diagnostics["dependencyPrefix"] = dependency_prefix_diagnostic
 bundle = {
     "target": target,
     "pluginAbiVersion": 1,
@@ -441,19 +470,7 @@ bundle = {
         "initdb": "postgres/bin/initdb",
         "postgres": "postgres/bin/postgres",
     },
-    "diagnostics": {
-        "path": "diagnostics",
-        "buildProvenance": "diagnostics/build-provenance.txt",
-        "nativeLinkManifest": "diagnostics/native-link-manifest.txt",
-        "extensionInventory": "diagnostics/extension-inventory.txt",
-        "pluginDefinedSymbols": "diagnostics/plugin-defined-symbols.txt",
-        "backendExportSymbols": "diagnostics/backend-export-symbols.txt",
-        "dependencies": "diagnostics/dependencies.txt",
-        "dependencyManifest": "diagnostics/dependencies.json",
-        "sourceProvenance": "diagnostics/source-provenance.json",
-        "runtimeLifecycle": "diagnostics/runtime-lifecycle.json",
-        "conformanceResults": "diagnostics/conformance",
-    },
+    "diagnostics": diagnostics,
     "sourceArchive": f"libpglite-plugin-native-{release_version}-source.tar.zst",
     "noticeFile": f"libpglite-plugin-native-{release_version}-NOTICE.txt",
     "licenseInventory": f"libpglite-plugin-native-{release_version}-licenses.json",

@@ -7,6 +7,7 @@ out="${LIBPGLITE_NATIVE_LINK_MANIFEST:-}"
 build_postgres="${LIBPGLITE_BUILD_POSTGRES:-0}"
 fetch_other_extensions="${LIBPGLITE_FETCH_OTHER_EXTENSIONS:-0}"
 build_other_extensions="${LIBPGLITE_BUILD_OTHER_EXTENSIONS:-0}"
+dependency_prefix="${LIBPGLITE_NATIVE_DEPENDENCY_PREFIX:-}"
 
 if [[ "$(uname -s)" == "Darwin" && -z "${MACOSX_DEPLOYMENT_TARGET:-}" ]]; then
   export MACOSX_DEPLOYMENT_TARGET=11.0
@@ -14,7 +15,7 @@ fi
 
 usage() {
   cat >&2 <<'USAGE'
-usage: scripts/prepare-native-pglite-link.sh [--source-dir <path>] [--out <manifest>] [--build-postgres] [--fetch-other-extensions] [--build-other-extensions]
+usage: scripts/prepare-native-pglite-link.sh [--source-dir <path>] [--out <manifest>] [--build-postgres] [--fetch-other-extensions] [--build-other-extensions] [--dependency-prefix <path>]
 
 Validates the pinned postgres-pglite source substrate and writes a native link
 manifest. By default it validates the source and compiles PGlite-specific C
@@ -27,6 +28,7 @@ Environment:
   LIBPGLITE_BUILD_POSTGRES=1
   LIBPGLITE_FETCH_OTHER_EXTENSIONS=1
   LIBPGLITE_BUILD_OTHER_EXTENSIONS=1
+  LIBPGLITE_NATIVE_DEPENDENCY_PREFIX=<path>
   LIBPGLITE_NATIVE_MAKE_JOBS=<jobs>
   MACOSX_DEPLOYMENT_TARGET=<version>  default: 11.0 on Darwin
 USAGE
@@ -54,6 +56,10 @@ while [[ $# -gt 0 ]]; do
       fetch_other_extensions=1
       build_other_extensions=1
       shift
+      ;;
+    --dependency-prefix)
+      dependency_prefix="${2:-}"
+      shift 2
       ;;
     -h|--help)
       usage
@@ -125,6 +131,12 @@ case "$source_dir" in
   /*) ;;
   *) source_dir="$repo_root/$source_dir" ;;
 esac
+if [[ -n "$dependency_prefix" ]]; then
+  case "$dependency_prefix" in
+    /*) ;;
+    *) dependency_prefix="$repo_root/$dependency_prefix" ;;
+  esac
+fi
 
 if [[ ! -d "$source_dir" ]]; then
   echo "postgres-pglite source directory not found: $source_dir" >&2
@@ -320,10 +332,31 @@ native_extension_required_symbols() {
 
 if [[ "$build_postgres" == "1" ]]; then
   require pkg-config
-
+  native_dependency_provider="host-pkg-config"
+  native_dependency_prefix_manifest=""
+  native_dependency_prefix_fingerprint=""
   native_dependency_packages=(libxslt libxml-2.0 zlib uuid)
   native_backend_link_packages=(libxslt libxml-2.0 zlib)
   native_crypto_packages=(openssl)
+  native_uuid_impl="e2fs"
+  if [[ -n "$dependency_prefix" ]]; then
+    if [[ ! -d "$dependency_prefix" ]]; then
+      echo "native dependency prefix not found: $dependency_prefix" >&2
+      exit 2
+    fi
+    native_dependency_provider="libpglite-prefix"
+    native_dependency_prefix_manifest="$build_dir/native-dependency-prefix.json"
+    python3 "$repo_root/scripts/describe-native-dependency-prefix.py" \
+      --prefix "$dependency_prefix" \
+      --out "$native_dependency_prefix_manifest" \
+      --require-complete
+    native_dependency_prefix_fingerprint="$(sha256 "$native_dependency_prefix_manifest")"
+    export PKG_CONFIG_LIBDIR="$dependency_prefix/lib/pkgconfig:$dependency_prefix/share/pkgconfig"
+    native_dependency_packages=(libxslt libxml-2.0 zlib)
+    native_backend_link_packages=(libxslt libxml-2.0 zlib)
+    native_crypto_packages=(openssl)
+    native_uuid_impl="ossp"
+  fi
   for package in "${native_dependency_packages[@]}" "${native_crypto_packages[@]}"; do
     if ! pkg-config --exists "$package"; then
       echo "missing native dependency pkg-config package required for extension parity: $package" >&2
@@ -336,7 +369,6 @@ if [[ "$build_postgres" == "1" ]]; then
   native_dependency_libs="$(pkg-config --libs-only-l "${native_backend_link_packages[@]}")"
   native_crypto_ldflags="$(pkg-config --libs-only-L "${native_crypto_packages[@]}")"
   native_crypto_libs="$(pkg-config --libs-only-l "${native_crypto_packages[@]}")"
-  native_uuid_impl="e2fs"
   native_extension_be_dlllibs=""
   if [[ "$(uname -s)" == "Darwin" ]]; then
     native_extension_be_dlllibs="-undefined dynamic_lookup"
@@ -348,6 +380,9 @@ macos_deployment_target=${MACOSX_DEPLOYMENT_TARGET:-}
 patch_fingerprint=$patch_fingerprint
 extension_inventory_fingerprint=$extension_inventory_fingerprint
 build_other_extensions=$build_other_extensions
+native_dependency_provider=$native_dependency_provider
+native_dependency_prefix=$dependency_prefix
+native_dependency_prefix_fingerprint=$native_dependency_prefix_fingerprint
 native_trap_fingerprint=$native_trap_fingerprint
 pglite_copt=$pglite_copt
 native_dependency_cppflags=$native_dependency_cppflags
@@ -541,6 +576,12 @@ fi
   echo "native_trap_source=native/c/libpglite_native_trap.c"
   echo "native_trap_fingerprint=$native_trap_fingerprint"
   if [[ "$build_postgres" == "1" ]]; then
+    echo "native_dependency_provider=$native_dependency_provider"
+    if [[ -n "$dependency_prefix" ]]; then
+      echo "native_dependency_prefix=$dependency_prefix"
+      echo "native_dependency_prefix_manifest=$native_dependency_prefix_manifest"
+      echo "native_dependency_prefix_manifest_sha256=$native_dependency_prefix_fingerprint"
+    fi
     echo "archive=$backend_archive"
     echo "archive=$timezone_archive"
     echo "archive=$common_archive"

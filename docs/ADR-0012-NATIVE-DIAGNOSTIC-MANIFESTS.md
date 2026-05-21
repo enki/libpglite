@@ -85,6 +85,8 @@ actual plugin and prefix contents.
   - `diagnostics/backend-export-symbols.txt`
   - `diagnostics/dependencies.txt`
   - `diagnostics/dependencies.json`
+  - `diagnostics/native-dependency-prefix.json` when the native link manifest
+    was built from a controlled dependency prefix
   - `diagnostics/source-provenance.json`
   - `diagnostics/runtime-lifecycle.json`
 - `dependencies.txt` is generated with `otool -L` on macOS and `ldd` on Linux.
@@ -95,6 +97,10 @@ actual plugin and prefix contents.
   code, object path, and dependency classifications. The package doctor rejects
   missing, unknown, build-machine, local-provider, or external dependencies in
   strict/production mode.
+- Dependency-prefix diagnostics are optional only for the current host-pkg-config
+  development lane. When present, build provenance must name the prefix
+  diagnostic and the package doctor requires it to be a complete
+  `libpglite-native-dependency-prefix-v1` manifest.
 - `scripts/doctor-native-plugin-package.py` validates either an extracted
   package directory or a `.tar.zst` package without rebuilding it. It checks the
   bundle manifest, plugin checksum, ABI symbols, PostgreSQL prefix files,

@@ -346,6 +346,16 @@ class Doctor:
                         f"provenance={values.get('dependency_manifest')!r}"
                     )
 
+            dependency_prefix = diagnostics.get("dependencyPrefix")
+            if isinstance(dependency_prefix, str):
+                expected_dependency_prefix = pathlib.PurePosixPath(dependency_prefix).name
+                if values.get("dependency_prefix") != expected_dependency_prefix:
+                    self.errors.append(
+                        "build provenance dependency_prefix mismatch: "
+                        f"bundle={expected_dependency_prefix!r} "
+                        f"provenance={values.get('dependency_prefix')!r}"
+                    )
+
         packaged_at = values.get("packaged_at_utc")
         if not isinstance(packaged_at, str) or not re.fullmatch(
             r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", packaged_at
@@ -741,6 +751,25 @@ class Doctor:
             else:
                 self.warnings.append(message)
 
+        prefix_manifest = self.diagnostic_path_if_present("dependencyPrefix")
+        if prefix_manifest is not None:
+            try:
+                with prefix_manifest.open() as handle:
+                    prefix = json.load(handle)
+            except Exception as err:
+                self.errors.append(f"dependency prefix manifest is not readable: {err}")
+                return
+            if not isinstance(prefix, dict):
+                self.errors.append("dependency prefix manifest root must be an object")
+                return
+            if prefix.get("format") != "libpglite-native-dependency-prefix-v1":
+                self.errors.append("dependency prefix manifest has wrong format")
+            if prefix.get("complete") is not True:
+                self.errors.append("dependency prefix manifest is not complete")
+            dependencies_value = prefix.get("dependencies")
+            if not isinstance(dependencies_value, list) or not dependencies_value:
+                self.errors.append("dependency prefix manifest dependencies must be nonempty")
+
     def run_self_test(self) -> None:
         if shutil.which("cargo") is None:
             self.errors.append("package self-test requires cargo in PATH")
@@ -831,6 +860,22 @@ class Doctor:
         value = diagnostics.get(key)
         if not isinstance(value, str) or not value:
             self.errors.append(f"bundle diagnostics.{key} is missing")
+            return None
+        path = self.root / value
+        if not path.is_file():
+            self.errors.append(f"diagnostic file is missing: {value}")
+            return None
+        return path
+
+    def diagnostic_path_if_present(self, key: str) -> pathlib.Path | None:
+        diagnostics = self.bundle.get("diagnostics")
+        if not isinstance(diagnostics, dict):
+            return None
+        value = diagnostics.get(key)
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value:
+            self.errors.append(f"bundle diagnostics.{key} is invalid")
             return None
         path = self.root / value
         if not path.is_file():
