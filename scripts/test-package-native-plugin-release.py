@@ -58,24 +58,31 @@ class PackageNativePluginReleaseTests(unittest.TestCase):
             self.assertIn(line, text)
 
     def test_production_packaging_is_blocked_while_root_adrs_are_open(self):
-        test_adr = SCRIPT.parents[1] / "docs" / "ADR-9999-TEST-OPEN.md"
-        test_adr.write_text(
-            "# ADR-9999: Test Open ADR\n\n"
-            "Status: Open\n\n"
-            "## Acceptance Criteria\n\n"
-            "- test\n\n"
-            "## Remaining Closure Criteria\n\n"
-            "- test\n"
-        )
-        self.addCleanup(lambda: test_adr.exists() and test_adr.unlink())
         with tempfile.TemporaryDirectory() as tempdir:
-            plugin = pathlib.Path(tempdir) / "liblibpglite_plugin_native.dylib"
+            root = pathlib.Path(tempdir) / "repo"
+            scripts = root / "scripts"
+            docs = root / "docs"
+            out = root / "out"
+            scripts.mkdir(parents=True)
+            docs.mkdir()
+            script = scripts / SCRIPT.name
+            script.write_text(SCRIPT.read_text())
+            script.chmod(0o755)
+            (docs / "ADR-9999-TEST-OPEN.md").write_text(
+                "# ADR-9999: Test Open ADR\n\n"
+                "Status: Open\n\n"
+                "## Acceptance Criteria\n\n"
+                "- test\n\n"
+                "## Remaining Closure Criteria\n\n"
+                "- test\n"
+            )
+            plugin = root / "liblibpglite_plugin_native.dylib"
             plugin.write_bytes(b"placeholder")
             env = os.environ.copy()
             env["LIBPGLITE_RELEASE_MODE"] = "production"
             result = subprocess.run(
-                [str(SCRIPT), "v0.0.0-test", str(plugin), str(pathlib.Path(tempdir) / "out")],
-                cwd=SCRIPT.parents[1],
+                [str(script), "v0.0.0-test", str(plugin), str(out)],
+                cwd=root,
                 env=env,
                 capture_output=True,
                 text=True,
