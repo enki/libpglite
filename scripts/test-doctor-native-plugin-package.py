@@ -27,6 +27,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         plugin_manifest_symbols: set[str],
         native_manifest_backend_symbols: set[str],
         backend_manifest_symbols: set[str],
+        extension_inventory_text: str = "format=libpglite-native-extension-inventory-v1\n",
     ):
         tempdir = tempfile.TemporaryDirectory()
         root = pathlib.Path(tempdir.name)
@@ -71,9 +72,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         (diagnostics / "native-link-manifest.txt").write_text(
             "\n".join(native_manifest_lines) + "\n"
         )
-        (diagnostics / "extension-inventory.txt").write_text(
-            "format=libpglite-native-extension-inventory-v1\n"
-        )
+        (diagnostics / "extension-inventory.txt").write_text(extension_inventory_text)
         (diagnostics / "dependencies.txt").write_text(
             "format=libpglite-native-dependencies-v1\n"
         )
@@ -261,6 +260,78 @@ class DoctorDiagnosticsTests(unittest.TestCase):
 
         self.assertIn(
             "source provenance postgresPglite.commit mismatch",
+            "\n".join(doctor.errors),
+        )
+
+    def test_other_extension_inventory_requires_submodule_provenance(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+            extension_inventory_text=(
+                "format=libpglite-native-extension-inventory-v1\n"
+                "other_extension=vector;"
+                "source=pglite/other_extensions/vector;"
+                "submodule_state=-;"
+                "submodule_commit=;"
+                "status=missing\n"
+            ),
+        )
+        with tempdir:
+            doctor.validate_extensions()
+
+        errors = "\n".join(doctor.errors)
+        self.assertIn("missing pinned submodule commit: vector", errors)
+        self.assertIn("missing submodule URL: vector", errors)
+
+    def test_missing_other_extension_is_warning_only_for_development(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+            extension_inventory_text=(
+                "format=libpglite-native-extension-inventory-v1\n"
+                "other_extension=vector;"
+                "source=pglite/other_extensions/vector;"
+                "submodule_state=-;"
+                "submodule_commit=35ab919bf5da677709b2ebb8be07480bb25e97cf;"
+                "status=missing;"
+                "submodule_url=https://github.com/pgvector/pgvector.git\n"
+            ),
+        )
+        with tempdir:
+            doctor.validate_extensions()
+
+        self.assertFalse(doctor.errors)
+        self.assertIn(
+            "PGlite other extension submodule is missing",
+            "\n".join(doctor.warnings),
+        )
+
+    def test_missing_other_extension_blocks_production(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+            extension_inventory_text=(
+                "format=libpglite-native-extension-inventory-v1\n"
+                "other_extension=vector;"
+                "source=pglite/other_extensions/vector;"
+                "submodule_state=-;"
+                "submodule_commit=35ab919bf5da677709b2ebb8be07480bb25e97cf;"
+                "status=missing;"
+                "submodule_url=https://github.com/pgvector/pgvector.git\n"
+            ),
+        )
+        doctor.bundle["releaseMode"] = "production"
+        with tempdir:
+            doctor.validate_extensions()
+
+        self.assertIn(
+            "PGlite other extension submodule is missing",
             "\n".join(doctor.errors),
         )
 

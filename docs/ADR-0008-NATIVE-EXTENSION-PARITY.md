@@ -84,6 +84,8 @@ PGlite-shipped extension.
 9. Add runtime conformance tests that initialize a clean data directory and run
    `CREATE EXTENSION` smoke tests for the full parity set, including `vector`
    and PostGIS.
+10. Fetch or vendor the exact `pglite/other_extensions` gitlink commits from
+    the pinned `postgres-pglite` tree before building parity artifacts.
 
 ## Acceptance Criteria
 
@@ -95,10 +97,14 @@ PGlite-shipped extension.
   additional files or user configuration.
 - Release preflight fails if `postgres-pglite` adds an extension and the native
   build does not include it.
+- Release preflight fails if a PGlite `other_extensions` entry lacks a pinned
+  submodule commit and source URL in the generated inventory.
 - Release preflight fails if extension control files are present without the
   corresponding linked code or required support data.
 - The native bundle remains relocatable; no extension depends on build-machine
   absolute paths.
+- This ADR moves to `docs/done/` only after the full inventoried parity set is
+  built, packaged, and exercised from the packaged artifact.
 
 ## Implementation Notes
 
@@ -114,20 +120,26 @@ PGlite-shipped extension.
   requires third-party library and data packaging.
 - `scripts/inventory-native-pglite-extensions.py` derives a native extension
   inventory from the pinned PGlite source and records it in the native link
-  manifest. It currently shows the PGlite `other_extensions` as required
-  submodules with explicit present/missing status.
+  manifest. It now records each PGlite `other_extensions` entry's source path,
+  present/missing status, gitlink commit, submodule URL, and branch metadata
+  where the pinned source declares it.
 - The current local pinned source has unpopulated `pglite/other_extensions`
-  submodules. Full parity requires fetching or vendoring those exact submodule
-  commits before native extension builds can be made release-gating.
+  submodules, but the pinned gitlinks are now visible in the inventory:
+  `age`, `pg_hashids`, `pg_ivm`, `pg_textsearch`, `pg_uuidv7`, `pgtap`,
+  `postgis`, and `vector` each carry exact commits and URLs. Full parity
+  requires fetching or vendoring those exact commits before native extension
+  builds can be made release-gating.
 - The package doctor now validates inventoried PostgreSQL `contrib` extensions
   beyond control-file presence: it checks each extension's `default_version`
   SQL and verifies native `$libdir`/`MODULE_PATHNAME` modules are present in the
   packaged Postgres prefix.
 - Missing PGlite `other_extensions` submodules are warnings for development
-  packages and production-package failures. This keeps the current macOS bring-up
-  usable while preventing a production artifact from silently claiming full
-  PGlite extension parity without `vector`, PostGIS, and the rest of the pinned
-  PGlite extension set.
+  packages and production-package failures. Missing submodule commits or URLs
+  are package errors in all modes because they mean the native inventory cannot
+  identify the exact parity target. This keeps the current macOS bring-up usable
+  while preventing a production artifact from silently claiming full PGlite
+  extension parity without `vector`, PostGIS, and the rest of the pinned PGlite
+  extension set.
 - The native prepare step now builds extension-bearing PostgreSQL `contrib`
   source directories individually and validates installed control files.
   Standalone contrib modules and utility programs remain inventoried, but are

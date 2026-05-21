@@ -537,15 +537,43 @@ class Doctor:
             key, fields = parse_inventory_line(line)
             if key == "contrib_extension":
                 self.validate_contrib_extension(fields["name"])
-            elif key == "other_extension" and fields.get("status") == "missing":
-                message = (
-                    "PGlite other extension submodule is missing from the native "
-                    f"extension inventory: {fields['name']}"
-                )
-                if self.bundle.get("releaseMode") == "production":
-                    self.errors.append(message)
-                else:
-                    self.warnings.append(message)
+            elif key == "other_extension":
+                self.validate_other_extension_inventory(fields)
+
+    def validate_other_extension_inventory(self, fields: dict[str, str]) -> None:
+        extension = fields["name"]
+        source = fields.get("source")
+        if source != f"pglite/other_extensions/{extension}":
+            self.errors.append(
+                f"PGlite other extension has wrong source path: {extension}"
+            )
+
+        commit = fields.get("submodule_commit")
+        if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+            self.errors.append(
+                f"PGlite other extension is missing pinned submodule commit: {extension}"
+            )
+
+        url = fields.get("submodule_url")
+        if not isinstance(url, str) or not url.startswith("https://"):
+            self.errors.append(
+                f"PGlite other extension is missing submodule URL: {extension}"
+            )
+
+        status = fields.get("status")
+        if status not in {"present", "missing"}:
+            self.errors.append(
+                f"PGlite other extension has invalid status: {extension}"
+            )
+        elif status == "missing":
+            message = (
+                "PGlite other extension submodule is missing from the native "
+                f"extension inventory: {extension}"
+            )
+            if self.bundle.get("releaseMode") == "production":
+                self.errors.append(message)
+            else:
+                self.warnings.append(message)
 
     def validate_contrib_extension(self, extension: str) -> None:
         extension_dir = self.root / "postgres" / "share" / "extension"

@@ -52,6 +52,9 @@ actual plugin and prefix contents.
    per runtime mode so crashes or lifecycle failures are attributable.
 7. Add a `libpglite doctor`-style command or script that validates a packaged
    plugin directory without rebuilding it.
+8. Treat unknown extension provenance as a diagnostic failure: every PGlite
+   `other_extensions` entry must carry a source path, pinned submodule commit,
+   source URL, and present/missing status.
 
 ## Acceptance Criteria
 
@@ -61,10 +64,14 @@ actual plugin and prefix contents.
   status from files in the package.
 - Production packaging fails if diagnostic manifests are absent, stale, or
   contradicted by the actual artifact.
+- Production packaging fails if the extension inventory cannot identify the
+  exact PGlite extension source commits it is supposed to build.
 - Raw protocol and high-level client checks are recorded separately so the
   current single-start lifecycle cannot hide which runtime mode failed.
 - Linux diagnostics use the same schema as macOS diagnostics, even if the
   platform-specific dependency tools differ.
+- This ADR moves to `docs/done/` only after the package doctor owns all
+  release-critical manifest checks that preflight depends on.
 
 ## Implementation Notes
 
@@ -111,7 +118,9 @@ actual plugin and prefix contents.
 - The doctor now cross-checks inventoried `contrib` extensions against packaged
   control files, default-version SQL, and referenced native modules. It also
   makes missing PGlite `other_extensions` production-fatal while keeping them
-  visible as development warnings.
+  visible as development warnings. The inventory now records each
+  `other_extensions` gitlink commit and submodule URL, and the doctor fails any
+  package whose PGlite extension provenance is unknown.
 - The package now includes a structured runtime lifecycle diagnostic. The doctor
   validates that it matches the current single-start-per-process contract and
   cites raw protocol conformance as evidence.

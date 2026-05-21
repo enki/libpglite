@@ -158,6 +158,7 @@ fi
 
 echo "==> preflight ${release_version}: doctor regression tests"
 python3 scripts/test-doctor-native-plugin-package.py
+python3 scripts/test-inventory-native-pglite-extensions.py
 
 echo "==> preflight ${release_version}: dynamic-loading check"
 cargo check --features dynamic-loading,client-tokio-postgres

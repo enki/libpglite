@@ -18,3 +18,37 @@ Done records:
 
 - `done/ADR-0001-RUST-FACADE-AND-DYNAMIC-PLUGIN.md`
 - `done/ADR-0003-POSTGRES-CLIENT-TRANSPORT.md`
+
+## Closing Rules
+
+An ADR moves to `docs/done/` only when its acceptance criteria are enforced by
+repo commands, not just described in text. The minimum evidence is:
+
+- implementation exists in the release path, not only in a local fixture
+- a focused regression test covers the behavior or failure mode
+- native preflight runs that test or an equivalent package-level doctor check
+- packaged diagnostics carry enough data to debug stale or partial artifacts
+- production packaging fails when the ADR's release contract is not satisfied
+
+Current closure frontier:
+
+- ADR-0002: still needs Linux native link/conformance and broader protocol
+  coverage before the native build lane is complete.
+- ADR-0004: still needs every root ADR closed before production packages can
+  claim runtime-ready status.
+- ADR-0005: still needs Linux `pglitec.c` PIC proof and an upstream/carry
+  decision for the native portability patches.
+- ADR-0006: still needs Linux baseline automation through the Ubuntu
+  environment in `../smolvm/` or an equivalent release container.
+- ADR-0007: still needs final relocatable prefix closure after extension parity
+  expands the prefix beyond current contrib coverage.
+- ADR-0008: still needs populated and built `pglite/other_extensions`, full
+  `CREATE EXTENSION` conformance, and third-party data packaging.
+- ADR-0009: still needs a pinned native dependency prefix instead of repaired
+  local-provider libraries.
+- ADR-0010: still needs stale-symbol checks against the full extension parity
+  set and Linux export/version-script coverage.
+- ADR-0011: still needs either deterministic restart support or a deliberate
+  decision that the production contract is single-start-per-process.
+- ADR-0012: still needs structured diagnostic coverage for the remaining
+  extension/dependency/platform gates before it can close.
