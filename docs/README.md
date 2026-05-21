@@ -80,7 +80,8 @@ Current closure frontier:
   packaged parity set, including common data symbols, and proves the modules
   load through the globally loaded plugin. Linux now uses a Rust staticlib plus
   one final GNU ld version-script boundary and filters the expected version node
-  from symbol diagnostics. The Ubuntu lane now reaches the package doctor after
+  from symbol diagnostics, with focused preflight-wired regressions protecting
+  the final-link boundary. The Ubuntu lane now reaches the package doctor after
   raw-protocol extension conformance; `pg_ivm` exposed the need to export
   read-only backend data symbols such as `InvalidObjectAddress`, so the scanner
   now includes `R` symbols. The Ubuntu packaged-runtime proof now passes; this

@@ -79,9 +79,6 @@ set changes.
 - Linux symbol-boundary checks tolerate only the GNU version node plus the
   stable host ABI and generated backend-symbol set; they must not accept
   accidental exports from Rust, PostgreSQL, or dependency archives.
-- A focused regression proves the Linux final-link script remains the only
-  export boundary and cannot silently fall back to Cargo's `cdylib` version
-  script.
 
 ## Implementation Notes
 
@@ -161,6 +158,12 @@ set changes.
   archive-sourced ABI symbols even when the version script listed them, so the
   final link relies on the version script's `local: *` rule as the export
   boundary.
+- `scripts/test-link-linux-native-plugin.py` pins that final-link script as the
+  only GNU ld export boundary, and
+  `scripts/test-preflight-native-plugin-release.py` pins Linux preflight to
+  build the Rust plugin as a `staticlib` before calling the final-link script.
+  The ADR audit now fails if either focused regression falls out of native
+  release preflight.
 - Linux symbol scanners now filter the GNU version-node symbol
   `LIBPGLITE_PLUGIN_NATIVE_1` before comparing exported symbols. The version
   node is expected metadata from the single final version script, not an
