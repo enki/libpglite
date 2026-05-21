@@ -334,7 +334,12 @@ class Doctor:
             self.errors.append(f"conformance diagnostics directory is missing: {value}")
             return
 
-        for name in ["raw-protocol", "tokio-postgres-client"]:
+        for name in [
+            "raw-protocol",
+            "tokio-postgres-client",
+            "prefix-initialize",
+            "prefix-resume",
+        ]:
             result_path = conformance_dir / f"{name}.json"
             log_path = conformance_dir / f"{name}.log"
             if not result_path.is_file():

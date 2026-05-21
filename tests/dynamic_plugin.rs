@@ -186,6 +186,74 @@ fn dynamic_plugin_tokio_postgres_client_child() {
     });
 }
 
+#[test]
+fn dynamic_plugin_prefix_initialize_child() {
+    if std::env::var_os("LIBPGLITE_RUN_PREFIX_INITIALIZE_CHILD").is_none() {
+        return;
+    }
+
+    let _guard = test_guard();
+    let Some(data_dir) = std::env::var_os("LIBPGLITE_TEST_DATA_DIR") else {
+        panic!("LIBPGLITE_TEST_DATA_DIR is required");
+    };
+    let data_dir = std::path::PathBuf::from(data_dir);
+    assert!(
+        !data_dir.join("PG_VERSION").exists(),
+        "prefix initialize check must start with a missing cluster"
+    );
+    let Some(mut runtime) = load_native_runtime_with_data_dir(
+        "dynamic-plugin-prefix-initialize-test",
+        data_dir.clone(),
+    ) else {
+        return;
+    };
+
+    startup(&mut runtime);
+    let response = runtime
+        .exec_protocol_raw(&query_message(
+            "create table prefix_resume_marker(value int); insert into prefix_resume_marker values (17)",
+        ))
+        .expect("prefix initialize write succeeds");
+    assert_no_error_message(&response);
+    assert_message_type(&response, b'C');
+    runtime.shutdown().expect("runtime shuts down");
+    assert!(
+        data_dir.join("PG_VERSION").is_file(),
+        "runtime should initialize missing data directory"
+    );
+}
+
+#[test]
+fn dynamic_plugin_prefix_resume_child() {
+    if std::env::var_os("LIBPGLITE_RUN_PREFIX_RESUME_CHILD").is_none() {
+        return;
+    }
+
+    let _guard = test_guard();
+    let Some(data_dir) = std::env::var_os("LIBPGLITE_TEST_DATA_DIR") else {
+        panic!("LIBPGLITE_TEST_DATA_DIR is required");
+    };
+    let data_dir = std::path::PathBuf::from(data_dir);
+    assert!(
+        data_dir.join("PG_VERSION").is_file(),
+        "prefix resume check requires an initialized cluster"
+    );
+    let Some(mut runtime) =
+        load_native_runtime_with_data_dir("dynamic-plugin-prefix-resume-test", data_dir)
+    else {
+        return;
+    };
+
+    startup(&mut runtime);
+    let response = runtime
+        .exec_protocol_raw(&query_message("select value from prefix_resume_marker"))
+        .expect("prefix resume read succeeds");
+    assert_no_error_message(&response);
+    assert_message_type(&response, b'D');
+    assert_message_type(&response, b'Z');
+    runtime.shutdown().expect("runtime shuts down");
+}
+
 fn load_native_runtime(name: &str) -> Option<DynamicPgliteRuntime> {
     Some(load_native_runtime_result(name)?.expect("runtime opens"))
 }
@@ -198,11 +266,41 @@ fn load_native_runtime_result(
     let postgres_prefix = std::env::var_os("LIBPGLITE_TEST_POSTGRES_PREFIX")?;
 
     let tempdir = tempfile::tempdir().expect("tempdir");
-    let config = PgliteConfig::new(name, tempdir.keep().join("pgdata")).with_environment([(
+    Some(load_native_runtime_result_with_data_dir(
+        name,
+        tempdir.keep().join("pgdata"),
+        plugin_path,
+        postgres_prefix,
+    ))
+}
+
+fn load_native_runtime_with_data_dir(
+    name: &str,
+    data_dir: std::path::PathBuf,
+) -> Option<DynamicPgliteRuntime> {
+    Some(
+        load_native_runtime_result_with_data_dir(
+            name,
+            data_dir,
+            std::fs::canonicalize(std::env::var_os("LIBPGLITE_TEST_PLUGIN_PATH")?)
+                .expect("plugin path is absolute"),
+            std::env::var_os("LIBPGLITE_TEST_POSTGRES_PREFIX")?,
+        )
+        .expect("runtime opens"),
+    )
+}
+
+fn load_native_runtime_result_with_data_dir(
+    name: &str,
+    data_dir: std::path::PathBuf,
+    plugin_path: std::path::PathBuf,
+    postgres_prefix: std::ffi::OsString,
+) -> Result<DynamicPgliteRuntime, libpglite::PgliteError> {
+    let config = PgliteConfig::new(name, data_dir).with_environment([(
         "LIBPGLITE_POSTGRES_PREFIX",
         postgres_prefix.to_string_lossy().as_ref(),
     )]);
-    Some(DynamicPgliteRuntime::load(plugin_path, config))
+    DynamicPgliteRuntime::load(plugin_path, config)
 }
 
 fn startup(runtime: &mut DynamicPgliteRuntime) {

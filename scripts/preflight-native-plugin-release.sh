@@ -161,7 +161,8 @@ if [[ -z "$initdb_binary" || ! -x "$initdb_binary" ]]; then
   exit 1
 fi
 initdb_tempdir="$(mktemp -d)"
-trap 'rm -rf "$initdb_tempdir" "$conformance_dir"' EXIT
+resume_tempdir="$(mktemp -d)"
+trap 'rm -rf "$initdb_tempdir" "$resume_tempdir" "$conformance_dir"' EXIT
 echo "==> preflight ${release_version}: native initdb prefix smoke test"
 DYLD_LIBRARY_PATH="$postgres_lib_dir${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}" \
 LD_LIBRARY_PATH="$postgres_lib_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
@@ -249,6 +250,24 @@ run_conformance_check tokio-postgres-client \
     LIBPGLITE_TEST_POSTGRES_PREFIX="$postgres_prefix" \
     cargo test --features dynamic-loading,client-tokio-postgres --test dynamic_plugin \
       dynamic_plugin_tokio_postgres_client_child -- --nocapture
+
+run_conformance_check prefix-initialize \
+  env \
+    LIBPGLITE_RUN_PREFIX_INITIALIZE_CHILD=1 \
+    LIBPGLITE_TEST_PLUGIN_PATH="$plugin_binary" \
+    LIBPGLITE_TEST_POSTGRES_PREFIX="$postgres_prefix" \
+    LIBPGLITE_TEST_DATA_DIR="$resume_tempdir/pgdata" \
+    cargo test --features dynamic-loading --test dynamic_plugin \
+      dynamic_plugin_prefix_initialize_child -- --nocapture
+
+run_conformance_check prefix-resume \
+  env \
+    LIBPGLITE_RUN_PREFIX_RESUME_CHILD=1 \
+    LIBPGLITE_TEST_PLUGIN_PATH="$plugin_binary" \
+    LIBPGLITE_TEST_POSTGRES_PREFIX="$postgres_prefix" \
+    LIBPGLITE_TEST_DATA_DIR="$resume_tempdir/pgdata" \
+    cargo test --features dynamic-loading --test dynamic_plugin \
+      dynamic_plugin_prefix_resume_child -- --nocapture
 
 out_dir="${LIBPGLITE_RELEASE_OUT_DIR:-"$repo_root/dist/preflight-native-plugin"}"
 rm -rf "$out_dir"

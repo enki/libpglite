@@ -92,7 +92,9 @@ actual plugin and prefix contents.
   `diagnostics/conformance/`. The initial result set records `raw-protocol` and
   `tokio-postgres-client` as separate JSON files with logs, preserving the
   process-level attribution required by the current single-start lifecycle
-  contract.
+  contract. It also records `prefix-initialize` and `prefix-resume` results to
+  prove the packaged Postgres prefix can initialize a missing data directory and
+  later reopen the initialized cluster from a fresh process.
 - Conformance result JSON records a SHA-256 checksum of its log, and the package
   doctor verifies the checksum. This prevents stale or mismatched logs from
   satisfying a release diagnostic gate.

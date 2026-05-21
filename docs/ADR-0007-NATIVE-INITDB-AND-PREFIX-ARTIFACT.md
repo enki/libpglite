@@ -54,3 +54,8 @@ the plugin or provide an equivalent generated artifact.
 - `scripts/package-native-plugin-release.sh` requires that manifest and packages
   the prefix under `postgres/` beside the native plugin. The bundle metadata
   records the relative prefix paths.
+- Native preflight now records separate `prefix-initialize` and `prefix-resume`
+  conformance results. The checks run in separate processes against the same
+  temporary data directory: the first proves the runtime can initialize a
+  missing cluster using the produced prefix, and the second proves a later
+  process can open the initialized cluster and read persisted data.
