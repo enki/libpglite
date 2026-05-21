@@ -117,8 +117,9 @@ Current closure frontier:
   same dependency schema, the platform baseline diagnostic has joined the
   package doctor gate, production packaging and doctor validation both require
   a dependency-prefix diagnostic, malformed structured JSON diagnostics have
-  focused doctor regressions, build provenance now names every release-critical
-  packaged diagnostic, raw-protocol diagnostics must name their covered protocol
-  cases, patch-apply reproducibility is now a prepare-time gate rather than
-  only a checksum claim, and the ADR audit now fails if any focused
+  focused doctor regressions, malformed extension-inventory lines now produce
+  package errors, build provenance now names every release-critical packaged
+  diagnostic, raw-protocol diagnostics must name their covered protocol cases,
+  patch-apply reproducibility is now a prepare-time gate rather than only a
+  checksum claim, and the ADR audit now fails if any focused
   `scripts/test-*.py` regression is not wired into native release preflight.

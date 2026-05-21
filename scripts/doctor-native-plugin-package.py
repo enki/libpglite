@@ -768,11 +768,25 @@ class Doctor:
         if inventory is None:
             return
         for line in nonempty_lines(inventory, self.errors):
+            if "=" not in line:
+                self.errors.append(f"extension inventory line is malformed: {line}")
+                continue
             key, fields = parse_inventory_line(line)
+            if key == "format":
+                continue
             if key == "contrib_extension":
-                self.validate_contrib_extension(fields["name"])
+                extension = fields.get("name")
+                if not extension:
+                    self.errors.append("extension inventory contrib_extension is missing name")
+                    continue
+                self.validate_contrib_extension(extension)
             elif key == "other_extension":
+                if not fields.get("name"):
+                    self.errors.append("extension inventory other_extension is missing name")
+                    continue
                 self.validate_other_extension_inventory(fields)
+            else:
+                self.errors.append(f"extension inventory has unknown entry: {key}")
 
     def validate_other_extension_inventory(self, fields: dict[str, str]) -> None:
         extension = fields["name"]

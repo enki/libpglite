@@ -272,6 +272,10 @@ actual plugin and prefix contents.
   provenance, dependency prefix, runtime lifecycle, and conformance result
   files. This keeps malformed release diagnostics from being treated as missing
   optional data or plausible text.
+- The package doctor now also treats malformed extension-inventory lines,
+  unnamed inventoried extensions, and unknown inventory entry types as
+  diagnostic errors instead of allowing malformed text to crash or be silently
+  ignored.
 - Packaging now writes `diagnostics/platform-baseline.json` and the doctor
   validates it as a package claim. The diagnostic must match the bundle target.
   Linux packages must record the Ubuntu `24.04` baseline, matching

@@ -774,6 +774,27 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         self.assertIn("missing pinned submodule commit: vector", errors)
         self.assertIn("missing submodule URL: vector", errors)
 
+    def test_malformed_extension_inventory_lines_are_diagnostics(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+            extension_inventory_text=(
+                "format=libpglite-native-extension-inventory-v1\n"
+                "other_extension\n"
+                "other_extension=;status=present\n"
+                "unexpected_extension=vector\n"
+            ),
+        )
+        with tempdir:
+            doctor.validate_extensions()
+
+        errors = "\n".join(doctor.errors)
+        self.assertIn("extension inventory line is malformed: other_extension", errors)
+        self.assertIn("extension inventory other_extension is missing name", errors)
+        self.assertIn("extension inventory has unknown entry: unexpected_extension", errors)
+
     def test_missing_other_extension_is_warning_only_for_development(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS,
