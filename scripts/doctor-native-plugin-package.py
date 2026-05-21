@@ -267,12 +267,58 @@ class Doctor:
         if inventory is None:
             return
         for line in nonempty_lines(inventory, self.errors):
-            if not line.startswith("contrib_extension="):
-                continue
-            extension = line.split("=", 1)[1].split(";", 1)[0]
-            control = self.root / "postgres" / "share" / "extension" / f"{extension}.control"
-            if not control.is_file():
-                self.errors.append(f"inventoried extension is missing control file: {extension}")
+            key, fields = parse_inventory_line(line)
+            if key == "contrib_extension":
+                self.validate_contrib_extension(fields["name"])
+            elif key == "other_extension" and fields.get("status") == "missing":
+                message = (
+                    "PGlite other extension submodule is missing from the native "
+                    f"extension inventory: {fields['name']}"
+                )
+                if self.bundle.get("releaseMode") == "production":
+                    self.errors.append(message)
+                else:
+                    self.warnings.append(message)
+
+    def validate_contrib_extension(self, extension: str) -> None:
+        extension_dir = self.root / "postgres" / "share" / "extension"
+        lib_dir = self.root / "postgres" / "lib"
+        control = extension_dir / f"{extension}.control"
+        if not control.is_file():
+            self.errors.append(f"inventoried extension is missing control file: {extension}")
+            return
+
+        control_text = read_text(control, self.errors)
+        default_version = control_value(control_text, "default_version")
+
+        sql_files = sorted(extension_dir.glob(f"{extension}--*.sql"))
+        if not sql_files:
+            self.errors.append(f"extension has no SQL files: {extension}")
+        elif default_version is None:
+            self.errors.append(f"extension control is missing default_version: {extension}")
+        elif not extension_can_install_version(extension, sql_files, default_version):
+            self.errors.append(
+                f"extension has no SQL install path to default_version {default_version}: {extension}"
+            )
+
+        module_names = set()
+        module_pathname = control_value(control_text, "module_pathname")
+        if module_pathname is not None:
+            module_names.add(module_pathname.removeprefix("$libdir/"))
+        sql_texts = [read_text(path, self.errors) for path in sql_files]
+        for sql_text in sql_texts:
+            module_names.update(
+                match.removeprefix("$libdir/")
+                for match in re.findall(r"\$libdir/[A-Za-z0-9_.+-]+", sql_text)
+            )
+        if not module_names and any("MODULE_PATHNAME" in text for text in sql_texts):
+            module_names.add(extension)
+
+        for module_name in sorted(module_names):
+            if not native_module_exists(lib_dir, module_name):
+                self.errors.append(
+                    f"extension {extension} references missing native module: {module_name}"
+                )
 
     def validate_dependencies(self) -> None:
         dependencies = self.diagnostic_path("dependencies")
@@ -409,6 +455,70 @@ def read_text(path: pathlib.Path, errors: list[str]) -> str:
 
 def nonempty_lines(path: pathlib.Path, errors: list[str]) -> list[str]:
     return [line.strip() for line in read_text(path, errors).splitlines() if line.strip()]
+
+
+def parse_inventory_line(line: str) -> tuple[str, dict[str, str]]:
+    key, raw_value = line.split("=", 1)
+    parts = raw_value.split(";")
+    fields = {"name": parts[0]}
+    for part in parts[1:]:
+        if "=" not in part:
+            continue
+        field, value = part.split("=", 1)
+        fields[field] = value
+    return key, fields
+
+
+def control_value(control_text: str, key: str) -> str | None:
+    for line in control_text.splitlines():
+        match = re.match(rf"^\s*{re.escape(key)}\s*=\s*'([^']+)'\s*$", line)
+        if match:
+            return match.group(1)
+    return None
+
+
+def native_module_exists(lib_dir: pathlib.Path, module_name: str) -> bool:
+    module = pathlib.PurePosixPath(module_name).name
+    candidates = [
+        lib_dir / module,
+        lib_dir / f"{module}.dylib",
+        lib_dir / f"{module}.so",
+    ]
+    return any(candidate.is_file() for candidate in candidates)
+
+
+def extension_can_install_version(
+    extension: str, sql_files: list[pathlib.Path], version: str
+) -> bool:
+    base_versions: set[str] = set()
+    upgrade_edges: dict[str, set[str]] = {}
+    pattern = re.compile(
+        rf"^{re.escape(extension)}--(.+?)(?:--(.+?))?\.sql$"
+    )
+    for sql_file in sql_files:
+        match = pattern.match(sql_file.name)
+        if match is None:
+            continue
+        source_version, target_version = match.groups()
+        if target_version is None:
+            base_versions.add(source_version)
+        else:
+            upgrade_edges.setdefault(source_version, set()).add(target_version)
+
+    if version in base_versions:
+        return True
+
+    seen = set(base_versions)
+    pending = list(base_versions)
+    while pending:
+        current = pending.pop()
+        for next_version in upgrade_edges.get(current, set()):
+            if next_version == version:
+                return True
+            if next_version not in seen:
+                seen.add(next_version)
+                pending.append(next_version)
+    return False
 
 
 def looks_like_build_path(line: str) -> bool:

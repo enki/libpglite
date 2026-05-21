@@ -119,6 +119,15 @@ PGlite-shipped extension.
 - The current local pinned source has unpopulated `pglite/other_extensions`
   submodules. Full parity requires fetching or vendoring those exact submodule
   commits before native extension builds can be made release-gating.
+- The package doctor now validates inventoried PostgreSQL `contrib` extensions
+  beyond control-file presence: it checks each extension's `default_version`
+  SQL and verifies native `$libdir`/`MODULE_PATHNAME` modules are present in the
+  packaged Postgres prefix.
+- Missing PGlite `other_extensions` submodules are warnings for development
+  packages and production-package failures. This keeps the current macOS bring-up
+  usable while preventing a production artifact from silently claiming full
+  PGlite extension parity without `vector`, PostGIS, and the rest of the pinned
+  PGlite extension set.
 - The native prepare step now builds extension-bearing PostgreSQL `contrib`
   source directories individually and validates installed control files.
   Standalone contrib modules and utility programs remain inventoried, but are

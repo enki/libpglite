@@ -101,6 +101,10 @@ actual plugin and prefix contents.
   native raw protocol/contrib smoke against the packaged plugin and packaged
   Postgres prefix. This keeps final-artifact runtime validation in the artifact
   doctor instead of duplicating one-off extraction logic in preflight.
+- The doctor now cross-checks inventoried `contrib` extensions against packaged
+  control files, default-version SQL, and referenced native modules. It also
+  makes missing PGlite `other_extensions` production-fatal while keeping them
+  visible as development warnings.
 - This ADR remains open until diagnostics are generated as structured release
   data across all required gates and production packaging rejects stale
   diagnostics.
