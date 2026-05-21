@@ -60,9 +60,6 @@ libraries or runtime data.
 
 ## Remaining Closure Criteria
 
-- The Linux controlled-prefix contract is documented as release policy: Ubuntu
-  `24.04` is the current baseline, package-local RUNPATH repair is required,
-  and `patchelf` is a release preflight prerequisite for that lane.
 - Linux packaged-artifact conformance continues to prove `pgcrypto` and PostGIS
   work with controlled OpenSSL, GEOS, PROJ, json-c, SQLite, related dependency
   inputs, and projection data from the final package.
@@ -211,7 +208,14 @@ libraries or runtime data.
   entrypoint, and prefix descriptor define the contract, and the normal macOS
   and Ubuntu preflights now prove the full extension surface from the packaged
   artifact. The remaining closure work is keeping that strictness under
-  regression and writing the Linux contract down as release policy.
+  regression.
+- `docs/LINUX-RELEASE-POLICY.md` records the Linux controlled-prefix release
+  contract: Ubuntu `24.04` is the current baseline, `patchelf` is required for
+  release preflight, the plugin and PostgreSQL modules must use package-local
+  RUNPATHs, and strict diagnostics reject host-provider, build-machine,
+  absolute-external, missing, or unknown dependency classifications.
+  `scripts/test-preflight-linux-smolvm.py` pins the policy to the local Ubuntu
+  preflight lane so the policy cannot drift away from the executable path.
 - PGlite's WASM build extracts export-symbol lists from dependency archives for
   Emscripten. Native builds do not need the same files verbatim, but they do
   need equivalent link/export discipline for extension module loading.

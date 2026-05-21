@@ -4,16 +4,33 @@ import unittest
 
 
 SCRIPT = pathlib.Path(__file__).with_name("preflight-linux-smolvm.sh")
+POLICY = pathlib.Path(__file__).parents[1] / "docs" / "LINUX-RELEASE-POLICY.md"
 
 
 class PreflightLinuxSmolvmTests(unittest.TestCase):
     def test_uses_documented_ubuntu_baseline_and_repo_mount(self):
         text = SCRIPT.read_text()
+        policy = POLICY.read_text()
         self.assertIn('image="${LIBPGLITE_LINUX_BASELINE_IMAGE:-ubuntu:24.04}"', text)
+        self.assertIn("Ubuntu `24.04`", policy)
+        self.assertIn("`../smolvm/`", policy)
         self.assertIn('--volume "$repo_root:/mnt/libpglite"', text)
         self.assertIn("cd /mnt/libpglite", text)
         self.assertIn("LIBPGLITE_SMOLVM_LIB_DIR", text)
         self.assertIn("DYLD_LIBRARY_PATH=$smolvm_lib_dir", text)
+
+    def test_linux_release_policy_documents_dependency_contract(self):
+        text = SCRIPT.read_text()
+        policy = POLICY.read_text()
+        self.assertIn("patchelf", text)
+        self.assertIn("Release preflight for Linux requires `patchelf`", policy)
+        self.assertIn("$ORIGIN/postgres/lib", policy)
+        self.assertIn("$ORIGIN", policy)
+        self.assertIn("host-provider", policy)
+        self.assertIn("build-machine", policy)
+        self.assertIn("absolute-external", policy)
+        self.assertIn("missing", policy)
+        self.assertIn("unknown", policy)
 
     def test_mounts_postgres_source_and_marks_git_safe(self):
         text = SCRIPT.read_text()

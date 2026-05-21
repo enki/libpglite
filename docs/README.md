@@ -19,6 +19,10 @@ Done records:
 - `done/ADR-0003-POSTGRES-CLIENT-TRANSPORT.md`
 - `done/ADR-0011-NATIVE-RUNTIME-LIFECYCLE.md`
 
+Policy records:
+
+- `LINUX-RELEASE-POLICY.md`
+
 ## Closing Rules
 
 An ADR moves to `docs/done/` only when its acceptance criteria are enforced by
@@ -75,8 +79,9 @@ Current closure frontier:
 - ADR-0009: macOS packaged `pgcrypto` and PostGIS now work from the controlled
   dependency prefix under strict package diagnostics. The Ubuntu lane now
   applies package-local RUNPATH repair with `patchelf` and passes strict package
-  diagnostics. Remaining closure is documenting the Linux prefix contract as
-  release policy and keeping strict dependency-regression coverage in place.
+  diagnostics. The Linux controlled-prefix release policy is now documented and
+  pinned to the local Ubuntu preflight test. Remaining closure is keeping strict
+  dependency-regression coverage in place across package layouts.
 - ADR-0010: macOS release preflight now generates backend exports from the full
   packaged parity set, including common data symbols, and proves the modules
   load through the globally loaded plugin. Linux now uses a Rust staticlib plus
