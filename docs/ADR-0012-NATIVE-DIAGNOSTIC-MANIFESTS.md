@@ -263,6 +263,11 @@ actual plugin and prefix contents.
   patched source can live under this repository's `target/`, prepare sets a Git
   ceiling directory while applying patches so `git apply` operates on the
   archived source tree rather than silently walking up to this repository.
+- The ADR closure audit now also verifies that every focused
+  `scripts/test-*.py` regression is wired into native release preflight. Python
+  unittest discovery does not load these hyphenated filenames by default, so the
+  audit makes the explicit preflight list a checked contract rather than a
+  fragile convention.
 - This ADR remains open until diagnostics are generated as structured release
   data across all required gates and production packaging rejects stale
   diagnostics.

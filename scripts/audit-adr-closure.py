@@ -7,6 +7,7 @@ import sys
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 DOCS = REPO_ROOT / "docs"
 README = DOCS / "README.md"
+PREFLIGHT = REPO_ROOT / "scripts" / "preflight-native-plugin-release.sh"
 
 
 def status(path: pathlib.Path) -> str | None:
@@ -25,6 +26,7 @@ def has_section(text: str, heading: str) -> bool:
 def main() -> int:
     errors: list[str] = []
     readme = README.read_text()
+    preflight = PREFLIGHT.read_text()
 
     open_adrs = sorted(DOCS.glob("ADR-*.md"))
     done_adrs = sorted((DOCS / "done").glob("ADR-*.md"))
@@ -52,6 +54,11 @@ def main() -> int:
             errors.append(f"{rel} must have Status: Done while it is in docs/done/")
         if not listed(readme, rel):
             errors.append(f"{rel} is not listed in docs/README.md done records")
+
+    for path in sorted((REPO_ROOT / "scripts").glob("test-*.py")):
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        if f"python3 {rel}" not in preflight:
+            errors.append(f"{rel} is not wired into scripts/preflight-native-plugin-release.sh")
 
     if errors:
         for error in errors:
