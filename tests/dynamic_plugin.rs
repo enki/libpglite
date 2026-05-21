@@ -66,9 +66,27 @@ fn dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_
     assert_message_type(&pgcrypto_response, b'Z');
 
     runtime.shutdown().expect("runtime shuts down");
+    drop(runtime);
+
+    let Some(restart_error) = load_native_runtime_result("dynamic-plugin-restart-test")
+        .map(|result| result.expect_err("second native runtime open fails actionably"))
+    else {
+        return;
+    };
+    let restart_message = restart_error.to_string();
+    assert!(
+        restart_message.contains("only one backend startup per process"),
+        "{restart_message}"
+    );
 }
 
 fn load_native_runtime(name: &str) -> Option<DynamicPgliteRuntime> {
+    Some(load_native_runtime_result(name)?.expect("runtime opens"))
+}
+
+fn load_native_runtime_result(
+    name: &str,
+) -> Option<Result<DynamicPgliteRuntime, libpglite::PgliteError>> {
     let plugin_path = std::env::var_os("LIBPGLITE_TEST_PLUGIN_PATH")?;
     let plugin_path = std::fs::canonicalize(plugin_path).expect("plugin path is absolute");
     let postgres_prefix = std::env::var_os("LIBPGLITE_TEST_POSTGRES_PREFIX")?;
@@ -78,7 +96,7 @@ fn load_native_runtime(name: &str) -> Option<DynamicPgliteRuntime> {
         "LIBPGLITE_POSTGRES_PREFIX",
         postgres_prefix.to_string_lossy().as_ref(),
     )]);
-    Some(DynamicPgliteRuntime::load(plugin_path, config).expect("runtime opens"))
+    Some(DynamicPgliteRuntime::load(plugin_path, config))
 }
 
 fn startup(runtime: &mut DynamicPgliteRuntime) {

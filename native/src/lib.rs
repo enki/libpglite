@@ -20,7 +20,7 @@ use std::process::Command;
 #[cfg(libpglite_native_link_pglite)]
 use std::ptr;
 #[cfg(libpglite_native_link_pglite)]
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 
 use libpglite::{PgliteConfig, PgliteError, PgliteResult, PgliteRuntime};
 
@@ -114,6 +114,8 @@ impl NativeTransport {
 
 #[cfg(libpglite_native_link_pglite)]
 static ACTIVE_TRANSPORT: AtomicPtr<NativeTransport> = AtomicPtr::new(ptr::null_mut());
+#[cfg(libpglite_native_link_pglite)]
+static NATIVE_BACKEND_START_ATTEMPTED: AtomicBool = AtomicBool::new(false);
 
 impl PgliteRuntime for NativePgliteRuntime {
     fn open(config: PgliteConfig) -> PgliteResult<Self> {
@@ -123,6 +125,7 @@ impl PgliteRuntime for NativePgliteRuntime {
             std::hint::black_box(ffi::native_link_probe());
             let postgres_prefix = postgres_prefix(&config)?;
             ensure_data_dir(&postgres_prefix, &config.data_dir)?;
+            claim_native_backend_start()?;
 
             let mut runtime = Self {
                 config,
@@ -302,6 +305,19 @@ impl NativePgliteRuntime {
             "pgl_startPGlite",
         )
     }
+}
+
+#[cfg(libpglite_native_link_pglite)]
+fn claim_native_backend_start() -> PgliteResult<()> {
+    NATIVE_BACKEND_START_ATTEMPTED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .map(|_| ())
+        .map_err(|_| {
+            PgliteError::initialize(
+                "native PGlite currently supports only one backend startup per process; \
+                 restart is blocked until ADR-0011 defines a verified PostgreSQL global-state reset path",
+            )
+        })
 }
 
 #[cfg(libpglite_native_link_pglite)]

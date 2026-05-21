@@ -35,6 +35,10 @@ The preferred target is deterministic restart, because Rust library consumers
 will naturally expect a runtime object to be droppable and creatable again in
 tests, workers, and long-running hosts.
 
+Until that reset path is proven, the implemented native contract is single
+backend startup per process. A second startup attempt must fail before entering
+PostgreSQL with an actionable Rust initialization error.
+
 ## Required Work
 
 1. Inventory PostgreSQL and PGlite process-global state touched by native
@@ -71,3 +75,10 @@ tests, workers, and long-running hosts.
   evidence for sequential lifecycle safety.
 - This ADR blocks moving the runtime-ready release gate to done even though the
   macOS single-runtime extension smoke now passes.
+- The native implementation now records whether a backend startup has been
+  attempted in the process. After the first startup, later opens fail before
+  calling into PostgreSQL. This is an explicit temporary lifecycle contract, not
+  the desired final restart behavior.
+- The dynamic plugin test now verifies that startup, simple query, `citext`,
+  `pgcrypto`, and shutdown all work in one runtime, then verifies that a second
+  open returns an actionable Rust error instead of aborting the process.
