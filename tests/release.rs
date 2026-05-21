@@ -1,6 +1,7 @@
 use libpglite::release::{
     BundledNativePluginResolver, LIBPGLITE_PLUGIN_PATH_ENV, NativePluginResolver,
-    NativePluginSource, RELEASE_TAG, current_native_plugin_asset,
+    NativePluginSource, RELEASE_TAG, current_native_plugin_asset, expected_checksum,
+    verify_file_checksum,
 };
 
 #[test]
@@ -16,6 +17,22 @@ fn current_asset_names_match_release_contract() {
         )
     );
     assert!(asset.archive_url().ends_with(&asset.asset_name));
+    assert_eq!(
+        asset.checksums_asset_name(),
+        format!("libpglite-plugin-native-{}-checksums.txt", RELEASE_TAG)
+    );
+    assert_eq!(
+        asset.notice_asset_name(),
+        format!("libpglite-plugin-native-{}-NOTICE.txt", RELEASE_TAG)
+    );
+    assert_eq!(
+        asset.source_asset_name(),
+        format!("libpglite-plugin-native-{}-SOURCE.txt", RELEASE_TAG)
+    );
+    assert_eq!(
+        asset.licenses_asset_name(),
+        format!("libpglite-plugin-native-{}-licenses.json", RELEASE_TAG)
+    );
     if asset.target.ends_with("apple-darwin") {
         assert_eq!(asset.plugin_filename, "liblibpglite_plugin_native.dylib");
     } else {
@@ -92,4 +109,18 @@ fn resolver_missing_plugin_error_is_actionable() {
     assert!(message.contains(&asset.asset_name), "{message}");
     assert!(message.contains(&asset.archive_url()), "{message}");
     assert!(message.contains(&asset.target), "{message}");
+}
+
+#[test]
+fn checksum_helpers_parse_and_verify_release_format() {
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let asset_path = tempdir.path().join("asset.txt");
+    std::fs::write(&asset_path, b"hello").expect("write asset");
+    let checksums = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824  asset.txt\n";
+
+    assert_eq!(
+        expected_checksum(checksums, "asset.txt").expect("checksum entry"),
+        "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    );
+    verify_file_checksum(checksums, "asset.txt", &asset_path).expect("checksum verifies");
 }

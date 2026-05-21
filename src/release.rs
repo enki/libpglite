@@ -1,6 +1,8 @@
 use std::path::Path;
 use std::path::PathBuf;
 
+use sha2::Digest;
+
 use crate::PgliteError;
 use crate::PgliteResult;
 
@@ -8,6 +10,10 @@ pub const LIBPGLITE_PLUGIN_PATH_ENV: &str = "LIBPGLITE_PLUGIN_PATH";
 pub const LIBPGLITE_HOME_ENV: &str = "LIBPGLITE_HOME";
 pub const RELEASE_REPOSITORY: &str = "enki/libpglite";
 pub const RELEASE_TAG: &str = concat!("v", env!("CARGO_PKG_VERSION"));
+pub const CHECKSUMS_ASSET_SUFFIX: &str = "checksums.txt";
+pub const NOTICE_ASSET_SUFFIX: &str = "NOTICE.txt";
+pub const SOURCE_ASSET_SUFFIX: &str = "SOURCE.txt";
+pub const LICENSES_ASSET_SUFFIX: &str = "licenses.json";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativePluginAsset {
@@ -76,10 +82,39 @@ impl NativePluginAsset {
     }
 
     pub fn archive_url(&self) -> String {
-        format!(
-            "https://github.com/{}/releases/download/{}/{}",
-            self.repository, self.release_tag, self.asset_name
-        )
+        self.release_asset_url(&self.asset_name)
+    }
+
+    pub fn checksums_asset_name(&self) -> String {
+        release_asset_name(CHECKSUMS_ASSET_SUFFIX)
+    }
+
+    pub fn notice_asset_name(&self) -> String {
+        release_asset_name(NOTICE_ASSET_SUFFIX)
+    }
+
+    pub fn source_asset_name(&self) -> String {
+        release_asset_name(SOURCE_ASSET_SUFFIX)
+    }
+
+    pub fn licenses_asset_name(&self) -> String {
+        release_asset_name(LICENSES_ASSET_SUFFIX)
+    }
+
+    pub fn checksums_url(&self) -> String {
+        self.release_asset_url(&self.checksums_asset_name())
+    }
+
+    pub fn notice_url(&self) -> String {
+        self.release_asset_url(&self.notice_asset_name())
+    }
+
+    pub fn source_url(&self) -> String {
+        self.release_asset_url(&self.source_asset_name())
+    }
+
+    pub fn licenses_url(&self) -> String {
+        self.release_asset_url(&self.licenses_asset_name())
     }
 
     pub fn cache_dir(&self, cache_root: impl AsRef<Path>) -> PathBuf {
@@ -92,6 +127,13 @@ impl NativePluginAsset {
 
     pub fn plugin_path_in_dir(&self, dir: impl AsRef<Path>) -> PathBuf {
         dir.as_ref().join(self.plugin_filename)
+    }
+
+    fn release_asset_url(&self, asset_name: &str) -> String {
+        format!(
+            "https://github.com/{}/releases/download/{}/{}",
+            self.repository, self.release_tag, asset_name
+        )
     }
 }
 
@@ -225,6 +267,38 @@ pub fn resolve_native_plugin() -> PgliteResult<ResolvedNativePlugin> {
     NativePluginResolver::from_env().resolve()
 }
 
+pub fn expected_checksum(checksums: &str, asset_name: &str) -> PgliteResult<String> {
+    checksums
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.split_whitespace();
+            let checksum = parts.next()?;
+            let name = parts.next()?;
+            (name == asset_name).then(|| checksum.to_string())
+        })
+        .next()
+        .ok_or_else(|| {
+            PgliteError::initialize(format!("checksum entry for `{asset_name}` was not found"))
+        })
+}
+
+pub fn verify_file_checksum(checksums: &str, asset_name: &str, path: &Path) -> PgliteResult<()> {
+    let expected = expected_checksum(checksums, asset_name)?;
+    let bytes = std::fs::read(path).map_err(|err| {
+        PgliteError::initialize(format!(
+            "failed to read `{}` for checksum verification: {err}",
+            path.display()
+        ))
+    })?;
+    let actual = hex_lower(&sha2::Sha256::digest(bytes));
+    if actual != expected {
+        return Err(PgliteError::initialize(format!(
+            "checksum mismatch for `{asset_name}`: expected {expected}, got {actual}"
+        )));
+    }
+    Ok(())
+}
+
 fn resolve_bundled_plugin_in_dir(
     asset: NativePluginAsset,
     plugin_dir: &Path,
@@ -293,4 +367,18 @@ fn default_cache_root() -> Option<PathBuf> {
     std::env::var_os("HOME")
         .map(PathBuf::from)
         .map(|home| home.join(".cache").join("libpglite"))
+}
+
+fn release_asset_name(suffix: &str) -> String {
+    format!("libpglite-plugin-native-{RELEASE_TAG}-{suffix}")
+}
+
+fn hex_lower(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        out.push(HEX[(byte >> 4) as usize] as char);
+        out.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    out
 }
