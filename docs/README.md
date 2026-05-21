@@ -53,8 +53,9 @@ Current closure frontier:
   packages.
 - ADR-0004: production packaging is now regression-tested to fail while root
   ADRs remain open, and the doctor has focused conformance-diagnostic failure
-  regressions. It still needs every root ADR closed before production packages
-  can claim runtime-ready status.
+  regressions. The package script is also regression-pinned to run the package
+  doctor before writing the distributable binary archive. It still needs every
+  root ADR closed before production packages can claim runtime-ready status.
 - ADR-0005: the backend archive now audits that PostgreSQL socket I/O binds to
   PGlite callback shims instead of libc socket APIs, Linux prepare forces the
   poll/self-pipe latch path for the dummy PGlite socket descriptor, the

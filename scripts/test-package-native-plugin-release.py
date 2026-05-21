@@ -94,6 +94,13 @@ class PackageNativePluginReleaseTests(unittest.TestCase):
             text.index('diagnostics["dependencyPrefix"] = dependency_prefix_diagnostic'),
         )
 
+    def test_package_doctor_runs_before_binary_archive_is_written(self):
+        text = SCRIPT.read_text()
+        self.assertLess(
+            text.index('"$repo_root/scripts/doctor-native-plugin-package.py" "$binary_stage"'),
+            text.index('tar -C "$binary_stage" --zstd -cf "$binary_asset" .'),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

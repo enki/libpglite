@@ -63,6 +63,9 @@ assembly while naming the still-open root ADRs.
 The package doctor validates packaged conformance diagnostics directly, and
 `scripts/test-doctor-native-plugin-package.py` now pins missing results, failing
 status/exit codes, and stale log checksums as package errors.
+The release packaging regression suite also pins the final boundary ordering:
+`scripts/package-native-plugin-release.sh` must run the package doctor against
+the staged binary package before writing the distributable `.tar.zst` archive.
 
 ## Required Work
 
@@ -89,4 +92,5 @@ status/exit codes, and stale log checksums as package errors.
   acceptance evidence intact.
 - Once the other release-gating ADRs are done, production packaging sets
   `runtimeStatus=runtime-ready` only after native preflight has produced passing
-  packaged-artifact conformance diagnostics.
+  packaged-artifact conformance diagnostics and the staged artifact has passed
+  the package doctor before archive creation.
