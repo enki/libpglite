@@ -42,8 +42,9 @@ Current closure frontier:
   still needs broader protocol coverage before the native build lane is
   complete; the Ubuntu package path now proves the Linux final artifact for the
   current conformance set.
-- ADR-0004: still needs every root ADR closed before production packages can
-  claim runtime-ready status.
+- ADR-0004: production packaging is now regression-tested to fail while root
+  ADRs remain open. It still needs every root ADR closed before production
+  packages can claim runtime-ready status.
 - ADR-0005: still needs the final upstream/carry decision for the native
   portability patches. The backend archive now audits that PostgreSQL socket
   I/O binds to PGlite callback shims instead of libc socket APIs, Linux prepare

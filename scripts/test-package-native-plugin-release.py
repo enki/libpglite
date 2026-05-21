@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
+import os
 import pathlib
+import subprocess
+import tempfile
 import unittest
 
 
@@ -41,6 +44,28 @@ class PackageNativePluginReleaseTests(unittest.TestCase):
             'echo "linux_baseline_version_id=${LIBPGLITE_LINUX_BASELINE_VERSION_ID:-24.04}"',
             text,
         )
+
+    def test_production_packaging_is_blocked_while_root_adrs_are_open(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            plugin = pathlib.Path(tempdir) / "liblibpglite_plugin_native.dylib"
+            plugin.write_bytes(b"placeholder")
+            env = os.environ.copy()
+            env["LIBPGLITE_RELEASE_MODE"] = "production"
+            result = subprocess.run(
+                [str(SCRIPT), "v0.0.0-test", str(plugin), str(pathlib.Path(tempdir) / "out")],
+                cwd=SCRIPT.parents[1],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "production packaging is blocked while release-gating ADRs remain open",
+            result.stderr,
+        )
+        self.assertIn("docs/ADR-0004-RUNTIME-READY-RELEASE-GATE.md", result.stderr)
 
 
 if __name__ == "__main__":

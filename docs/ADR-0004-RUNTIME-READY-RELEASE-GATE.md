@@ -57,6 +57,9 @@ Production packaging now fails while any root `docs/ADR-*.md` remains open.
 This makes the ADR process itself part of the release gate: an artifact cannot
 claim `runtime-ready` status until every release-gating ADR has been honestly
 moved to `docs/done/` and the remaining package diagnostics pass.
+`scripts/test-package-native-plugin-release.py` runs the production packaging
+command with a placeholder plugin and asserts that it fails before package
+assembly while naming the still-open root ADRs.
 
 ## Required Work
 
@@ -81,9 +84,6 @@ moved to `docs/done/` and the remaining package diagnostics pass.
 
 - All root `docs/ADR-*.md` records have moved to `docs/done/` with their own
   acceptance evidence intact.
-- Production packaging fails while any release-gating ADR remains open, for
-  example:
-  `LIBPGLITE_RELEASE_MODE=production scripts/package-native-plugin-release.sh <version> <target>`.
 - Once the other release-gating ADRs are done, production packaging sets
   `runtimeStatus=runtime-ready` only after native preflight has produced passing
   packaged-artifact conformance diagnostics.
