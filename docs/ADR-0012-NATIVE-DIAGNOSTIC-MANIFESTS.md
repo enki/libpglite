@@ -178,6 +178,10 @@ actual plugin and prefix contents.
 - Conformance result JSON records a SHA-256 checksum of its log, and the package
   doctor verifies the checksum. This prevents stale or mismatched logs from
   satisfying a release diagnostic gate.
+- Conformance result JSON must also record the invoked command and well-formed
+  UTC `startedAt`/`endedAt` timestamps, and the package doctor rejects results
+  whose end time predates the start time. This keeps release evidence
+  self-diagnosing when a packaged-artifact check is copied, truncated, or stale.
 - Packaging requires `LIBPGLITE_CONFORMANCE_DIR` so native artifacts are tied to
   explicit runtime evidence instead of only console output. The doctor validates
   that both required conformance results passed.

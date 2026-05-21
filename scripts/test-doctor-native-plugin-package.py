@@ -321,6 +321,45 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         self.assertIn("parameterized-extended-query", errors)
         self.assertIn("deterministic-shutdown", errors)
 
+    def test_conformance_result_requires_command_and_valid_timestamps(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        doctor.bundle["diagnostics"]["conformanceResults"] = "diagnostics/conformance"
+        conformance = pathlib.Path(tempdir.name) / "diagnostics" / "conformance"
+        conformance.mkdir()
+        for name in [
+            "raw-protocol",
+            "tokio-postgres-client",
+            "prefix-initialize",
+            "prefix-resume",
+        ]:
+            log_text = f"{name} ok\n"
+            (conformance / f"{name}.log").write_text(log_text)
+            result = {
+                "format": "libpglite-native-conformance-result-v1",
+                "name": name,
+                "status": "passed",
+                "exitCode": 0,
+                "startedAt": "2026-05-21T00:00:01Z",
+                "endedAt": "2026-05-21T00:00:00Z",
+                "command": "",
+                "log": f"{name}.log",
+                "logSha256": hashlib.sha256(log_text.encode()).hexdigest(),
+            }
+            if name == "raw-protocol":
+                result["cases"] = sorted(doctor_module.RAW_PROTOCOL_CASES)
+            (conformance / f"{name}.json").write_text(json.dumps(result) + "\n")
+        with tempdir:
+            doctor.validate_conformance()
+
+        errors = "\n".join(doctor.errors)
+        self.assertIn("conformance result raw-protocol.json ended before it started", errors)
+        self.assertIn("conformance result raw-protocol.json is missing command", errors)
+
     def test_plugin_symbol_diagnostic_must_match_actual_exports(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS | {"ActualBackendSymbol"},

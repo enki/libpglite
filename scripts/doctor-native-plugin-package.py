@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import datetime
 import hashlib
 import json
 import os
@@ -31,6 +32,7 @@ RAW_PROTOCOL_CASES = {
     "parameterized-extended-query",
     "deterministic-shutdown",
 }
+UTC_TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 POSTGRES_PREFIX_LAYOUT = {
     "path": "postgres",
     "bin": "postgres/bin",
@@ -39,6 +41,14 @@ POSTGRES_PREFIX_LAYOUT = {
     "initdb": "postgres/bin/initdb",
     "postgres": "postgres/bin/postgres",
 }
+
+
+def parse_utc_timestamp(value: object) -> datetime.datetime | None:
+    if not isinstance(value, str) or not UTC_TIMESTAMP.fullmatch(value):
+        return None
+    return datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(
+        tzinfo=datetime.timezone.utc
+    )
 
 
 def main() -> int:
@@ -762,6 +772,17 @@ class Doctor:
                 self.errors.append(f"conformance result {name}.json did not pass")
             if result.get("exitCode") != 0:
                 self.errors.append(f"conformance result {name}.json exitCode is not 0")
+            started_at = parse_utc_timestamp(result.get("startedAt"))
+            ended_at = parse_utc_timestamp(result.get("endedAt"))
+            if started_at is None:
+                self.errors.append(f"conformance result {name}.json has invalid startedAt")
+            if ended_at is None:
+                self.errors.append(f"conformance result {name}.json has invalid endedAt")
+            if started_at is not None and ended_at is not None and ended_at < started_at:
+                self.errors.append(f"conformance result {name}.json ended before it started")
+            command = result.get("command")
+            if not isinstance(command, str) or not command.strip():
+                self.errors.append(f"conformance result {name}.json is missing command")
             if result.get("log") != f"{name}.log":
                 self.errors.append(f"conformance result {name}.json points at wrong log")
             expected_log_sha = result.get("logSha256")

@@ -129,5 +129,6 @@ Current closure frontier:
   diagnostic, raw-protocol diagnostics must name their covered protocol cases,
   patch-apply reproducibility is now a prepare-time gate rather than only a
   checksum claim, dependency manifests must use the platform-native scanner
-  they claim, and the ADR audit now fails if any focused `scripts/test-*.py`
-  regression is not wired into native release preflight.
+  they claim, conformance diagnostics must carry command and timestamp evidence,
+  and the ADR audit now fails if any focused `scripts/test-*.py` regression is
+  not wired into native release preflight.
