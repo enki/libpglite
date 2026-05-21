@@ -93,6 +93,12 @@ libraries or runtime data.
   uuid URLs currently require fallback mirrors because their historical primary
   URLs are not reliably fetchable, but the content hashes keep those fallbacks
   pinned.
+- `scripts/build-native-dependency-prefix.sh` is the compile-stage entrypoint
+  for the native equivalent of PGlite's `/install/libs`. It consumes the fetched
+  source manifest, builds into an isolated prefix, and finishes by running the
+  prefix descriptor. The script mirrors the PGlite build order and can run
+  focused smoke builds with `--only <name>` while the full macOS prefix is being
+  brought up.
 - `scripts/describe-native-dependency-prefix.py` validates a native dependency
   prefix against that inventory and writes
   `libpglite-native-dependency-prefix-v1`. The native prepare step accepts
@@ -123,10 +129,10 @@ libraries or runtime data.
   prefix. This verifies that the repaired install names work behaviorally, not
   just textually.
 - This is still not the final dependency-prefix implementation: the checked-in
-  inventory, source fetcher, and prefix descriptor define the contract, but the
-  clean macOS build script that compiles each dependency into that prefix
-  remains open. OpenSSL is still copied from the local provider for default
-  macOS development packaging.
+  inventory, source fetcher, compile-stage entrypoint, and prefix descriptor
+  define the contract, but the full clean macOS prefix build still needs to pass
+  for every dependency and become the default release path. OpenSSL is still
+  copied from the local provider for default macOS development packaging.
 - PGlite's WASM build extracts export-symbol lists from dependency archives for
   Emscripten. Native builds do not need the same files verbatim, but they do
   need equivalent link/export discipline for extension module loading.
