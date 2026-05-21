@@ -156,6 +156,12 @@ PGlite-shipped extension.
   extensions into the generated prefix with the same dynamic lookup model used
   by contrib. PostGIS remains a separate open item because it needs the pinned
   GEOS/PROJ/json-c/SQLite dependency prefix and projection data from ADR-0009.
+- The PostGIS native dependency substrate is now substantially less speculative:
+  the macOS full-prefix smoke builds the pinned GEOS, PROJ, json-c, SQLite,
+  libtiff, libdeflate, zlib, libxml2, and libxslt inputs into one static
+  controlled prefix, and PROJ installs `proj.db` plus its projection data under
+  `share/proj`. This does not close PostGIS parity yet; it closes the
+  third-party dependency-prefix build precondition for the macOS path.
 - When materialized sources are present, the inventory is regenerated from the
   patched tree and records `status=present`; the package doctor then validates
   the corresponding packaged control/SQL/module files instead of treating

@@ -65,6 +65,12 @@ still need an explicitly documented Linux baseline.
 - Packaged build provenance records the release target, and the package doctor
   verifies that this target agrees with the bundle manifest so stale or
   cross-target provenance cannot satisfy the diagnostic gate.
+- The native dependency-prefix builder now applies the same macOS floor
+  discipline to third-party C/C++ dependencies. On Darwin it adds
+  `-Werror=unguarded-availability-new`, so SDK availability mistakes fail the
+  prefix build. This caught SQLite detecting `strchrnul` from the macOS 15 SDK
+  despite the macOS 11.0 deployment target; the builder now forces
+  `HAVE_STRCHRNUL=0` after SQLite configure.
 - Linux baseline selection remains open, but local Linux testing should use the
   Ubuntu environment in `../smolvm/` until CI or release containers cover the
   same path.

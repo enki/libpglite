@@ -47,7 +47,9 @@ class NativeDependencyPrefixDescriptorTests(unittest.TestCase):
             manifest = json.loads(out.read_text())
             self.assertEqual(manifest["format"], "libpglite-native-dependency-prefix-v1")
             self.assertFalse(manifest["complete"])
+            self.assertTrue(manifest["staticOnly"])
             self.assertTrue(manifest["missing"])
+            self.assertEqual(manifest["dynamicObjects"], [])
 
     def test_require_complete_fails_for_incomplete_prefix(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -71,6 +73,33 @@ class NativeDependencyPrefixDescriptorTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing dependency prefix artifact", result.stderr)
+
+    def test_require_static_fails_for_dynamic_objects(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            prefix = root / "prefix"
+            (prefix / "lib").mkdir(parents=True)
+            (prefix / "lib" / "legacy.dylib").write_bytes(b"placeholder")
+            out = root / "manifest.json"
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(SCRIPT),
+                    "--prefix",
+                    str(prefix),
+                    "--out",
+                    str(out),
+                    "--require-static",
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("dynamic dependency prefix object: lib/legacy.dylib", result.stderr)
+            manifest = json.loads(out.read_text())
+            self.assertFalse(manifest["staticOnly"])
+            self.assertEqual(manifest["dynamicObjects"], ["lib/legacy.dylib"])
 
     def test_pkg_config_probe_is_isolated_to_prefix(self):
         with tempfile.TemporaryDirectory() as temp:

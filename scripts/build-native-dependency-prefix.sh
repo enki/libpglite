@@ -180,6 +180,10 @@ run_step() {
 
 common_cflags="-O2 -fPIC"
 common_cxxflags="-O2 -fPIC"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  common_cflags="$common_cflags -Werror=unguarded-availability-new"
+  common_cxxflags="$common_cxxflags -Werror=unguarded-availability-new"
+fi
 common_env=(
   "CFLAGS=$common_cflags"
   "CXXFLAGS=$common_cxxflags"
@@ -369,6 +373,10 @@ build_sqlite() {
       --disable-shared \
       --disable-threadsafe \
       --prefix="$prefix"
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      # The macOS 15 SDK exposes strchrnul even when the deployment target is 11.0.
+      perl -0pi -e 's/#define HAVE_STRCHRNUL 1/#define HAVE_STRCHRNUL 0/' sqlite_cfg.h
+    fi
     make -j"$jobs"
     make install
   )
@@ -433,6 +441,7 @@ else
   python3 "$repo_root/scripts/describe-native-dependency-prefix.py" \
     --prefix "$prefix" \
     --out "$prefix/native-dependency-prefix.json" \
-    --require-complete
+    --require-complete \
+    --require-static
 fi
 echo "wrote $prefix/native-dependency-prefix.json"

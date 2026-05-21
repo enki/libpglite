@@ -24,6 +24,11 @@ def main() -> int:
         action="store_true",
         help="fail if any locked dependency artifact is absent from the prefix",
     )
+    parser.add_argument(
+        "--require-static",
+        action="store_true",
+        help="fail if the dependency prefix contains dynamic libraries or modules",
+    )
     args = parser.parse_args()
 
     prefix = pathlib.Path(args.prefix).resolve()
@@ -60,6 +65,7 @@ def main() -> int:
             }
         )
 
+    dynamic_objects = dynamic_prefix_objects(prefix)
     manifest = {
         "format": "libpglite-native-dependency-prefix-v1",
         "prefix": str(prefix),
@@ -68,7 +74,9 @@ def main() -> int:
         else str(inventory_path),
         "inventorySha256": sha256(inventory_path),
         "complete": not missing,
+        "staticOnly": not dynamic_objects,
         "missing": missing,
+        "dynamicObjects": dynamic_objects,
         "dependencies": dependencies,
     }
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -76,6 +84,10 @@ def main() -> int:
     if missing and args.require_complete:
         for item in missing:
             print(f"missing dependency prefix artifact: {item}", file=sys.stderr)
+        return 1
+    if dynamic_objects and args.require_static:
+        for item in dynamic_objects:
+            print(f"dynamic dependency prefix object: {item}", file=sys.stderr)
         return 1
     return 0
 
@@ -128,6 +140,22 @@ def pkg_config_probe(prefix: pathlib.Path, package: str) -> dict:
         "present": result.returncode == 0,
         "version": result.stdout.strip() if result.returncode == 0 else "",
     }
+
+
+def dynamic_prefix_objects(prefix: pathlib.Path) -> list[str]:
+    results = []
+    for path in prefix.rglob("*"):
+        if not path.is_file():
+            continue
+        name = path.name
+        if (
+            name.endswith(".dylib")
+            or name.endswith(".bundle")
+            or name.endswith(".so")
+            or ".so." in name
+        ):
+            results.append(path.relative_to(prefix).as_posix())
+    return sorted(results)
 
 
 def sha256(path: pathlib.Path) -> str:

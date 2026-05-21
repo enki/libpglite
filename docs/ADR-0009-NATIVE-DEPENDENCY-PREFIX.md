@@ -60,9 +60,6 @@ libraries or runtime data.
 
 ## Remaining Closure Criteria
 
-- A macOS command builds the full pinned dependency prefix from
-  `deps/native-pglite-dependencies.json` without Homebrew libraries in the
-  release link path.
 - `scripts/prepare-native-pglite-link.sh --dependency-prefix <prefix>
   --build-postgres` is the release path, and the resulting manifest records a
   complete `libpglite-native-dependency-prefix-v1` diagnostic.
@@ -74,6 +71,15 @@ libraries or runtime data.
   unresolved dependency paths in plugin and extension modules.
 - The same prefix contract is implemented for the Linux baseline after macOS is
   closed.
+
+## Closed Evidence
+
+- A clean macOS command builds the full pinned dependency prefix from
+  `deps/native-pglite-dependencies.json` without relying on Homebrew libraries
+  as link inputs. Homebrew autotools are still build tools for regenerated
+  autotools projects.
+- The macOS full-prefix descriptor is complete and static-only:
+  `complete=true`, `staticOnly=true`, `missing=[]`, and `dynamicObjects=[]`.
 
 ## Implementation Notes
 
@@ -99,12 +105,30 @@ libraries or runtime data.
   prefix descriptor. The script mirrors the PGlite build order and can run
   focused smoke builds with `--only <name>` while the full macOS prefix is being
   brought up.
-- macOS focused smoke builds have proven locked-source `zlib` and OpenSSL
-  static prefix builds. The OpenSSL native path uses `no-module` in addition to
-  `no-shared` so the prefix does not silently acquire a loadable
-  `legacy.dylib`. The next local blocker for the full prefix is the GNU
-  autotools prerequisite needed by PGlite's libxml2/libxslt/libtiff `autogen.sh`
-  path.
+- macOS focused smoke builds have proven every locked dependency slice:
+  `zlib`, `libxml2`, `libxslt`, OpenSSL, OSSP uuid, json-c, libdeflate,
+  libtiff, SQLite, PROJ, and GEOS. The OpenSSL native path uses `no-module` in
+  addition to `no-shared` so the prefix does not silently acquire a loadable
+  `legacy.dylib`.
+- A clean macOS full-prefix smoke run now builds the entire pinned inventory
+  from `deps/native-pglite-dependencies.json` into an isolated prefix and emits
+  a complete `libpglite-native-dependency-prefix-v1` descriptor. The descriptor
+  for that run reports `complete=true`, `staticOnly=true`, `missing=[]`, and
+  `dynamicObjects=[]`.
+- The compile-stage descriptor now records dynamic objects under the prefix and
+  `--require-static` rejects `.dylib`, `.bundle`, `.so`, and `.so.*` outputs.
+  Full prefix builds and dependency-prefix release prepares use that stricter
+  gate so accidental dynamic dependency leakage cannot satisfy this ADR's prefix
+  evidence.
+- The macOS dependency-prefix path currently requires GNU autotools from
+  Homebrew for the PGlite-aligned libxml2/libxslt/libtiff `autogen.sh` path.
+  That is an acceptable source-build prerequisite, not a release link provider.
+  Release artifacts must still link against the controlled prefix outputs.
+- The Darwin dependency compile flags include
+  `-Werror=unguarded-availability-new`, and SQLite's generated
+  `HAVE_STRCHRNUL` setting is forced off after configure because the macOS 15
+  SDK exposes `strchrnul` even when `MACOSX_DEPLOYMENT_TARGET=11.0`. This turns
+  deployment-floor leaks into prefix build failures instead of warnings.
 - `scripts/describe-native-dependency-prefix.py` validates a native dependency
   prefix against that inventory and writes
   `libpglite-native-dependency-prefix-v1`. The native prepare step accepts
@@ -136,9 +160,11 @@ libraries or runtime data.
   just textually.
 - This is still not the final dependency-prefix implementation: the checked-in
   inventory, source fetcher, compile-stage entrypoint, and prefix descriptor
-  define the contract, but the full clean macOS prefix build still needs to pass
-  for every dependency and become the default release path. OpenSSL is still
-  copied from the local provider for default macOS development packaging.
+  define the contract, and the clean macOS full-prefix smoke now passes. The
+  remaining closure work is making this prefix the default release link path,
+  proving `pgcrypto` and PostGIS from the packaged artifact, and then repeating
+  the prefix contract on Linux. OpenSSL is still copied from the local provider
+  for default macOS development packaging.
 - PGlite's WASM build extracts export-symbol lists from dependency archives for
   Emscripten. Native builds do not need the same files verbatim, but they do
   need equivalent link/export discipline for extension module loading.

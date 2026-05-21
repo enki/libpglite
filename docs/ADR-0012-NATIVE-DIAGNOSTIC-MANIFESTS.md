@@ -122,6 +122,10 @@ actual plugin and prefix contents.
   and exact git commits. That manifest is build-stage evidence today; it should
   become package diagnostic input when the controlled dependency prefix becomes
   the release path.
+- Native dependency-prefix diagnostics now record whether the prefix is purely
+  static and list any dynamic objects found under the prefix. Release-style
+  prefix checks use `--require-static`, so a complete prefix descriptor cannot
+  hide accidental `.dylib`, `.bundle`, `.so`, or `.so.*` outputs.
 - `scripts/doctor-native-plugin-package.py` validates either an extracted
   package directory or a `.tar.zst` package without rebuilding it. It checks the
   bundle manifest, plugin checksum, ABI symbols, PostgreSQL prefix files,

@@ -349,7 +349,8 @@ if [[ "$build_postgres" == "1" ]]; then
     python3 "$repo_root/scripts/describe-native-dependency-prefix.py" \
       --prefix "$dependency_prefix" \
       --out "$native_dependency_prefix_manifest" \
-      --require-complete
+      --require-complete \
+      --require-static
     native_dependency_prefix_fingerprint="$(sha256 "$native_dependency_prefix_manifest")"
     export PKG_CONFIG_LIBDIR="$dependency_prefix/lib/pkgconfig:$dependency_prefix/share/pkgconfig"
     native_dependency_packages=(libxslt libxml-2.0 zlib)
