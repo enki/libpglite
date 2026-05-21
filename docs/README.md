@@ -51,9 +51,9 @@ Current closure frontier:
   `CREATE EXTENSION` conformance from packaged artifacts, and promotion of the
   opt-in non-PostGIS `other_extensions` build into release preflight.
 - ADR-0009: still needs a pinned native dependency prefix instead of repaired
-  local-provider libraries; the pinned dependency inventory/prefix diagnostic
-  contract exists, but the clean macOS dependency builder still needs to compile
-  that prefix.
+  local-provider libraries; the pinned dependency inventory, verified source
+  fetcher, and prefix diagnostic contract exist, but the clean macOS dependency
+  builder still needs to compile that prefix.
 - ADR-0010: still needs stale-symbol checks against the full extension parity
   set and Linux export/version-script coverage.
 - ADR-0012: still needs structured diagnostic coverage for the remaining

@@ -117,6 +117,11 @@ actual plugin and prefix contents.
   development lane. When present, build provenance must name the prefix
   diagnostic and the package doctor requires it to be a complete
   `libpglite-native-dependency-prefix-v1` manifest.
+- Native dependency sources now have a structured
+  `libpglite-native-dependency-sources-v1` fetch manifest with archive hashes
+  and exact git commits. That manifest is build-stage evidence today; it should
+  become package diagnostic input when the controlled dependency prefix becomes
+  the release path.
 - `scripts/doctor-native-plugin-package.py` validates either an extracted
   package directory or a `.tar.zst` package without rebuilding it. It checks the
   bundle manifest, plugin checksum, ABI symbols, PostgreSQL prefix files,

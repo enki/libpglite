@@ -84,7 +84,15 @@ libraries or runtime data.
 - `deps/native-pglite-dependencies.json` records the native dependency inventory
   copied from the pinned PGlite WASM builder: zlib, libxml2, libxslt, OpenSSL,
   OSSP uuid, json-c, libdeflate, libtiff, SQLite, PROJ, and GEOS, with versions,
-  source URLs, expected headers/libraries, pkg-config names, and consuming roles.
+  source URLs, archive SHA-256 values or exact git commits, expected
+  headers/libraries, pkg-config names, and consuming roles.
+- `scripts/fetch-native-dependency-sources.py` is the first stage of the native
+  prefix build: it fetches archives with checksum verification, checks out git
+  dependencies at exact commits, and writes
+  `libpglite-native-dependency-sources-v1`. The PGlite upstream zlib and OSSP
+  uuid URLs currently require fallback mirrors because their historical primary
+  URLs are not reliably fetchable, but the content hashes keep those fallbacks
+  pinned.
 - `scripts/describe-native-dependency-prefix.py` validates a native dependency
   prefix against that inventory and writes
   `libpglite-native-dependency-prefix-v1`. The native prepare step accepts
@@ -115,9 +123,10 @@ libraries or runtime data.
   prefix. This verifies that the repaired install names work behaviorally, not
   just textually.
 - This is still not the final dependency-prefix implementation: the checked-in
-  inventory and prefix descriptor define the contract, but the clean macOS build
-  script that compiles each dependency into that prefix remains open. OpenSSL is
-  still copied from the local provider for default macOS development packaging.
+  inventory, source fetcher, and prefix descriptor define the contract, but the
+  clean macOS build script that compiles each dependency into that prefix
+  remains open. OpenSSL is still copied from the local provider for default
+  macOS development packaging.
 - PGlite's WASM build extracts export-symbol lists from dependency archives for
   Emscripten. Native builds do not need the same files verbatim, but they do
   need equivalent link/export discipline for extension module loading.

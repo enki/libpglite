@@ -162,7 +162,10 @@ if grep -E 'libpglite-native|libpglite-plugin-native' <<<"$facade_tree" >/dev/nu
 fi
 
 echo "==> preflight ${release_version}: doctor regression tests"
+python3 scripts/test-describe-native-dependency-prefix.py
 python3 scripts/test-doctor-native-plugin-package.py
+python3 scripts/test-fetch-native-dependency-sources.py
+python3 scripts/test-generate-native-dependency-manifest.py
 python3 scripts/test-inventory-native-pglite-extensions.py
 python3 scripts/test-materialize-native-pglite-other-extensions.py
 
