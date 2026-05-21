@@ -50,10 +50,13 @@ def main() -> int:
 
     for path in done_adrs:
         rel = path.relative_to(DOCS).as_posix()
+        text = path.read_text()
         if status(path) != "Done":
             errors.append(f"{rel} must have Status: Done while it is in docs/done/")
         if not listed(readme, rel):
             errors.append(f"{rel} is not listed in docs/README.md done records")
+        if not has_section(text, "Closing Evidence"):
+            errors.append(f"{rel} is missing Closing Evidence")
 
     for path in sorted((REPO_ROOT / "scripts").glob("test-*.py")):
         rel = path.relative_to(REPO_ROOT).as_posix()

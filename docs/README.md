@@ -35,9 +35,9 @@ repo commands, not just described in text. The minimum evidence is:
 - production packaging fails when the ADR's release contract is not satisfied
 
 `scripts/audit-adr-closure.py` keeps the bookkeeping honest: root ADR files must
-be `Status: Open`, done ADR files must be `Status: Done`, and this README must
-list every open and done record. Native preflight runs that audit before package
-work starts.
+be `Status: Open`, done ADR files must be `Status: Done` with a `Closing
+Evidence` section, and this README must list every open and done record. Native
+preflight runs that audit before package work starts.
 
 Current closure frontier:
 

@@ -66,3 +66,16 @@ the first client layer.
   the `tokio-postgres` client transport as separate native checks. Separate
   processes keep failures attributable under the current single-start lifecycle
   contract from ADR-0011.
+
+## Closing Evidence
+
+- `src/postgres_client.rs` implements the `tokio-postgres` custom transport on
+  top of `PgliteRuntime::exec_protocol_raw`, keeping SQL parameters and row
+  decoding in the normal Rust PostgreSQL client stack.
+- `tests/dynamic_plugin.rs` runs the high-level client path against the real
+  native dynamic plugin and packaged prefix, covering connection startup,
+  parameterized queries, row decoding, extension loading, transaction rollback,
+  and deterministic shutdown.
+- `scripts/preflight-native-plugin-release.sh 0.1.0` runs the high-level client
+  transport check as package evidence instead of relying on build-tree-only
+  fixtures.

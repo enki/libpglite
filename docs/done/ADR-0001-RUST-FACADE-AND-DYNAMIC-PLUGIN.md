@@ -81,3 +81,17 @@ The dynamic plugin ABI is a small C ABI:
   mismatch rejection, plugin-owned buffer release, resolver path behavior,
   package checksum/symbol validation, and the no-default-feature facade
   dependency boundary.
+
+## Closing Evidence
+
+- `src/dynamic.rs` owns plugin loading, ABI-version validation, symbol
+  resolution, plugin-owned buffer release, and binary-relative plugin
+  resolution.
+- `tests/dynamic_plugin.rs` verifies ABI mismatch rejection before runtime
+  creation, plugin-owned buffer release, bundled-plugin resolution, and native
+  runtime status reporting through the facade.
+- `scripts/doctor-native-plugin-package.py` validates packaged plugin checksum
+  and required `libpglite_plugin_*` ABI exports.
+- `scripts/preflight-native-plugin-release.sh 0.1.0` runs the dynamic plugin
+  tests, package doctor, symbol diagnostics, and facade dependency-boundary
+  check before packaging can be considered release evidence.
