@@ -43,14 +43,14 @@ Current closure frontier:
 
 - ADR-0002: macOS release preflight now passes from the final package artifact
   with native Postgres/PGlite linked and full extension parity exercised. It
-  now covers raw startup, simple query, transaction rollback, transaction
-  commit, recoverable protocol error, basic extended query, and parameter-bound
-  extended query, and the raw-protocol conformance diagnostic must name those
-  cases. It still needs broader protocol coverage before the native build lane
-  is complete; the Ubuntu package path now proves the Linux final artifact for
-  the current conformance set, and the package doctor now rejects WASM,
-  JavaScript, Emscripten-named, wasm2c-named, and bitcode payloads in native
-  packages.
+  now covers raw startup, simple query, empty query, transaction rollback,
+  transaction commit, recoverable protocol error, basic extended query, and
+  parameter-bound extended query, and the raw-protocol conformance diagnostic
+  must name those cases. It still needs broader protocol coverage before the
+  native build lane is complete; the Ubuntu package path now proves the Linux
+  final artifact for the current conformance set, and the package doctor now
+  rejects WASM, JavaScript, Emscripten-named, wasm2c-named, and bitcode payloads
+  in native packages.
 - ADR-0004: production packaging is now regression-tested to fail while root
   ADRs remain open, and the doctor has focused conformance-diagnostic failure
   regressions. The package script is also regression-pinned to run the package

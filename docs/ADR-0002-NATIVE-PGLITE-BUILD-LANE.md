@@ -101,7 +101,8 @@ The native lane must preserve the PGlite runtime model:
 - The native runtime now has a macOS conformance path through the dynamic
   plugin: initialize a clean data directory with the generated Postgres prefix,
   install PGlite read/write callbacks, start the single-user backend, process a
-  PostgreSQL startup packet, execute raw simple query messages, exercise
+  PostgreSQL startup packet, execute raw simple query and empty-query messages,
+  exercise
   transaction rollback and transaction commit, recover after a backend protocol
   error, execute basic and parameter-bound extended-query flows, create contrib
   extensions, and shut down. The same native plugin is also exercised through
@@ -122,8 +123,8 @@ The native lane must preserve the PGlite runtime model:
   the current restart lifecycle now have macOS and Ubuntu final-package evidence
   and remain tracked in their owning ADRs until production gates close.
 - Raw-protocol conformance diagnostics now carry an explicit case inventory:
-  startup, simple query, transaction rollback, transaction commit, recoverable
-  protocol error, extended query, parameterized extended query, and deterministic
-  shutdown. The package doctor rejects raw-protocol conformance results that do
-  not name all of those cases, so packaged diagnostics can explain what the
-  passing result actually proved.
+  startup, simple query, empty query, transaction rollback, transaction commit,
+  recoverable protocol error, extended query, parameterized extended query, and
+  deterministic shutdown. The package doctor rejects raw-protocol conformance
+  results that do not name all of those cases, so packaged diagnostics can
+  explain what the passing result actually proved.

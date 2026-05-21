@@ -23,6 +23,7 @@ ABI_SYMBOLS = {
 RAW_PROTOCOL_CASES = {
     "startup",
     "simple-query",
+    "empty-query",
     "transaction-rollback",
     "transaction-commit",
     "recoverable-protocol-error",

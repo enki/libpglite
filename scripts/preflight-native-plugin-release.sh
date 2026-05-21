@@ -110,6 +110,7 @@ if name == "raw-protocol":
     result["cases"] = [
         "startup",
         "simple-query",
+        "empty-query",
         "transaction-rollback",
         "transaction-commit",
         "recoverable-protocol-error",

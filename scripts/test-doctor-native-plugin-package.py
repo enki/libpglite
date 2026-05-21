@@ -316,6 +316,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
 
         errors = "\n".join(doctor.errors)
         self.assertIn("raw-protocol conformance result is missing cases", errors)
+        self.assertIn("empty-query", errors)
         self.assertIn("transaction-commit", errors)
         self.assertIn("parameterized-extended-query", errors)
         self.assertIn("deterministic-shutdown", errors)

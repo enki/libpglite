@@ -170,7 +170,9 @@ actual plugin and prefix contents.
 - The `raw-protocol` conformance JSON now includes a required `cases` inventory
   for the protocol behaviors it covers. The package doctor rejects stale or
   partial raw-protocol diagnostics that omit any required case, so a passing
-  conformance file cannot hide a narrowed test command.
+  conformance file cannot hide a narrowed test command. The required case list
+  now includes the empty-query path so PostgreSQL `EmptyQueryResponse` behavior
+  is part of the named raw protocol evidence.
 - Conformance result JSON records a SHA-256 checksum of its log, and the package
   doctor verifies the checksum. This prevents stale or mismatched logs from
   satisfying a release diagnostic gate.

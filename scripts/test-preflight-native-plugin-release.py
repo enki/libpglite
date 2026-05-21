@@ -56,6 +56,7 @@ class PreflightNativePluginReleaseTest(unittest.TestCase):
         for case in [
             "startup",
             "simple-query",
+            "empty-query",
             "transaction-rollback",
             "transaction-commit",
             "recoverable-protocol-error",

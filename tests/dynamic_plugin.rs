@@ -91,6 +91,13 @@ fn dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_
     assert_message_type(&query_response, b'C');
     assert_message_type(&query_response, b'Z');
 
+    let empty_query_response = runtime
+        .exec_protocol_raw(&query_message(""))
+        .expect("empty simple query succeeds");
+    assert_no_error_message(&empty_query_response);
+    assert_message_type(&empty_query_response, b'I');
+    assert_message_type(&empty_query_response, b'Z');
+
     let transaction_response = runtime
         .exec_protocol_raw(&query_message(
             "begin; create table tx_smoke(value int); insert into tx_smoke values (7); rollback; select to_regclass('tx_smoke') is null",
@@ -136,7 +143,10 @@ fn dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_
     assert_message_type(&extended_response, b'Z');
 
     let extended_param_response = runtime
-        .exec_protocol_raw(&extended_query_message_with_text_param("select $1::int4 + 1", "6"))
+        .exec_protocol_raw(&extended_query_message_with_text_param(
+            "select $1::int4 + 1",
+            "6",
+        ))
         .expect("parameterized extended query succeeds");
     assert_no_error_message(&extended_param_response);
     assert_message_type(&extended_param_response, b'1');
