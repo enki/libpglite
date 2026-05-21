@@ -82,7 +82,6 @@ require() {
 
 require git
 require cc
-require patch
 require make
 require ar
 require tar

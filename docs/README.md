@@ -63,10 +63,11 @@ Current closure frontier:
   poll/self-pipe latch path for the dummy PGlite socket descriptor, the
   forced-include header now declares the replacement shim ABI before macro
   remapping, and the Ubuntu preflight passes the current release path. The ADR
-  records per-patch downstream carry decisions, and preflight verifies that
-  every carried patch has a decision row. Remaining closure is keeping the
-  patch-apply and shim-prototype regressions in the preflight path until final
-  package evidence is current.
+  records per-patch downstream carry decisions, preflight verifies that every
+  carried patch has a decision row, and prepare no longer depends on the
+  platform `patch` utility. Remaining closure is keeping the patch-apply and
+  shim-prototype regressions in the preflight path until final package evidence
+  is current.
 - ADR-0006: the full Ubuntu preflight now passes through `../smolvm/`, and
   packages now carry a doctor-validated `platform-baseline.json`. The prepare
   regression suite now pins deployment-target build-cache invalidation.

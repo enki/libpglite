@@ -35,6 +35,7 @@ class PrepareNativePgliteLinkTests(unittest.TestCase):
             'GIT_CEILING_DIRECTORIES="$repo_root" git -C "$patched_source" apply "$patch_file"',
             text,
         )
+        self.assertNotIn("require patch", text)
         self.assertNotIn('patch -d "$patched_source" -p1 <"$patch_file"', text)
 
     def test_macos_deployment_target_invalidates_native_build_cache(self):

@@ -135,3 +135,7 @@ clear preprocessor gates.
 - `scripts/test-native-patch-decisions.py` keeps that decision table in sync
   with the actual `patches/postgres-pglite/*.patch` files, and native preflight
   runs the test before build work.
+- The prepare script no longer depends on the platform `patch` utility for the
+  downstream patch lane. `git apply --check` and `git apply` are the only
+  accepted patch application path, and the prepare regression suite pins both
+  the positive Git path and the absence of the old `patch` command.
