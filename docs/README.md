@@ -97,7 +97,8 @@ Current closure frontier:
   diagnostics. The Linux controlled-prefix release policy is now documented and
   pinned to the local Ubuntu preflight test. Production packages now require a
   controlled dependency-prefix diagnostic, and the doctor rejects
-  loader-relative dependency paths that escape the package with `..`. Remaining
+  loader-relative dependency paths that escape the package with `..` as well as
+  dependency manifests whose platform contradicts the package target. Remaining
   closure is keeping strict dependency-regression coverage in place across
   package layouts.
 - ADR-0010: macOS release preflight now generates backend exports from the full

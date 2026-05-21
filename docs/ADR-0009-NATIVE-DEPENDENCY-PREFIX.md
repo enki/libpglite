@@ -190,7 +190,9 @@ libraries or runtime data.
   that classifies each object dependency as package-local, platform,
   loader-relative, local-provider, build-machine, missing, unknown, or external.
   The doctor fails strict/preflight packages on non-relocatable or unresolved
-  classifications instead of relying only on text matching.
+  classifications instead of relying only on text matching. The doctor also
+  rejects dependency manifests whose recorded platform contradicts the package
+  target, so a macOS scan cannot satisfy a Linux package or vice versa.
 - If a native link manifest was built with a dependency prefix, packaging carries
   `diagnostics/native-dependency-prefix.json`, build provenance names it, and
   the package doctor requires that prefix diagnostic to be complete. This keeps

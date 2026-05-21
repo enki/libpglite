@@ -1154,6 +1154,27 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "\n".join(doctor.errors),
         )
 
+    def test_dependency_manifest_platform_must_match_bundle_target(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        doctor.bundle["target"] = "x86_64-unknown-linux-gnu"
+        dependency_manifest = pathlib.Path(tempdir.name) / "diagnostics" / "dependencies.json"
+        manifest = json.loads(dependency_manifest.read_text())
+        manifest["platform"] = "Darwin"
+        manifest["tool"] = "ldd"
+        dependency_manifest.write_text(json.dumps(manifest) + "\n")
+        with tempdir:
+            doctor.validate_dependencies()
+
+        self.assertIn(
+            "dependency manifest platform mismatch",
+            "\n".join(doctor.errors),
+        )
+
     def test_dependency_prefix_manifest_must_be_complete_when_present(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS,

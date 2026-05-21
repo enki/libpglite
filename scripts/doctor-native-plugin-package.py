@@ -937,6 +937,19 @@ class Doctor:
             return
         if manifest.get("format") != "libpglite-native-dependencies-v1":
             self.errors.append("dependency manifest has wrong format")
+        manifest_platform = manifest.get("platform")
+        target = self.bundle.get("target")
+        if isinstance(target, str):
+            expected_platform = None
+            if target.endswith("apple-darwin"):
+                expected_platform = "Darwin"
+            elif target.endswith("linux-gnu"):
+                expected_platform = "Linux"
+            if expected_platform is not None and manifest_platform != expected_platform:
+                self.errors.append(
+                    "dependency manifest platform mismatch: "
+                    f"target={target!r} manifest={manifest_platform!r}"
+                )
         tool = manifest.get("tool")
         if tool not in {"otool -L", "ldd"}:
             self.errors.append(f"dependency manifest has unsupported tool: {tool!r}")
