@@ -148,6 +148,14 @@ fi
 echo "==> preflight ${release_version}: workspace tests"
 cargo test --all-features --workspace
 
+echo "==> preflight ${release_version}: facade dependency boundary"
+facade_tree="$(cargo tree -p libpglite --edges normal --no-default-features)"
+if grep -E 'libpglite-native|libpglite-plugin-native' <<<"$facade_tree" >/dev/null; then
+  echo "facade crate links native implementation crates with no default features" >&2
+  echo "$facade_tree" >&2
+  exit 1
+fi
+
 echo "==> preflight ${release_version}: doctor regression tests"
 python3 scripts/test-doctor-native-plugin-package.py
 

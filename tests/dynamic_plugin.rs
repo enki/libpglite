@@ -7,6 +7,52 @@ use std::sync::Mutex;
 use std::sync::OnceLock;
 
 #[test]
+fn dynamic_plugin_rejects_abi_mismatch_before_runtime_create() {
+    let _guard = test_guard();
+    let Some(plugin_path) = build_fake_plugin_with_abi_version(999) else {
+        return;
+    };
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let config = PgliteConfig::new(
+        "dynamic-plugin-abi-mismatch-test",
+        tempdir.path().join("pgdata"),
+    );
+
+    let error = DynamicPgliteRuntime::load(plugin_path, config)
+        .expect_err("ABI mismatch fails before runtime creation");
+    let message = error.to_string();
+    assert!(
+        message.contains("dynamic plugin ABI version 999 is incompatible"),
+        "{message}"
+    );
+}
+
+#[test]
+fn dynamic_plugin_frees_plugin_owned_status_buffers() {
+    let _guard = test_guard();
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let marker_path = tempdir.path().join("buffer-free-marker");
+    let Some(plugin_path) = build_fake_plugin_with_buffer_free_marker(&marker_path) else {
+        return;
+    };
+    let config = PgliteConfig::new(
+        "dynamic-plugin-buffer-free-test",
+        tempdir.path().join("pgdata"),
+    );
+    let mut runtime = DynamicPgliteRuntime::load(plugin_path, config).expect("fake runtime opens");
+    assert_marker_count(&marker_path, 1);
+
+    let response = runtime
+        .exec_protocol_raw(&[])
+        .expect("fake runtime returns protocol bytes");
+    assert_eq!(response, vec![84]);
+    assert_marker_count(&marker_path, 2);
+
+    runtime.shutdown().expect("fake runtime shuts down");
+    assert_marker_count(&marker_path, 3);
+}
+
+#[test]
 fn dynamic_plugin_loads_and_reports_native_runtime_status() {
     let _guard = test_guard();
     let Some(plugin_path) = std::env::var_os("LIBPGLITE_TEST_PLUGIN_PATH") else {
@@ -362,6 +408,139 @@ fn load_native_runtime_result_with_data_dir(
         postgres_prefix.to_string_lossy().as_ref(),
     )]);
     DynamicPgliteRuntime::load(plugin_path, config)
+}
+
+fn build_fake_plugin_with_abi_version(version: u32) -> Option<std::path::PathBuf> {
+    build_fake_plugin(&format!(
+        "#include <stdint.h>\nuint32_t libpglite_plugin_abi_version(void) {{ return {version}; }}\n"
+    ))
+}
+
+fn build_fake_plugin_with_buffer_free_marker(
+    marker_path: &std::path::Path,
+) -> Option<std::path::PathBuf> {
+    let marker = c_string_literal(marker_path.to_string_lossy().as_ref());
+    build_fake_plugin(&format!(
+        r#"
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+typedef struct {{
+    uint8_t *data;
+    uintptr_t len;
+}} LibpglitePluginBuffer;
+
+typedef struct {{
+    uint32_t code;
+    LibpglitePluginBuffer payload;
+}} LibpglitePluginStatus;
+
+static LibpglitePluginStatus json_status(const char *json) {{
+    uintptr_t len = strlen(json);
+    uint8_t *data = (uint8_t *)malloc(len);
+    memcpy(data, json, len);
+    LibpglitePluginStatus status = {{0, {{data, len}}}};
+    return status;
+}}
+
+uint32_t libpglite_plugin_abi_version(void) {{
+    return 1;
+}}
+
+void libpglite_plugin_buffer_free(LibpglitePluginBuffer buffer) {{
+    FILE *marker = fopen({marker}, "a");
+    if (marker != NULL) {{
+        fputs("free\n", marker);
+        fclose(marker);
+    }}
+    free(buffer.data);
+}}
+
+LibpglitePluginStatus libpglite_plugin_runtime_create(const uint8_t *config, uintptr_t config_len, void **runtime) {{
+    (void)config;
+    (void)config_len;
+    *runtime = malloc(1);
+    return json_status("{{}}");
+}}
+
+void libpglite_plugin_runtime_destroy(void *runtime) {{
+    free(runtime);
+}}
+
+LibpglitePluginStatus libpglite_plugin_runtime_exec_protocol_raw(void *runtime, const uint8_t *input, uintptr_t input_len) {{
+    (void)runtime;
+    (void)input;
+    (void)input_len;
+    return json_status("[84]");
+}}
+
+LibpglitePluginStatus libpglite_plugin_runtime_shutdown(void *runtime) {{
+    (void)runtime;
+    return json_status("{{}}");
+}}
+"#
+    ))
+}
+
+fn build_fake_plugin(source: &str) -> Option<std::path::PathBuf> {
+    let compiler = std::env::var_os("CC").unwrap_or_else(|| "cc".into());
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let source_path = tempdir.path().join("fake_plugin.c");
+    let extension = if cfg!(target_os = "macos") {
+        "dylib"
+    } else {
+        "so"
+    };
+    let output = tempdir
+        .path()
+        .join(format!("libfake_pglite_plugin.{extension}"));
+    std::fs::write(&source_path, source).expect("write fake plugin source");
+
+    let mut command = std::process::Command::new(compiler);
+    if cfg!(target_os = "macos") {
+        command.arg("-dynamiclib");
+    } else {
+        command.arg("-shared").arg("-fPIC");
+    }
+    let status = command
+        .arg(&source_path)
+        .arg("-o")
+        .arg(&output)
+        .status()
+        .expect("run C compiler for fake plugin");
+    if !status.success() {
+        return None;
+    }
+
+    Some(
+        tempdir
+            .keep()
+            .join(output.file_name().expect("fake plugin filename")),
+    )
+}
+
+fn c_string_literal(value: &str) -> String {
+    let mut escaped = String::from("\"");
+    for ch in value.chars() {
+        match ch {
+            '\\' => escaped.push_str("\\\\"),
+            '"' => escaped.push_str("\\\""),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            other => escaped.push(other),
+        }
+    }
+    escaped.push('"');
+    escaped
+}
+
+fn assert_marker_count(marker_path: &std::path::Path, expected: usize) {
+    let marker = std::fs::read_to_string(marker_path).unwrap_or_default();
+    let actual = marker.lines().filter(|line| *line == "free").count();
+    assert_eq!(actual, expected, "{marker}");
 }
 
 fn startup(runtime: &mut DynamicPgliteRuntime) {

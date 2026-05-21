@@ -1,6 +1,6 @@
 # ADR-0001: Rust Facade and Dynamic Plugin Boundary
 
-Status: Open
+Status: Done
 Date: 2026-05-21
 
 ## Context
@@ -60,3 +60,24 @@ The dynamic plugin ABI is a small C ABI:
 - Plugin-owned buffers are freed only through the plugin ABI.
 - No native Postgres symbol becomes part of the public Rust API.
 
+## Implementation Notes
+
+- The root crate remains the publishable facade. The native adapter and plugin
+  crates are workspace members with `publish = false`.
+- The dynamic loader checks `libpglite_plugin_abi_version` before resolving the
+  rest of the plugin ABI, and the test suite builds a tiny fake plugin to prove
+  ABI mismatch fails before runtime creation.
+- The dynamic loader test suite also builds a fake correct-ABI plugin that
+  returns plugin-owned status buffers from create, protocol execution, and
+  shutdown. The test proves each payload is released through
+  `libpglite_plugin_buffer_free`.
+- Release packaging and the package doctor validate plugin checksums and the
+  required `libpglite_plugin_*` export set. Symbol diagnostics must match the
+  packaged plugin.
+- Native preflight now checks the facade dependency boundary with
+  `cargo tree -p libpglite --edges normal --no-default-features` and fails if
+  the facade pulls in the internal native implementation or plugin crates.
+- Full native preflight now enforces the facade/plugin boundary, including ABI
+  mismatch rejection, plugin-owned buffer release, resolver path behavior,
+  package checksum/symbol validation, and the no-default-feature facade
+  dependency boundary.
