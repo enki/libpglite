@@ -102,8 +102,8 @@ set changes.
 - `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS on
   2026-05-21 after creating the full parity set from the final package through
   the globally loaded plugin.
-- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed the same packaged
-  symbol-boundary path in the Ubuntu `24.04` baseline.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` passed the same packaged
+  symbol-boundary path in the Ubuntu `24.04` baseline on 2026-05-21.
 
 ## Implementation Notes
 

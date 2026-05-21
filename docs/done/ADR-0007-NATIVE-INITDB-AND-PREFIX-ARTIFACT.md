@@ -76,8 +76,8 @@ the plugin or provide an equivalent generated artifact.
 - `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS on
   2026-05-21 through prefix initialize/resume conformance, package smoke, and
   final package doctor self-test.
-- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed the same packaged
-  prefix self-test in the Ubuntu `24.04` baseline.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` passed the same packaged prefix
+  self-test in the Ubuntu `24.04` baseline on 2026-05-21.
 
 ## Implementation Notes
 

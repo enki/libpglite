@@ -121,8 +121,8 @@ actual plugin and prefix contents.
   platform/tool mismatches.
 - `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS on
   2026-05-21 through strict package doctor and final-artifact self-test.
-- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed in the Ubuntu
-  `24.04` baseline with the same package-doctor diagnostic gate.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` passed in the Ubuntu `24.04`
+  baseline on 2026-05-21 with the same package-doctor diagnostic gate.
 
 ## Implementation Notes
 
@@ -241,9 +241,8 @@ actual plugin and prefix contents.
   build-machine, or absolute-external dependencies remain strict failures.
 - After Linux RUNPATH repair, `scripts/preflight-linux-smolvm.sh 0.1.0` passes
   the strict package doctor and final-artifact self-test in the Ubuntu baseline.
-  That gives this ADR Linux schema evidence for the current diagnostics, while
-  production enforcement still depends on closing the remaining release-gating
-  ADRs.
+  The current pass includes the package doctor high-level client self-test from
+  the extracted package.
 - The doctor now cross-checks inventoried `contrib` extensions against packaged
   control files, default-version SQL, and referenced native modules. It also
   makes missing PGlite `other_extensions` production-fatal while keeping them

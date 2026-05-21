@@ -141,8 +141,8 @@ PGlite-shipped extension.
 - `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS on
   2026-05-21 after building, packaging, doctoring, and creating the full parity
   set from the final package.
-- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed the same final
-  package parity path in the Ubuntu `24.04` baseline.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` passed the same final package
+  parity path in the Ubuntu `24.04` baseline on 2026-05-21.
 
 ## Implementation Notes
 

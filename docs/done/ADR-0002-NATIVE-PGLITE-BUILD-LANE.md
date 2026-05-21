@@ -107,9 +107,9 @@ The native lane must preserve the PGlite runtime model:
   dist/preflight-native-plugin/libpglite-plugin-native-v0.1.0-aarch64-apple-darwin.tar.zst`
   passed on 2026-05-21 after the doctor self-test was extended to run the
   high-level client from the extracted package.
-- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed the same
-  release-path shape in the Ubuntu `24.04` baseline for the then-current
-  conformance set; future protocol widening must rerun that lane before release.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` passed in the Ubuntu `24.04`
+  baseline on 2026-05-21 after the package doctor self-test was extended to run
+  the high-level client from the extracted package.
 
 ## Implementation Notes
 

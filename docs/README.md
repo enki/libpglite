@@ -54,5 +54,8 @@ What is now closed:
 - ADR-0004 has also moved to `docs/done/` after a production-mode macOS package
   command wrote a `runtime-ready` archive and the generated archive passed
   strict package doctor/self-test.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` passed again on 2026-05-21 after
+  the final package doctor self-test was extended to run the high-level
+  `tokio-postgres` client from the extracted package.
 - Adding new process documents is not required unless a new substrate weakness
   is found or the runtime contract is intentionally widened.

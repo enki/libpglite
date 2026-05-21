@@ -82,9 +82,9 @@ clear preprocessor gates.
 - `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS on
   2026-05-21 after building the native backend, running raw protocol
   conformance, and validating the final package.
-- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed in the documented
-  Ubuntu `24.04` baseline, including the Linux poll/self-pipe and jump-buffer
-  portability path.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` passed in the documented Ubuntu
+  `24.04` baseline on 2026-05-21, including the Linux poll/self-pipe and
+  jump-buffer portability path.
 
 ## Implementation Notes
 

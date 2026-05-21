@@ -113,8 +113,8 @@ libraries or runtime data.
   2026-05-21 after rebuilding the controlled dependency prefix, packaging the
   native artifact, and passing strict package doctor/self-test from the final
   `.tar.zst`.
-- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed in the Ubuntu
-  `24.04` baseline with Linux package-local RUNPATH repair and strict
+- `scripts/preflight-linux-smolvm.sh 0.1.0` passed in the Ubuntu `24.04`
+  baseline on 2026-05-21 with Linux package-local RUNPATH repair and strict
   dependency diagnostics.
 
 ## Implementation Notes
