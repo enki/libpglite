@@ -251,9 +251,14 @@ actual plugin and prefix contents.
   in a production `runtime-ready` package shape.
 - The doctor now parses `build-provenance.txt` and compares it with the bundle
   manifest. Target, release version, release mode, runtime status, libpglite git
-  commit, plugin filename/checksum, packaged diagnostic filenames, timestamp
-  shape, Rust toolchain block, C compiler block, and `uname` must be present and
-  current.
+  commit, plugin filename/checksum, packaged diagnostic filenames for every
+  release-critical diagnostic, timestamp shape, Rust toolchain block, C
+  compiler block, and `uname` must be present and current.
+- Packaging now records every release-critical diagnostic path in
+  `build-provenance.txt`, including public ABI symbols, backend exports,
+  dependency text/json, source provenance, lifecycle, and conformance results.
+  The doctor rejects provenance that points at stale or partial diagnostic
+  filenames rather than the bundle's current package claims.
 - The doctor now cross-checks `source-provenance.json` against the native link
   manifest for pinned `postgres-pglite` repository/ref/commit, patch
   fingerprint, patch list, and per-patch SHA-256 values. A stale source

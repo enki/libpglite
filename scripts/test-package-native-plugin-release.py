@@ -45,6 +45,18 @@ class PackageNativePluginReleaseTests(unittest.TestCase):
             text,
         )
 
+    def test_build_provenance_names_release_diagnostics(self):
+        text = SCRIPT.read_text()
+        for line in [
+            'echo "plugin_defined_symbols=plugin-defined-symbols.txt"',
+            'echo "backend_export_symbols=backend-export-symbols.txt"',
+            'echo "dependencies=dependencies.txt"',
+            'echo "source_provenance=source-provenance.json"',
+            'echo "runtime_lifecycle=runtime-lifecycle.json"',
+            'echo "conformance_results=conformance"',
+        ]:
+            self.assertIn(line, text)
+
     def test_production_packaging_is_blocked_while_root_adrs_are_open(self):
         with tempfile.TemporaryDirectory() as tempdir:
             plugin = pathlib.Path(tempdir) / "liblibpglite_plugin_native.dylib"

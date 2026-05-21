@@ -507,8 +507,14 @@ PY
   echo "plugin_sha256=$plugin_checksum"
   echo "native_manifest=native-link-manifest.txt"
   echo "extension_inventory=extension-inventory.txt"
+  echo "plugin_defined_symbols=plugin-defined-symbols.txt"
+  echo "backend_export_symbols=backend-export-symbols.txt"
+  echo "dependencies=dependencies.txt"
   echo "dependency_manifest=dependencies.json"
   echo "platform_baseline=platform-baseline.json"
+  echo "source_provenance=source-provenance.json"
+  echo "runtime_lifecycle=runtime-lifecycle.json"
+  echo "conformance_results=conformance"
   if [[ "$platform" == *apple-darwin ]]; then
     echo "macos_deployment_target=$(manifest_value macos_deployment_target)"
   fi

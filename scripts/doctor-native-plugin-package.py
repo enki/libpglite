@@ -422,48 +422,27 @@ class Doctor:
 
         diagnostics = self.bundle.get("diagnostics")
         if isinstance(diagnostics, dict):
-            native_manifest = diagnostics.get("nativeLinkManifest")
-            if isinstance(native_manifest, str):
-                expected_native_manifest = pathlib.PurePosixPath(native_manifest).name
-                if values.get("native_manifest") != expected_native_manifest:
+            for diagnostic_key, provenance_key in {
+                "nativeLinkManifest": "native_manifest",
+                "extensionInventory": "extension_inventory",
+                "pluginDefinedSymbols": "plugin_defined_symbols",
+                "backendExportSymbols": "backend_export_symbols",
+                "dependencies": "dependencies",
+                "dependencyManifest": "dependency_manifest",
+                "platformBaseline": "platform_baseline",
+                "sourceProvenance": "source_provenance",
+                "runtimeLifecycle": "runtime_lifecycle",
+                "conformanceResults": "conformance_results",
+            }.items():
+                diagnostic_path = diagnostics.get(diagnostic_key)
+                if not isinstance(diagnostic_path, str):
+                    continue
+                expected_name = pathlib.PurePosixPath(diagnostic_path).name
+                if values.get(provenance_key) != expected_name:
                     self.errors.append(
-                        "build provenance native_manifest mismatch: "
-                        f"bundle={expected_native_manifest!r} "
-                        f"provenance={values.get('native_manifest')!r}"
-                    )
-
-            extension_inventory = diagnostics.get("extensionInventory")
-            if isinstance(extension_inventory, str):
-                expected_extension_inventory = pathlib.PurePosixPath(extension_inventory).name
-                if values.get("extension_inventory") != expected_extension_inventory:
-                    self.errors.append(
-                        "build provenance extension_inventory mismatch: "
-                        f"bundle={expected_extension_inventory!r} "
-                        f"provenance={values.get('extension_inventory')!r}"
-                    )
-
-            dependency_manifest = diagnostics.get("dependencyManifest")
-            if isinstance(dependency_manifest, str):
-                expected_dependency_manifest = pathlib.PurePosixPath(
-                    dependency_manifest
-                ).name
-                if values.get("dependency_manifest") != expected_dependency_manifest:
-                    self.errors.append(
-                        "build provenance dependency_manifest mismatch: "
-                        f"bundle={expected_dependency_manifest!r} "
-                        f"provenance={values.get('dependency_manifest')!r}"
-                    )
-
-            platform_baseline = diagnostics.get("platformBaseline")
-            if isinstance(platform_baseline, str):
-                expected_platform_baseline = pathlib.PurePosixPath(
-                    platform_baseline
-                ).name
-                if values.get("platform_baseline") != expected_platform_baseline:
-                    self.errors.append(
-                        "build provenance platform_baseline mismatch: "
-                        f"bundle={expected_platform_baseline!r} "
-                        f"provenance={values.get('platform_baseline')!r}"
+                        f"build provenance {provenance_key} mismatch: "
+                        f"bundle={expected_name!r} "
+                        f"provenance={values.get(provenance_key)!r}"
                     )
 
             target = self.bundle.get("target")

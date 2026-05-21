@@ -58,8 +58,14 @@ class DoctorDiagnosticsTests(unittest.TestCase):
                     "plugin_sha256=abc123",
                     "native_manifest=native-link-manifest.txt",
                     "extension_inventory=extension-inventory.txt",
+                    "plugin_defined_symbols=plugin-defined-symbols.txt",
+                    "backend_export_symbols=backend-export-symbols.txt",
+                    "dependencies=dependencies.txt",
                     "dependency_manifest=dependencies.json",
                     "platform_baseline=platform-baseline.json",
+                    "source_provenance=source-provenance.json",
+                    "runtime_lifecycle=runtime-lifecycle.json",
+                    "conformance_results=conformance",
                     "macos_deployment_target=11.0",
                     "packaged_at_utc=2026-05-21T00:00:00Z",
                     "uname=test",
@@ -188,6 +194,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
                 "pluginDefinedSymbols": "diagnostics/plugin-defined-symbols.txt",
                 "backendExportSymbols": "diagnostics/backend-export-symbols.txt",
                 "sourceProvenance": "diagnostics/source-provenance.json",
+                "conformanceResults": "diagnostics/conformance",
             }
         }
         doctor.actual_plugin_symbols = plugin_symbols
@@ -502,6 +509,34 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "build provenance native_manifest mismatch",
             "\n".join(doctor.errors),
         )
+
+    def test_build_provenance_must_name_all_release_diagnostics(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        build_provenance = (
+            pathlib.Path(tempdir.name) / "diagnostics" / "build-provenance.txt"
+        )
+        build_provenance.write_text(
+            build_provenance.read_text()
+            .replace(
+                "source_provenance=source-provenance.json",
+                "source_provenance=old-source-provenance.json",
+            )
+            .replace(
+                "conformance_results=conformance",
+                "conformance_results=old-conformance",
+            )
+        )
+        with tempdir:
+            doctor.validate_build_provenance()
+
+        errors = "\n".join(doctor.errors)
+        self.assertIn("build provenance source_provenance mismatch", errors)
+        self.assertIn("build provenance conformance_results mismatch", errors)
 
     def test_source_provenance_patch_sha256_must_match_native_manifest(self):
         tempdir, doctor = self.make_doctor(
