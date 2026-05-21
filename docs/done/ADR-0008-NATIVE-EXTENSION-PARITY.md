@@ -1,6 +1,6 @@
 # ADR-0008: Native Extension Parity
 
-Status: Open
+Status: Done
 Date: 2026-05-21
 
 ## Context
@@ -115,6 +115,34 @@ PGlite-shipped extension.
 - Production packaging must have no development fallback that can turn missing
   PGlite `other_extensions` sources into warnings once this ADR is moved to
   done.
+
+## Closing Evidence
+
+- `scripts/inventory-native-pglite-extensions.py` derives the extension
+  inventory from the pinned PGlite source, including `contrib` entries and all
+  pinned `pglite/other_extensions` gitlinks.
+- `scripts/materialize-native-pglite-other-extensions.py` refuses unpinned
+  PGlite extension sources and materializes the exact gitlink commits used by
+  the pinned source tree.
+- `scripts/prepare-native-pglite-link.sh --fetch-other-extensions
+  --build-other-extensions` builds and installs the full native parity set into
+  the generated PostgreSQL prefix, including `age`, `pg_hashids`, `pg_ivm`,
+  `pg_textsearch`, `pg_uuidv7`, `pgtap`, `postgis`, and `vector`.
+- The packaged dynamic-plugin conformance creates the full PGlite parity set
+  from the final package, and the PostGIS smoke calls `postgis_full_version()`
+  to prove dependency-backed runtime loading.
+- `scripts/doctor-native-plugin-package.py` rejects production packages with
+  missing PGlite `other_extensions` sources and rejects packaged extensions with
+  missing control files, default-version SQL, referenced native modules, or
+  required PostGIS projection data.
+- `scripts/test-doctor-native-plugin-package.py` covers the full pinned
+  `other_extensions` set for missing-control failures plus missing SQL, missing
+  native module, missing PostGIS data, and unreadable PostGIS data failures.
+- `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS on
+  2026-05-21 after building, packaging, doctoring, and creating the full parity
+  set from the final package.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed the same final
+  package parity path in the Ubuntu `24.04` baseline.
 
 ## Implementation Notes
 

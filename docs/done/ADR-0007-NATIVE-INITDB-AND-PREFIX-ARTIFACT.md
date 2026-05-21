@@ -1,6 +1,6 @@
 # ADR-0007: Native Initdb And Prefix Artifact
 
-Status: Open
+Status: Done
 Date: 2026-05-21
 
 ## Context
@@ -56,6 +56,28 @@ the plugin or provide an equivalent generated artifact.
 - The prefix layout remains stable across macOS and Linux packages; the bundle
   must continue to expose `postgres/`, `postgres/bin`, `postgres/share`,
   `postgres/lib`, `postgres/bin/initdb`, and `postgres/bin/postgres`.
+
+## Closing Evidence
+
+- `scripts/prepare-native-pglite-link.sh --build-postgres` installs the pinned
+  PostgreSQL/PGlite prefix and records the prefix paths in the native link
+  manifest.
+- `scripts/package-native-plugin-release.sh` stages that prefix as
+  `postgres/`, prunes build-only `postgres/include`, writes the canonical prefix
+  paths into bundle metadata, and runs the package doctor before archive
+  creation.
+- `scripts/doctor-native-plugin-package.py --self-test` extracts the final
+  package, opens the plugin by package directory, initializes a missing data
+  directory through the bundled prefix, resumes it from a later process, and
+  creates the packaged extension parity set.
+- `scripts/test-doctor-native-plugin-package.py` covers canonical prefix-layout
+  enforcement and build-machine absolute path rejection in packaged prefix text
+  metadata.
+- `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS on
+  2026-05-21 through prefix initialize/resume conformance, package smoke, and
+  final package doctor self-test.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed the same packaged
+  prefix self-test in the Ubuntu `24.04` baseline.
 
 ## Implementation Notes
 

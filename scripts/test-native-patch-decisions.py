@@ -5,7 +5,7 @@ import unittest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 PATCH_DIR = REPO_ROOT / "patches" / "postgres-pglite"
-ADR = REPO_ROOT / "docs" / "ADR-0005-PGLITEC-NATIVE-PORTABILITY.md"
+ADR = REPO_ROOT / "docs" / "done" / "ADR-0005-PGLITEC-NATIVE-PORTABILITY.md"
 
 
 class NativePatchDecisionTests(unittest.TestCase):

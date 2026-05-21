@@ -67,9 +67,14 @@ The native lane must preserve the PGlite runtime model:
   shutdown from the dynamic plugin.
 - The high-level Rust client transport runs against the same dynamic plugin and
   packaged prefix used by the raw protocol checks.
-- Linux and macOS preflight keep proving the same final-package path whenever
-  the native link, package, platform-floor, dependency, or extension substrate
-  changes.
+- The final protocol scope is explicit before this ADR moves to done. The
+  current minimum is the raw case set above plus the high-level Rust client
+  transport from the packaged artifact; any additional PostgreSQL frontend
+  protocol family judged release-critical must be added as a named conformance
+  case instead of left as an informal expectation.
+- Linux and macOS preflight prove the same final-package path after the final
+  protocol scope is set, and packaged diagnostics record the exact raw protocol
+  cases and high-level client command that passed.
 
 ## Implementation Notes
 
@@ -113,7 +118,8 @@ The native lane must preserve the PGlite runtime model:
   native Postgres/PGlite linked, the full materialized PGlite extension parity
   set built into the packaged prefix, and the package doctor self-test
   exercising the final archive. This closes the macOS release-path proof for
-  this ADR, but not the ADR itself because Linux remains a supported target.
+  this ADR, but not the ADR itself because the final protocol conformance scope
+  still needs to be made explicit.
 - The package doctor now rejects native package payloads that contain `.wasm`,
   JavaScript module files, Emscripten-named artifacts, wasm2c-named artifacts,
   or bitcode inputs. `scripts/test-doctor-native-plugin-package.py` pins those
@@ -127,6 +133,6 @@ The native lane must preserve the PGlite runtime model:
 - Raw-protocol conformance diagnostics now carry an explicit case inventory:
   startup, simple query, empty query, transaction rollback, transaction commit,
   recoverable protocol error, extended query, parameterized extended query, and
-  deterministic shutdown. The package doctor rejects raw-protocol conformance
-  results that do not name all of those cases, so packaged diagnostics can
-  explain what the passing result actually proved.
+  named prepared-statement reuse, and deterministic shutdown. The package doctor
+  rejects raw-protocol conformance results that do not name all of those cases,
+  so packaged diagnostics can explain what the passing result actually proved.

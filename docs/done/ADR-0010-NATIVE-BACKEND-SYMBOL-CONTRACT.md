@@ -1,6 +1,6 @@
 # ADR-0010: Native Backend Symbol Contract
 
-Status: Open
+Status: Done
 Date: 2026-05-21
 
 ## Context
@@ -77,6 +77,33 @@ set changes.
   exported backend symbols, and extension modules with unresolved backend
   references under the full packaged parity set.
 - Linux symbol-boundary checks remain release-gating for every final package.
+
+## Closing Evidence
+
+- Native prepare scans the installed packaged-prefix extension modules and emits
+  the generated backend export set into the native link manifest after the full
+  parity set is built.
+- The macOS plugin build exports the stable host ABI plus generated backend
+  symbols, while extension bundles use dynamic lookup and the Rust loader opens
+  the plugin with process-global visibility.
+- The Linux plugin build uses a Rust `staticlib` plus a final native link script
+  so GNU ld has one version-script boundary for both the stable host ABI and
+  generated backend exports.
+- `scripts/test-link-linux-native-plugin.py` pins the Linux final-link export
+  boundary, and `scripts/test-preflight-native-plugin-release.py` pins the
+  Linux staticlib-plus-final-link preflight shape.
+- `scripts/doctor-native-plugin-package.py` validates the packaged plugin's
+  exported symbols, compares `backend-export-symbols.txt` with the native link
+  manifest, and rejects stale diagnostics or Linux exports outside the host ABI
+  and generated backend set.
+- `scripts/test-doctor-native-plugin-package.py` covers stale backend-symbol
+  diagnostics and accidental Linux public exports, including the full pinned
+  PGlite `other_extensions` set.
+- `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS on
+  2026-05-21 after creating the full parity set from the final package through
+  the globally loaded plugin.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed the same packaged
+  symbol-boundary path in the Ubuntu `24.04` baseline.
 
 ## Implementation Notes
 

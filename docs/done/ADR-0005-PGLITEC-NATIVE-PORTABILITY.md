@@ -1,6 +1,6 @@
 # ADR-0005: PGlite C Support Native Portability
 
-Status: Open
+Status: Done
 Date: 2026-05-21
 
 ## Context
@@ -64,6 +64,27 @@ clear preprocessor gates.
   as part of preflight; a stale or malformed patch is not acceptable closure
   evidence. The patched-source cache must include the patch application method
   in its fingerprint so stricter patch validation cannot reuse an older tree.
+
+## Closing Evidence
+
+- `scripts/prepare-native-pglite-link.sh` applies the downstream patches with
+  `git apply --check` and fingerprints the patch application method before any
+  native build output can be reused.
+- `scripts/test-native-patch-decisions.py` keeps every
+  `patches/postgres-pglite/*.patch` file tied to the ADR's carry/upstream
+  decision table, and `scripts/audit-adr-closure.py` verifies that regression is
+  wired into native preflight.
+- `scripts/test-prepare-native-pglite-link.py` pins the forced-include shim
+  ordering, patch application path, patch-cache fingerprinting, and native
+  rebuild behavior.
+- Native preflight runs the patch-decision and prepare regressions before build
+  work, then builds the patched PGlite support code as release PIC.
+- `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS on
+  2026-05-21 after building the native backend, running raw protocol
+  conformance, and validating the final package.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed in the documented
+  Ubuntu `24.04` baseline, including the Linux poll/self-pipe and jump-buffer
+  portability path.
 
 ## Implementation Notes
 

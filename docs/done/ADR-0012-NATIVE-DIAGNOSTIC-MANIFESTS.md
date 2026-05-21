@@ -1,6 +1,6 @@
 # ADR-0012: Native Diagnostic Manifests
 
-Status: Open
+Status: Done
 Date: 2026-05-21
 
 ## Context
@@ -92,6 +92,37 @@ actual plugin and prefix contents.
   set no longer applies cleanly to the pinned PGlite source; patch checksums in
   package diagnostics are useful only if the patch substrate itself is
   reproducible.
+
+## Closing Evidence
+
+- Packaged artifacts carry `diagnostics/` files for build provenance, native
+  link manifest, source provenance, patch fingerprints, extension inventory,
+  public ABI symbols, backend exports, dependency scans, platform baseline,
+  dependency prefix, runtime lifecycle, and conformance results.
+- `scripts/package-native-plugin-release.sh` requires explicit conformance
+  diagnostics, writes build provenance that names every release-critical
+  diagnostic, runs the package doctor before archive creation, and packages the
+  same diagnostics that the doctor validates.
+- `scripts/doctor-native-plugin-package.py` validates extracted package
+  directories and `.tar.zst` archives without source checkout access, including
+  stale symbol files, dependency schema/platform/tool agreement, extension
+  package claims, runtime lifecycle, source provenance, patch fingerprints,
+  platform floor, dependency-prefix completeness, and conformance command/log
+  integrity.
+- `scripts/test-doctor-native-plugin-package.py` covers stale, missing,
+  malformed, and contradicted diagnostics across JSON families, symbols,
+  dependencies, extension inventory, platform baseline, source provenance,
+  lifecycle, and conformance results.
+- `scripts/audit-adr-closure.py` verifies every focused `scripts/test-*.py`
+  regression is wired into native release preflight, so diagnostic regressions
+  cannot become optional local checks.
+- Linux and macOS packages use the same structured dependency-manifest schema
+  while recording platform-specific scanner details as data; the doctor rejects
+  platform/tool mismatches.
+- `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS on
+  2026-05-21 through strict package doctor and final-artifact self-test.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed in the Ubuntu
+  `24.04` baseline with the same package-doctor diagnostic gate.
 
 ## Implementation Notes
 
@@ -198,11 +229,12 @@ actual plugin and prefix contents.
   native raw protocol/contrib smoke against the packaged plugin and packaged
   Postgres prefix. This keeps final-artifact runtime validation in the artifact
   doctor instead of duplicating one-off extraction logic in preflight.
-- Linux native preflight now reaches that strict doctor gate. The current
-  failure is diagnostic, not opaque: dependency manifests classify
-  build-prefix `libpq.so.5` references from modules such as `dblink` and
-  `postgres_fdw`, plus unresolved/static-unknown module dependencies, and the
-  strict doctor rejects the package before it can be treated as releasable.
+- An earlier Linux native preflight reached that strict doctor gate and exposed
+  diagnostic dependency failures rather than an opaque runtime failure:
+  manifests classified build-prefix `libpq.so.5` references from modules such
+  as `dblink` and `postgres_fdw`, plus unresolved/static-unknown module
+  dependencies, and the strict doctor rejected the package before it could be
+  treated as releasable.
 - Linux dependency diagnostics now ignore `ldd`'s `statically linked` marker
   for modules that have no dynamic dependencies, because that line is an absence
   of dependencies rather than an unresolved dependency. Real missing,
@@ -318,6 +350,6 @@ actual plugin and prefix contents.
   unittest discovery does not load these hyphenated filenames by default, so the
   audit makes the explicit preflight list a checked contract rather than a
   fragile convention.
-- This ADR remains open until diagnostics are generated as structured release
-  data across all required gates and production packaging rejects stale
-  diagnostics.
+- The diagnostics substrate is complete for the current release-gating ADR set.
+  Future native runtime widening must add new diagnostics and doctor checks
+  before moving its own ADR to `docs/done/`.

@@ -5,19 +5,19 @@ Rust-hosted native dynamic library.
 
 - `ADR-0002-NATIVE-PGLITE-BUILD-LANE.md`
 - `ADR-0004-RUNTIME-READY-RELEASE-GATE.md`
-- `ADR-0005-PGLITEC-NATIVE-PORTABILITY.md`
-- `ADR-0006-NATIVE-BUILD-PLATFORM-FLOOR.md`
-- `ADR-0007-NATIVE-INITDB-AND-PREFIX-ARTIFACT.md`
-- `ADR-0008-NATIVE-EXTENSION-PARITY.md`
-- `ADR-0009-NATIVE-DEPENDENCY-PREFIX.md`
-- `ADR-0010-NATIVE-BACKEND-SYMBOL-CONTRACT.md`
-- `ADR-0012-NATIVE-DIAGNOSTIC-MANIFESTS.md`
 
 Done records:
 
 - `done/ADR-0001-RUST-FACADE-AND-DYNAMIC-PLUGIN.md`
 - `done/ADR-0003-POSTGRES-CLIENT-TRANSPORT.md`
+- `done/ADR-0005-PGLITEC-NATIVE-PORTABILITY.md`
+- `done/ADR-0006-NATIVE-BUILD-PLATFORM-FLOOR.md`
+- `done/ADR-0007-NATIVE-INITDB-AND-PREFIX-ARTIFACT.md`
+- `done/ADR-0008-NATIVE-EXTENSION-PARITY.md`
+- `done/ADR-0009-NATIVE-DEPENDENCY-PREFIX.md`
+- `done/ADR-0010-NATIVE-BACKEND-SYMBOL-CONTRACT.md`
 - `done/ADR-0011-NATIVE-RUNTIME-LIFECYCLE.md`
+- `done/ADR-0012-NATIVE-DIAGNOSTIC-MANIFESTS.md`
 
 Policy records:
 
@@ -48,93 +48,30 @@ Current closure frontier:
   transaction commit, recoverable protocol error, basic extended query, and
   parameter-bound extended query, plus named prepared-statement reuse, and the
   raw-protocol conformance diagnostic must name those cases. It still needs
-  broader protocol coverage before the native build lane is complete; the
-  Ubuntu package path now proves the Linux final artifact for the current
-  conformance set, and the package doctor now rejects WASM, JavaScript,
+  broader protocol coverage before the native build lane is complete. The
+  missing closure is not more packaging substrate; it is a final protocol and
+  client conformance decision, followed by macOS and Ubuntu final-package
+  preflights that record that decision in packaged diagnostics. The Ubuntu
+  package path already proves the Linux final artifact for the current
+  conformance set, and the package doctor rejects WASM, JavaScript,
   Emscripten-named, wasm2c-named, and bitcode payloads in native packages.
 - ADR-0004: production packaging is now regression-tested to fail while root
   ADRs remain open, and the doctor has focused conformance-diagnostic failure
   regressions. The package script is also regression-pinned to run the package
   doctor before writing the distributable binary archive, and the doctor rejects
   contradictory `releaseMode`/`runtimeStatus` bundle claims. It still needs
-  every root ADR closed before production packages can claim runtime-ready
-  status.
-- ADR-0005: the backend archive now audits that PostgreSQL socket I/O binds to
-  PGlite callback shims instead of libc socket APIs, Linux prepare forces the
-  poll/self-pipe latch path for the dummy PGlite socket descriptor, the
-  forced-include header now declares the replacement shim ABI before macro
-  remapping, and the Ubuntu preflight passes the current release path. The ADR
-  records per-patch downstream carry decisions, preflight verifies that every
-  carried patch has a decision row, and prepare no longer depends on the
-  platform `patch` utility. Remaining closure is keeping the patch-apply and
-  shim-prototype regressions in the preflight path until final package evidence
-  is current.
-- ADR-0006: the full Ubuntu preflight now passes through `../smolvm/`, and
-  packages now carry a doctor-validated `platform-baseline.json`. The prepare
-  regression suite now pins deployment-target build-cache invalidation.
-  The Linux baseline is now documented as release policy and enforced by
-  package-time and doctor diagnostics, and the doctor rejects platform-baseline
-  diagnostics without observed `system` and `machine` fields. Remaining closure
-  is keeping both supported final-artifact preflights current after platform
-  diagnostic changes.
-- ADR-0007: macOS package doctor self-tests the packaged `postgres/` prefix,
-  including the full extension/runtime data surface. The Ubuntu lane now passes
-  the same package doctor self-test with Linux RUNPATH repair. The doctor now
-  rejects build-machine absolute paths in packaged prefix text metadata under
-  strict diagnostics and enforces the exact `postgresPrefix` bundle layout.
-  Runtime packaging now prunes server headers from the binary prefix so native
-  packages do not carry build-only port headers. Remaining closure is keeping
-  the final self-test and strict diagnostics release-gating current across
-  supported packages.
-- ADR-0008: macOS release preflight now materializes all pinned PGlite
-  `other_extensions`, builds the full set including `postgis`, packages them,
-  and runs packaged-artifact `CREATE EXTENSION` conformance for the parity set.
-  The Ubuntu lane now passes the same parity path on Linux, and the package
-  doctor now has full-set missing-control coverage plus focused regressions for
-  missing or unreadable PostGIS projection data. Standalone PostgreSQL
-  `contrib_module` inventory records are now explicitly validated as non-
-  extension entries. Remaining closure is production enforcement and deeper
-  dependency regressions that keep missing extension sources or files from
-  degrading to warnings.
-- ADR-0009: macOS packaged `pgcrypto` and PostGIS now work from the controlled
-  dependency prefix under strict package diagnostics. The Ubuntu lane now
-  applies package-local RUNPATH repair with `patchelf` and passes strict package
-  diagnostics. The Linux controlled-prefix release policy is now documented and
-  pinned to the local Ubuntu preflight test. Production packages now require a
-  controlled dependency-prefix diagnostic, and the doctor rejects
-  loader-relative dependency paths that escape the package with `..` as well as
-  dependency manifests whose platform contradicts the package target or whose
-  scanner tool does not match that platform. Remaining closure is keeping strict
-  dependency-regression coverage in place across package layouts.
-- ADR-0010: macOS release preflight now generates backend exports from the full
-  packaged parity set, including common data symbols, and proves the modules
-  load through the globally loaded plugin. Linux now uses a Rust staticlib plus
-  one final GNU ld version-script boundary and filters the expected version node
-  from symbol diagnostics, with focused preflight-wired regressions protecting
-  the final-link boundary. The Ubuntu lane now reaches the package doctor after
-  raw-protocol extension conformance; `pg_ivm` exposed the need to export
-  read-only backend data symbols such as `InvalidObjectAddress`, so the scanner
-  now includes `R` symbols. The doctor now rejects stale backend-symbol
-  diagnostics by scanning packaged extension modules for plugin-exported backend
-  references missing from `backend-export-symbols.txt`, with full pinned
-  `other_extensions` regression coverage. It also rejects accidental Linux
-  plugin exports outside the host ABI and generated backend set. Remaining
-  closure is keeping that strictness under the final packaged parity set.
-- ADR-0012: still needs production package enforcement for every
-  release-critical diagnostic and Linux schema parity before it can close. The
-  normal macOS preflight package path now carries controlled-prefix diagnostics,
-  source/patch provenance, symbol manifests, conformance logs, and full
-  extension package claims into the final-artifact doctor. Linux now uses the
-  same dependency schema, the platform baseline diagnostic has joined the
-  package doctor gate, production packaging and doctor validation both require
-  a dependency-prefix diagnostic, malformed structured JSON diagnostics have
-  focused doctor regressions, malformed extension-inventory lines now produce
-  package errors while `contrib_module` entries are validated as an explicit
-  inventory class, build provenance now names every release-critical packaged
-  diagnostic, raw-protocol diagnostics must name their covered protocol cases,
-  patch-apply reproducibility is now a prepare-time gate rather than only a
-  checksum claim, dependency manifests must use the platform-native scanner
-  they claim, conformance diagnostics must carry command and timestamp evidence,
-  conformance commands must match the expected release-gate fragments, and the
-  ADR audit now fails if any focused `scripts/test-*.py` regression is not wired
-  into native release preflight.
+  ADR-0002 closed first. After that, ADR-0004 is the final flip: production
+  packaging must assemble a `runtime-ready` artifact only after packaged
+  conformance diagnostics pass and the staged artifact passes the doctor before
+  archive creation.
+
+What is now closed:
+
+- ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010, and ADR-0012 have
+  been moved to `docs/done/` with `Closing Evidence` sections because their
+  contracts are enforced by release-path scripts, focused regressions, package
+  doctor checks, and macOS plus Ubuntu final-package evidence.
+- The remaining work is intentionally narrow: finish the runtime conformance
+  scope for ADR-0002, then perform the ADR-0004 production-ready packaging
+  transition. Adding new process documents is not required for closure unless a
+  new substrate weakness is found.

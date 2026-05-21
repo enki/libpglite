@@ -97,3 +97,8 @@ not claim that status.
   `runtimeStatus=runtime-ready` only after native preflight has produced passing
   packaged-artifact conformance diagnostics and the staged artifact has passed
   the package doctor before archive creation.
+- ADR-0004 closes last. Its final evidence must include a production-mode
+  package command that is no longer blocked by open ADRs, writes a
+  `runtime-ready` bundle, runs the staged package doctor before archive
+  creation, and then passes the archive doctor/self-test from the generated
+  `.tar.zst`.

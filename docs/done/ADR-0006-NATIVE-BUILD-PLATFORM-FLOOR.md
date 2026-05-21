@@ -1,6 +1,6 @@
 # ADR-0006: Native Build Platform Floor
 
-Status: Open
+Status: Done
 Date: 2026-05-21
 
 ## Context
@@ -52,6 +52,27 @@ still need an explicitly documented Linux baseline.
   the selected distro/libc baseline.
 - After platform-floor diagnostics change, the full macOS preflight and the
   Ubuntu `../smolvm/` preflight both pass from the final package artifact.
+
+## Closing Evidence
+
+- `scripts/test-prepare-native-pglite-link.py` verifies that
+  `MACOSX_DEPLOYMENT_TARGET` participates in the native build fingerprint,
+  causes native rebuilds when it changes, and is recorded in the native link
+  manifest.
+- Packaging writes `diagnostics/platform-baseline.json`; build provenance names
+  it; and `scripts/doctor-native-plugin-package.py` validates target identity,
+  observed `system`/`machine`, macOS deployment-target agreement, and Linux
+  Ubuntu baseline agreement.
+- `scripts/test-doctor-native-plugin-package.py` covers stale, missing,
+  malformed, contradictory, and target-mismatched platform-baseline diagnostics.
+- `docs/LINUX-RELEASE-POLICY.md` records Ubuntu `24.04` as the current Linux
+  release baseline, and `scripts/test-preflight-linux-smolvm.py` pins
+  `scripts/preflight-linux-smolvm.sh` as the local Ubuntu preflight entrypoint.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` passed in the Ubuntu `24.04`
+  baseline on 2026-05-21 after the platform-baseline diagnostic was added.
+- `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS on
+  2026-05-21 from the final package artifact after recording the macOS platform
+  floor in packaged diagnostics.
 
 ## Implementation Notes
 

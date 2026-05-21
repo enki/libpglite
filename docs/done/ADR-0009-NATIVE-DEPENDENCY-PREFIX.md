@@ -1,6 +1,6 @@
 # ADR-0009: Native Dependency Prefix
 
-Status: Open
+Status: Done
 Date: 2026-05-21
 
 ## Context
@@ -67,7 +67,7 @@ libraries or runtime data.
   external, or unresolved dependency paths in plugin and extension modules, with
   regression coverage for both macOS and Linux package layouts.
 
-## Closed Evidence
+## Closing Evidence
 
 - A clean macOS command builds the full pinned dependency prefix from
   `deps/native-pglite-dependencies.json` without relying on Homebrew libraries
@@ -109,6 +109,13 @@ libraries or runtime data.
 - Strict package diagnostics now reject loader-relative dependency paths that
   contain parent-directory traversal, so `@loader_path` or `$ORIGIN` entries
   cannot satisfy relocatability by escaping the packaged layout.
+- `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS on
+  2026-05-21 after rebuilding the controlled dependency prefix, packaging the
+  native artifact, and passing strict package doctor/self-test from the final
+  `.tar.zst`.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` previously passed in the Ubuntu
+  `24.04` baseline with Linux package-local RUNPATH repair and strict
+  dependency diagnostics.
 
 ## Implementation Notes
 
