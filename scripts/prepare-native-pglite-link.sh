@@ -187,7 +187,8 @@ mkdir -p "$build_dir" "$object_dir"
 
 patch_fingerprint="$(cd "$repo_root" && git hash-object patches/postgres-pglite/*.patch | git hash-object --stdin)"
 patched_source_fingerprint="source_commit=$source_commit
-patch_fingerprint=$patch_fingerprint"
+patch_fingerprint=$patch_fingerprint
+patch_applier=git-apply-check-ceiling-v2"
 patched_source_fingerprint_file="$patched_source/.libpglite-patched-source-fingerprint"
 if [[ ! -f "$patched_source_fingerprint_file" || "$(cat "$patched_source_fingerprint_file")" != "$patched_source_fingerprint" ]]; then
   rm -rf "$patched_source"
@@ -195,7 +196,8 @@ if [[ ! -f "$patched_source_fingerprint_file" || "$(cat "$patched_source_fingerp
   git -C "$source_dir" archive --format=tar HEAD | tar -xf - -C "$patched_source"
   for patch_file in "$repo_root"/patches/postgres-pglite/*.patch; do
     [[ -e "$patch_file" ]] || continue
-    patch -d "$patched_source" -p1 <"$patch_file" >/dev/null
+    GIT_CEILING_DIRECTORIES="$repo_root" git -C "$patched_source" apply --check "$patch_file"
+    GIT_CEILING_DIRECTORIES="$repo_root" git -C "$patched_source" apply "$patch_file"
   done
   printf '%s\n' "$patched_source_fingerprint" >"$patched_source_fingerprint_file"
 fi
@@ -235,6 +237,18 @@ cat >"$socket_shim_header" <<'EOF'
 #include <poll.h>
 #include <setjmp.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+
+int pgl_fcntl(int fd, int cmd, ...);
+int pgl_setsockopt(int fd, int level, int optname, const void *optval, socklen_t optlen);
+int pgl_getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen);
+int pgl_getsockname(int fd, struct sockaddr *addr, socklen_t *len);
+ssize_t pgl_recv(int fd, void *buf, size_t n, int flags);
+ssize_t pgl_send(int fd, const void *buf, size_t n, int flags);
+int pgl_connect(int socket, const struct sockaddr *address, socklen_t address_len);
+int pgl_poll(struct pollfd fds[], nfds_t nfds, int timeout);
+void pgl_longjmp(jmp_buf env, int val);
+void pgl_siglongjmp(sigjmp_buf env, int val);
 
 #define fcntl pgl_fcntl
 #define setsockopt pgl_setsockopt

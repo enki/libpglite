@@ -58,6 +58,14 @@ clear preprocessor gates.
 - A focused regression keeps the Linux forced-include ordering and jump-buffer
   address comparison in place, because those are the portability fixes most
   likely to be broken by future patch refreshes.
+- A focused regression keeps the forced-include shim header honest on every
+  target: it must include system socket/jump headers first, declare the PGlite
+  replacement functions with compatible prototypes, and only then macro-map
+  PostgreSQL call sites to those replacements.
+- The native portability patch itself must apply cleanly to the pinned source
+  as part of preflight; a stale or malformed patch is not acceptable closure
+  evidence. The patched-source cache must include the patch application method
+  in its fingerprint so stricter patch validation cannot reuse an older tree.
 
 ## Implementation Notes
 
@@ -73,6 +81,11 @@ clear preprocessor gates.
   Emscripten build, keeps native embedded mode from probing a nonexistent
   postmaster-death pipe, and preserves Emscripten behavior behind explicit
   preprocessor gates.
+- Native embedded mode must cover both public and internal postmaster-aliveness
+  probes. macOS conformance exposed a direct `PostmasterIsAliveInternal()` path
+  through latch handling; the runtime patch now returns alive immediately under
+  `__PGLITE__` so PostgreSQL does not read the nonexistent postmaster-death
+  pipe.
 - Linux native prepare now forces PostgreSQL's latch implementation onto the
   poll/self-pipe path with `WAIT_USE_POLL` and `WAIT_USE_SELF_PIPE`. The
   Emscripten lane already routes `poll()` through `pgl_poll`; native Linux must
@@ -92,6 +105,12 @@ clear preprocessor gates.
   `<setjmp.h>` before defining the PGlite socket and jump-call macros. That
   keeps libc prototypes intact and redirects PostgreSQL call sites instead of
   system declarations.
+- macOS then exposed the next layer of the same issue: modern C compilation
+  rejects call sites that macro-expand to undeclared replacement functions.
+  The forced-include header now declares the PGlite socket, poll, fcntl, and
+  jump shims before macro replacement. The carried native patch also gives
+  native `pgl_poll` the host `nfds_t` width while keeping the Emscripten dummy
+  `struct pollfd` path isolated behind an Emscripten gate.
 - Linux runtime conformance then reached Postgres error recovery and exposed
   another Emscripten-specific assumption: byte-comparing `jmp_buf` storage is
   not a portable way to identify the top-level Postgres exception frame. The

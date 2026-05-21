@@ -48,7 +48,10 @@ Current closure frontier:
   portability patches. The backend archive now audits that PostgreSQL socket
   I/O binds to PGlite callback shims instead of libc socket APIs, Linux prepare
   forces the poll/self-pipe latch path for the dummy PGlite socket descriptor,
-  and the Ubuntu preflight passes the current release path.
+  the forced-include header now declares the replacement shim ABI before macro
+  remapping, and the Ubuntu preflight passes the current release path. Remaining
+  closure is the final carry/upstream decision plus keeping the patch-apply and
+  shim-prototype regressions in the preflight path.
 - ADR-0006: the full Ubuntu preflight now passes through `../smolvm/`, and
   packages now carry a doctor-validated `platform-baseline.json`. Remaining
   closure is macOS floor-mismatch regression coverage, build-fingerprint
@@ -84,5 +87,6 @@ Current closure frontier:
   normal macOS preflight package path now carries controlled-prefix diagnostics,
   source/patch provenance, symbol manifests, conformance logs, and full
   extension package claims into the final-artifact doctor. Linux now uses the
-  same dependency schema, and the platform baseline diagnostic has joined the
-  package doctor gate.
+  same dependency schema, the platform baseline diagnostic has joined the
+  package doctor gate, and patch-apply reproducibility is now a prepare-time
+  gate rather than only a checksum claim.

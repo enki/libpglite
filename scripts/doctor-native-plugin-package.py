@@ -359,6 +359,34 @@ class Doctor:
                         f"provenance={values.get('platform_baseline')!r}"
                     )
 
+            target = self.bundle.get("target")
+            if isinstance(target, str) and target.endswith("apple-darwin"):
+                native_manifest_path = self.diagnostic_path("nativeLinkManifest")
+                expected_deployment_target = None
+                if native_manifest_path is not None:
+                    expected_deployment_target = first_manifest_value(
+                        native_manifest_path, "macos_deployment_target", self.errors
+                    )
+                if not values.get("macos_deployment_target"):
+                    self.errors.append(
+                        "build provenance is missing macos_deployment_target"
+                    )
+                elif values.get("macos_deployment_target") != expected_deployment_target:
+                    self.errors.append(
+                        "build provenance macos_deployment_target mismatch: "
+                        f"manifest={expected_deployment_target!r} "
+                        f"provenance={values.get('macos_deployment_target')!r}"
+                    )
+            elif isinstance(target, str) and target.endswith("linux-gnu"):
+                if values.get("linux_baseline_id") != "ubuntu" or values.get(
+                    "linux_baseline_version_id"
+                ) != "24.04":
+                    self.errors.append(
+                        "build provenance Linux baseline mismatch: "
+                        f"{values.get('linux_baseline_id')!r} "
+                        f"{values.get('linux_baseline_version_id')!r}"
+                    )
+
             dependency_prefix = diagnostics.get("dependencyPrefix")
             if isinstance(dependency_prefix, str):
                 expected_dependency_prefix = pathlib.PurePosixPath(dependency_prefix).name
@@ -435,6 +463,18 @@ class Doctor:
             deployment_target = expected.get("deploymentTarget")
             if not isinstance(deployment_target, str) or not deployment_target:
                 self.errors.append("macOS platform baseline is missing deploymentTarget")
+            native_manifest = self.diagnostic_path("nativeLinkManifest")
+            manifest_deployment_target = None
+            if native_manifest is not None:
+                manifest_deployment_target = first_manifest_value(
+                    native_manifest, "macos_deployment_target", self.errors
+                )
+            if deployment_target != manifest_deployment_target:
+                self.errors.append(
+                    "macOS platform baseline deployment target mismatch: "
+                    f"manifest={manifest_deployment_target!r} "
+                    f"diagnostic={deployment_target!r}"
+                )
 
     def validate_source_provenance(self) -> None:
         path = self.diagnostic_path("sourceProvenance")

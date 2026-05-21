@@ -88,6 +88,10 @@ actual plugin and prefix contents.
   platform-specific tool details captured as data.
 - Production packaging and strict preflight fail when any release-critical
   diagnostic is absent or contradicted by the artifact.
+- Preflight fails before build work starts if the documented downstream patch
+  set no longer applies cleanly to the pinned PGlite source; patch checksums in
+  package diagnostics are useful only if the patch substrate itself is
+  reproducible.
 
 ## Implementation Notes
 
@@ -242,8 +246,20 @@ actual plugin and prefix contents.
   validates it as a package claim. The diagnostic must match the bundle target.
   Linux packages must record the Ubuntu `24.04` baseline, matching
   `/etc/os-release`, plus a nonempty `ldd --version` line; packaging rejects a
-  mismatched Linux distro/version before the package is written. macOS packages
-  record the deployment target from the native link manifest.
+  mismatched Linux distro/version before the package is written. Build
+  provenance records the selected Linux baseline too. macOS packages record the
+  deployment target from the native link manifest, and the doctor rejects
+  mismatches between the manifest, build provenance, and platform baseline
+  diagnostic.
+- Native prepare now runs `git apply --check` before applying each downstream
+  source patch to the archived pinned source. That makes patch reproducibility
+  an explicit preflight gate, so source provenance, patch fingerprints, and
+  build inputs cannot drift apart silently. The patched-source cache fingerprint
+  also records the patch application method, so tightening patch validation
+  forces a fresh patched tree instead of trusting an older cache. Because the
+  patched source can live under this repository's `target/`, prepare sets a Git
+  ceiling directory while applying patches so `git apply` operates on the
+  archived source tree rather than silently walking up to this repository.
 - This ADR remains open until diagnostics are generated as structured release
   data across all required gates and production packaging rejects stale
   diagnostics.

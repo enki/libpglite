@@ -102,10 +102,13 @@ still need an explicitly documented Linux baseline.
 - Native packaging now writes `diagnostics/platform-baseline.json` and names it
   from both the bundle manifest and `build-provenance.txt`. On Linux, packaging
   defaults the expected baseline to Ubuntu `24.04`, records the `/etc/os-release`
-  identity and `ldd --version` first line, and fails immediately if the actual
-  distro/version differs. The package doctor validates the diagnostic target,
-  Linux baseline identity, recorded OS release, and Linux libc version line. On
-  macOS, the same diagnostic records the deployment target from the native link
-  manifest so the package has one place to explain its platform floor.
+  identity and `ldd --version` first line, records the selected baseline in
+  build provenance, and fails immediately if the actual distro/version differs.
+  The package doctor validates the diagnostic target, Linux baseline identity,
+  recorded OS release, Linux libc version line, and Linux baseline provenance.
+  On macOS, the same diagnostic records the deployment target from the native
+  link manifest, build provenance records that deployment target, and the doctor
+  rejects any disagreement between the native link manifest, package baseline
+  diagnostic, and build provenance.
 - After adding the package baseline diagnostic, `scripts/preflight-linux-smolvm.sh`
   with version `0.1.0` passed again in the `ubuntu:24.04` guest on 2026-05-21.

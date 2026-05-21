@@ -505,6 +505,13 @@ PY
   echo "extension_inventory=extension-inventory.txt"
   echo "dependency_manifest=dependencies.json"
   echo "platform_baseline=platform-baseline.json"
+  if [[ "$platform" == *apple-darwin ]]; then
+    echo "macos_deployment_target=$(manifest_value macos_deployment_target)"
+  fi
+  if [[ "$platform" == *linux-gnu ]]; then
+    echo "linux_baseline_id=${LIBPGLITE_LINUX_BASELINE_ID:-ubuntu}"
+    echo "linux_baseline_version_id=${LIBPGLITE_LINUX_BASELINE_VERSION_ID:-24.04}"
+  fi
   if [[ -n "$dependency_prefix_diagnostic" ]]; then
     echo "dependency_prefix=$(basename "$dependency_prefix_diagnostic")"
   fi

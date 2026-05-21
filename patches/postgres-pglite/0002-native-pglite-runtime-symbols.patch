@@ -45,6 +45,21 @@ index 1344d22..f9e16f1 100644
  
  	if (!load_hba())
  	{
+diff --git a/src/backend/storage/ipc/pmsignal.c b/src/backend/storage/ipc/pmsignal.c
+index 058644e..8f75316 100644
+--- a/src/backend/storage/ipc/pmsignal.c
++++ b/src/backend/storage/ipc/pmsignal.c
+@@ -376,6 +376,10 @@ PostmasterDeathSignalInit(void)
+ bool
+ PostmasterIsAliveInternal(void)
+ {
++#if defined(__PGLITE__)
++	return true;
++#endif
++
+ #ifdef USE_POSTMASTER_DEATH_SIGNAL
+ 	/*
+ 	 * Reset the flag before checking, so that we don't miss a signal if
 diff --git a/src/include/storage/pmsignal.h b/src/include/storage/pmsignal.h
 index 0e0c992..2fc99fa 100644
 --- a/src/include/storage/pmsignal.h

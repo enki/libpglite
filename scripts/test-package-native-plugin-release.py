@@ -35,6 +35,12 @@ class PackageNativePluginReleaseTests(unittest.TestCase):
         self.assertIn("Linux native package baseline mismatch", text)
         self.assertIn('"platformBaseline": "diagnostics/platform-baseline.json"', text)
         self.assertIn('echo "platform_baseline=platform-baseline.json"', text)
+        self.assertIn('echo "macos_deployment_target=$(manifest_value macos_deployment_target)"', text)
+        self.assertIn('echo "linux_baseline_id=${LIBPGLITE_LINUX_BASELINE_ID:-ubuntu}"', text)
+        self.assertIn(
+            'echo "linux_baseline_version_id=${LIBPGLITE_LINUX_BASELINE_VERSION_ID:-24.04}"',
+            text,
+        )
 
 
 if __name__ == "__main__":

@@ -49,6 +49,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
                     "extension_inventory=extension-inventory.txt",
                     "dependency_manifest=dependencies.json",
                     "platform_baseline=platform-baseline.json",
+                    "macos_deployment_target=11.0",
                     "packaged_at_utc=2026-05-21T00:00:00Z",
                     "uname=test",
                     "rustc_begin",
@@ -67,6 +68,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             f"patch={PATCH_PATH}",
             f"patch_sha256={PATCH_PATH};sha256={PATCH_SHA256}",
             "patch_fingerprint=1234567890abcdef1234567890abcdef12345678",
+            "macos_deployment_target=11.0",
         ]
         native_manifest_lines.extend(
             f"backend_export_symbol={symbol}"
@@ -396,6 +398,62 @@ class DoctorDiagnosticsTests(unittest.TestCase):
 
         self.assertIn(
             "Linux platform baseline must be ubuntu 24.04",
+            "\n".join(doctor.errors),
+        )
+
+    def test_macos_platform_baseline_must_match_native_manifest(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        doctor.bundle["target"] = "aarch64-apple-darwin"
+        baseline_path = pathlib.Path(tempdir.name) / "diagnostics" / "platform-baseline.json"
+        baseline_path.write_text(
+            json.dumps(
+                {
+                    "format": "libpglite-native-platform-baseline-v1",
+                    "target": "aarch64-apple-darwin",
+                    "system": "Darwin",
+                    "machine": "arm64",
+                    "baseline": {
+                        "kind": "macos-deployment-target",
+                        "deploymentTarget": "12.0",
+                    },
+                }
+            )
+            + "\n"
+        )
+        with tempdir:
+            doctor.validate_platform_baseline()
+
+        self.assertIn(
+            "macOS platform baseline deployment target mismatch",
+            "\n".join(doctor.errors),
+        )
+
+    def test_macos_build_provenance_must_match_native_manifest(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        doctor.bundle["target"] = "aarch64-apple-darwin"
+        build_provenance = (
+            pathlib.Path(tempdir.name) / "diagnostics" / "build-provenance.txt"
+        )
+        build_provenance.write_text(
+            build_provenance.read_text().replace(
+                "macos_deployment_target=11.0", "macos_deployment_target=12.0"
+            )
+        )
+        with tempdir:
+            doctor.validate_build_provenance()
+
+        self.assertIn(
+            "build provenance macos_deployment_target mismatch",
             "\n".join(doctor.errors),
         )
 
