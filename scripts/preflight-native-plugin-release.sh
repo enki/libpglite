@@ -236,16 +236,6 @@ LIBPGLITE_CONFORMANCE_DIR="$conformance_dir" \
   scripts/package-native-plugin-release.sh "$release_version" "$plugin_binary" "$out_dir"
 echo "==> preflight ${release_version}: package doctor"
 package_asset="$out_dir/libpglite-plugin-native-${release_version}-$(rustc -vV | awk -F': ' '$1 == "host" {print $2}').tar.zst"
-scripts/doctor-native-plugin-package.py --strict-relocatable "$package_asset"
-
-package_tempdir="$(mktemp -d)"
-tar --zstd -xf "$package_asset" -C "$package_tempdir"
-echo "==> preflight ${release_version}: packaged plugin runtime check"
-RUST_TEST_THREADS=1 \
-LIBPGLITE_TEST_PLUGIN_PATH="$package_tempdir/$plugin_name" \
-LIBPGLITE_TEST_POSTGRES_PREFIX="$package_tempdir/postgres" \
-  cargo test --features dynamic-loading --test dynamic_plugin \
-    dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_available -- --nocapture
-rm -rf "$package_tempdir"
+scripts/doctor-native-plugin-package.py --strict-relocatable --self-test "$package_asset"
 
 echo "==> preflight ${release_version}: complete"

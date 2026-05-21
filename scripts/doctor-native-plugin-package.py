@@ -31,12 +31,19 @@ def main() -> int:
         action="store_true",
         help="fail on build-machine dependency paths even for development packages",
     )
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="run the packaged plugin/prefix runtime smoke test from the artifact",
+    )
     args = parser.parse_args()
 
     package = pathlib.Path(args.package)
     with maybe_extract(package) as root:
         doctor = Doctor(root, strict_relocatable=args.strict_relocatable)
         doctor.run()
+        if args.self_test and not doctor.errors:
+            doctor.run_self_test()
         return doctor.finish()
 
 
@@ -292,6 +299,61 @@ class Doctor:
             self.errors.append(message)
         else:
             self.warnings.append(message)
+
+    def run_self_test(self) -> None:
+        if shutil.which("cargo") is None:
+            self.errors.append("package self-test requires cargo in PATH")
+            return
+
+        plugin = self.bundle.get("plugin")
+        if not isinstance(plugin, dict):
+            self.errors.append("package self-test cannot read bundle plugin field")
+            return
+        plugin_filename = plugin.get("filename")
+        if not isinstance(plugin_filename, str) or not plugin_filename:
+            self.errors.append("package self-test cannot read bundle plugin.filename")
+            return
+        plugin_path = self.root / plugin_filename
+        if not plugin_path.is_file():
+            self.errors.append(f"package self-test plugin is missing: {plugin_filename}")
+            return
+
+        postgres_prefix = self.bundle.get("postgresPrefix")
+        if not isinstance(postgres_prefix, dict):
+            self.errors.append("package self-test cannot read bundle postgresPrefix field")
+            return
+        postgres_prefix_path = postgres_prefix.get("path")
+        if not isinstance(postgres_prefix_path, str) or not postgres_prefix_path:
+            self.errors.append("package self-test cannot read bundle postgresPrefix.path")
+            return
+        postgres_root = self.root / postgres_prefix_path
+        if not postgres_root.is_dir():
+            self.errors.append(
+                f"package self-test Postgres prefix is missing: {postgres_prefix_path}"
+            )
+            return
+
+        repo_root = pathlib.Path(__file__).resolve().parents[1]
+        env = os.environ.copy()
+        env["RUST_TEST_THREADS"] = "1"
+        env["LIBPGLITE_TEST_PLUGIN_PATH"] = str(plugin_path)
+        env["LIBPGLITE_TEST_POSTGRES_PREFIX"] = str(postgres_root)
+
+        command = [
+            "cargo",
+            "test",
+            "--features",
+            "dynamic-loading",
+            "--test",
+            "dynamic_plugin",
+            "dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_available",
+            "--",
+            "--nocapture",
+        ]
+        print("running package self-test:", " ".join(command))
+        result = subprocess.run(command, cwd=repo_root, env=env, check=False)
+        if result.returncode != 0:
+            self.errors.append(f"package self-test failed with exit code {result.returncode}")
 
     def diagnostic_path(self, key: str) -> pathlib.Path | None:
         diagnostics = self.bundle.get("diagnostics")

@@ -43,6 +43,12 @@ native plugin. Runtime-ready status remains blocked on broader conformance, full
 extension parity, Linux coverage, packaging relocatability, and the explicit
 lifecycle contract in ADR-0011.
 
+The package doctor now owns the packaged-artifact runtime smoke through
+`--self-test`, and native preflight runs that mode against the final archive.
+That is still a development/preflight gate, but it moves the release boundary in
+the intended direction: runtime readiness must be proven from the artifact that
+would ship, not only from build-tree outputs.
+
 ## Required Work
 
 1. Keep package metadata explicit about `runtimeStatus`.
