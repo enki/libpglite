@@ -37,34 +37,32 @@ work starts.
 
 Current closure frontier:
 
-- ADR-0002: still needs Linux native link/conformance and broader protocol
-  coverage before the native build lane is complete.
+- ADR-0002: macOS release preflight now passes from the final package artifact
+  with native Postgres/PGlite linked and full extension parity exercised. It
+  still needs Linux native link/conformance and broader protocol coverage before
+  the native build lane is complete.
 - ADR-0004: still needs every root ADR closed before production packages can
   claim runtime-ready status.
 - ADR-0005: still needs Linux `pglitec.c` PIC proof and an upstream/carry
   decision for the native portability patches.
 - ADR-0006: still needs Linux baseline automation through the Ubuntu
   environment in `../smolvm/` or an equivalent release container.
-- ADR-0007: still needs final relocatable prefix closure after extension parity
-  expands the prefix beyond current contrib coverage.
-- ADR-0008: still needs packaged-artifact `CREATE EXTENSION` conformance for
-  the full parity set and promotion of the full `other_extensions` build into
-  release preflight. The dependency-prefixed macOS probe now materializes all
-  pinned PGlite `other_extensions` and builds the full set, including
-  `postgis`, into the generated prefix.
-- ADR-0009: still needs packaged `pgcrypto` and PostGIS runtime proof, strict
-  dependency diagnostics across the final extension surface, and the Linux
-  prefix contract. The macOS preflight path now builds the clean controlled
-  dependency prefix by default; the full-extension probe also builds PostGIS
-  against that prefix and installs its PROJ data into the generated Postgres
-  prefix.
-- ADR-0010: still needs stale-symbol checks against the packaged full extension
-  parity set and Linux export/version-script coverage. The macOS symbol scanner
-  has now seen the full PGlite `other_extensions` build, including PostGIS, but
-  the packaged parity set still needs to drive the release gate.
+- ADR-0007: macOS package doctor self-tests the packaged `postgres/` prefix,
+  including the full extension/runtime data surface. It still needs the same
+  prefix shape and strict relocatability on Linux.
+- ADR-0008: macOS release preflight now materializes all pinned PGlite
+  `other_extensions`, builds the full set including `postgis`, packages them,
+  and runs packaged-artifact `CREATE EXTENSION` conformance for the parity set.
+  It still needs the same release path and doctor regression coverage on Linux.
+- ADR-0009: macOS packaged `pgcrypto` and PostGIS now work from the controlled
+  dependency prefix under strict package diagnostics. It still needs the Linux
+  prefix contract and continued strict dependency-regression coverage.
+- ADR-0010: macOS release preflight now generates backend exports from the full
+  packaged parity set, including common data symbols, and proves the modules
+  load through the globally loaded plugin. It still needs Linux
+  export/version-script coverage and full-set stale-symbol regression coverage.
 - ADR-0012: still needs production package enforcement for every
   release-critical diagnostic and Linux schema parity before it can close. The
-  normal macOS preflight package path now carries the controlled prefix
-  diagnostic and checksum into the final-artifact doctor, and the full
-  `other_extensions` build probe now gives the diagnostic substrate concrete
-  PostGIS build artifacts and projection data to validate.
+  normal macOS preflight package path now carries controlled-prefix diagnostics,
+  source/patch provenance, symbol manifests, conformance logs, and full
+  extension package claims into the final-artifact doctor.

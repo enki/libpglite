@@ -11,8 +11,11 @@ class PreflightNativePluginReleaseTest(unittest.TestCase):
         text = SCRIPT.read_text()
         build = 'scripts/build-native-dependency-prefix.sh --prefix "$dependency_prefix"'
         prepare = (
-            'scripts/prepare-native-pglite-link.sh --build-postgres '
-            '--dependency-prefix "$dependency_prefix"'
+            "scripts/prepare-native-pglite-link.sh \\\n"
+            "  --build-postgres \\\n"
+            "  --dependency-prefix \"$dependency_prefix\" \\\n"
+            "  --fetch-other-extensions \\\n"
+            "  --build-other-extensions"
         )
 
         self.assertIn("LIBPGLITE_NATIVE_DEPENDENCY_PREFIX", text)

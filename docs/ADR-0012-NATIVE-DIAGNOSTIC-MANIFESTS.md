@@ -129,9 +129,7 @@ actual plugin and prefix contents.
 - The macOS `v0.1.0` preflight passed with that default path. The produced
   package contains `diagnostics/native-dependency-prefix.json`, the bundle
   manifest references it, and the strict package doctor/self-test accepted the
-  final `.tar.zst` artifact. The doctor still warns, but does not fail
-  development artifacts, for missing PGlite `other_extensions`; production mode
-  remains the hard gate for that parity gap.
+  final `.tar.zst` artifact.
 - Native dependency sources now have a structured
   `libpglite-native-dependency-sources-v1` fetch manifest with archive hashes
   and exact git commits. That manifest is build-stage evidence today; it should
@@ -181,15 +179,23 @@ actual plugin and prefix contents.
   `other_extensions`: missing materialized sources remain development warnings
   and production failures, while present sources must also have their packaged
   control files, install SQL, and referenced native modules.
-- A macOS controlled-prefix opt-in prepare has now exercised that distinction:
-  all eight pinned `other_extensions` were materialized and the full set,
-  including PostGIS, was installed into the generated prefix, so the inventory
-  can move from `status=missing` to `status=present` with concrete files behind
-  the claim. `scripts/check-native-other-extension-build.sh` now passes by
-  default without the PostGIS gap escape hatch and validates installed control,
-  SQL, native module, and PostGIS projection-data artifacts. This remains a
-  build-stage diagnostic proof until the normal preflight package carries those
-  present-source claims and the doctor validates them from the final artifact.
+- The macOS controlled-prefix prepare has now exercised that distinction in the
+  normal preflight path: all eight pinned `other_extensions` are materialized
+  and the full set, including PostGIS, is installed into the generated prefix, so
+  the inventory moves from `status=missing` to `status=present` with concrete
+  files behind the claim. `scripts/check-native-other-extension-build.sh` still
+  provides a focused build-stage proof, and normal macOS preflight now carries
+  the same claims into the package doctor.
+- The packaged-artifact doctor self-test now validates full-extension runtime
+  evidence from the final archive. It extracts the `.tar.zst`, loads the
+  packaged plugin and bundled prefix, and runs the dynamic-plugin sweep that
+  creates `age`, `pg_hashids`, `pg_ivm`, `pg_textsearch`, `pg_uuidv7`, `pgtap`,
+  `postgis`, and `vector` from the packaged files.
+- Native prepare and package diagnostics now record the failure mode that the
+  full parity sweep exposed: backend export manifests must include common data
+  symbols, and packaged `plpgsql` must be linked with dynamic lookup semantics.
+  Static regression tests assert both rules so future generated artifacts fail
+  early instead of producing a package that only fails when an extension loads.
 - The package now includes a structured runtime lifecycle diagnostic. The doctor
   validates that it matches the current single-start-per-process contract and
   cites raw protocol conformance as evidence.

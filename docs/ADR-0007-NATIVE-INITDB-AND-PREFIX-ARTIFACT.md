@@ -47,11 +47,11 @@ the plugin or provide an equivalent generated artifact.
 
 ## Remaining Closure Criteria
 
-- The packaged `postgres/` prefix contains every runtime file needed by the
-  final extension parity set, not only the current contrib subset.
+- Linux packages contain every runtime file needed by the final extension parity
+  set, matching the macOS packaged prefix shape.
 - Package doctor self-test initializes a missing data directory from the
   packaged prefix and resumes it from a later process without build-tree
-  environment variables.
+  environment variables on every supported target.
 - Strict package diagnostics reject build-machine absolute paths in prefix
   metadata, extension SQL/control files, loadable module paths, and runtime data
   references.
@@ -83,3 +83,10 @@ the plugin or provide an equivalent generated artifact.
   fetched PGlite `other_extensions` can build against the same native prefix
   rather than a host PostgreSQL installation. The package doctor treats those
   files as required prefix contents.
+- The macOS preflight prefix now includes the full materialized PGlite
+  `other_extensions` runtime surface, including extension control/SQL files,
+  loadable modules, PostGIS companion controls, and `share/proj` projection
+  data. The package doctor self-test creates those extensions from the packaged
+  prefix, so the remaining prefix closure is target parity and continued strict
+  relocatability rather than proving the macOS prefix contains only core
+  runtime files.

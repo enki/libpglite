@@ -35,15 +35,17 @@ Runtime-ready release status requires:
 - deterministic shutdown tested
 - high-level Rust PostgreSQL client transport tested
 
-The macOS native smoke now covers part of this list through raw protocol tests,
+The macOS native preflight now covers much of this list through raw protocol
+tests,
 including startup, simple query, a basic extended-query flow, transaction
 rollback, protocol error recovery, contrib extension loading, and deterministic
 shutdown. ADR-0003 also adds a `tokio-postgres` transport check against the real
-native plugin. Runtime-ready status remains blocked on broader conformance, full
-extension parity, Linux coverage, and packaging relocatability. ADR-0011 now
-closes the first lifecycle contract as single-start-per-process; deterministic
-same-process restart is a future widening of that contract, not a production
-release prerequisite.
+native plugin. The macOS package doctor now self-tests the final archive and
+creates the materialized PGlite `other_extensions` set from the packaged prefix.
+Runtime-ready status remains blocked on broader conformance, Linux coverage, and
+the fact that root ADRs are still open. ADR-0011 now closes the first lifecycle
+contract as single-start-per-process; deterministic same-process restart is a
+future widening of that contract, not a production release prerequisite.
 
 The package doctor now owns the packaged-artifact runtime smoke through
 `--self-test`, and native preflight runs that mode against the final archive.

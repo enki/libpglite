@@ -22,6 +22,22 @@ class PrepareNativePgliteLinkTests(unittest.TestCase):
         self.assertIn("if [[ \"$extension\" == \"postgis\" ]]; then", text)
         self.assertIn("build_native_postgis_extension", text)
 
+    def test_backend_export_scanner_includes_common_data_symbols(self):
+        text = SCRIPT.read_text()
+        self.assertIn("awk '$2 ~ /^[TDBSC]$/ {print $3}'", text)
+
+    def test_plpgsql_uses_extension_dynamic_lookup_flags(self):
+        text = SCRIPT.read_text()
+        self.assertIn(
+            'find "$postgres_build_dir/src/pl/plpgsql/src" -maxdepth 1 -type f \\( -name \'*.dylib\' -o -name \'*.so\' \\) -delete',
+            text,
+        )
+        self.assertIn(
+            'make -C "$postgres_build_dir/src/pl/plpgsql/src" install \\\n'
+            '    BE_DLLLIBS="$native_extension_be_dlllibs"',
+            text,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

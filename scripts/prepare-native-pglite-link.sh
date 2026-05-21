@@ -448,7 +448,7 @@ native_extension_required_symbols() {
 
   nm -g "$pglitec_object" "$native_trap_object" \
     "$backend_archive" "$timezone_archive" "$common_archive" "$port_archive" 2>/dev/null \
-    | awk '$2 ~ /^[TDBS]$/ {print $3}' \
+    | awk '$2 ~ /^[TDBSC]$/ {print $3}' \
     | sed 's/^_//' \
     | LC_ALL=C sort -u >"$defined_symbols"
 
@@ -616,7 +616,9 @@ native_extension_be_dlllibs=$native_extension_be_dlllibs"
     COPT="$pglite_copt" \
     LDFLAGS_EX="$pglitec_object $native_exit_object"
   make -C "$postgres_build_dir/src/backend/snowball" install
-  make -C "$postgres_build_dir/src/pl/plpgsql/src" install
+  find "$postgres_build_dir/src/pl/plpgsql/src" -maxdepth 1 -type f \( -name '*.dylib' -o -name '*.so' \) -delete
+  make -C "$postgres_build_dir/src/pl/plpgsql/src" install \
+    BE_DLLLIBS="$native_extension_be_dlllibs"
   make -C "$postgres_build_dir/src/bin/initdb" install
   make -C "$postgres_build_dir/src" install-local
   make -C "$postgres_build_dir/src/makefiles" install

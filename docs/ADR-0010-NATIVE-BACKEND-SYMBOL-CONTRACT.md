@@ -73,16 +73,13 @@ set changes.
 
 ## Remaining Closure Criteria
 
-- The backend export set is generated from every packaged extension module in
-  the final parity set, not only the current contrib subset.
-- macOS preflight proves the plugin exports the generated backend symbols while
-  keeping unrelated implementation symbols hidden from the public host ABI.
 - Linux preflight implements the equivalent export/version-script contract and
   proves bundled extension modules resolve against the globally loaded plugin.
-- The package doctor fails on stale backend-symbol diagnostics, missing exported
-  backend symbols, and extension modules with unresolved backend references.
-- Packaged-artifact conformance creates representative extension modules that
-  require backend symbol resolution, including `pgcrypto` and PostGIS.
+- The package doctor keeps failing on stale backend-symbol diagnostics, missing
+  exported backend symbols, and extension modules with unresolved backend
+  references, with regression coverage for the full parity set.
+- Linux packaged-artifact conformance creates representative extension modules
+  that require backend symbol resolution, including `pgcrypto` and PostGIS.
 
 ## Implementation Notes
 
@@ -107,6 +104,22 @@ set changes.
   manifest emits generated backend exports, contrib bundles are linked with
   dynamic lookup instead of `-bundle_loader postgres`, and the native dynamic
   test creates both extensions in one runtime.
+- The macOS release path now proves the same contract for the full PGlite
+  parity sweep from the packaged artifact. The backend export scanner runs
+  after `contrib` and all materialized `pglite/other_extensions` have been
+  installed, including `pg_textsearch`, PostGIS, and `vector`; the package
+  doctor checks the exported-symbol diagnostics against the actual plugin; and
+  the packaged runtime creates the extension set through the globally loaded
+  plugin.
+- The scanner must include common data symbols as well as text/data/BSS symbols.
+  The full parity sweep exposed `BufferBlocks` as a required common symbol for
+  `pg_textsearch`; the scanner now accepts `T`, `D`, `B`, `S`, and `C` symbol
+  classes so extension modules do not depend on accidental symbol omissions.
+- Bundled procedural language modules are part of the same dynamic-symbol
+  contract. The generated `plpgsql` module is rebuilt during native prepare with
+  the extension dynamic-lookup linker flags so extensions that require
+  `plpgsql`, including `pg_textsearch`, resolve backend symbols from the plugin
+  instead of from a nonexistent standalone `postgres` executable.
 - PGlite's own `pglitec.o` must also route `exit()` through the native exit trap.
   Otherwise `pgl_longjmp()` escapes the Rust process with status 100 instead of
   returning through the C trampoline as a recoverable backend longjmp boundary.
@@ -118,8 +131,8 @@ set changes.
   package doctor verifies that the diagnostic set agrees with the native link
   manifest and that every recorded backend export is actually exported by the
   packaged plugin.
-- A macOS controlled-prefix opt-in prepare has generated the backend export set
-  after building the full PGlite `other_extensions` set, including `vector` and
-  PostGIS. That is useful evidence that the scanner can see beyond `contrib`,
-  but this ADR stays open until the final packaged parity set drives the export
-  set and packaged conformance proves those modules load through the plugin.
+- A macOS controlled-prefix prepare now generates the backend export set after
+  building the full PGlite `other_extensions` set, including `vector` and
+  PostGIS, and that prepare is part of normal macOS preflight. This ADR remains
+  open because Linux still needs the equivalent exported-symbol/version-script
+  contract.

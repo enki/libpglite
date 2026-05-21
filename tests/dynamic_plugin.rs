@@ -125,25 +125,17 @@ fn dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_
     assert_message_type(&extended_response, b'C');
     assert_message_type(&extended_response, b'Z');
 
-    let citext_response = runtime
-        .exec_protocol_raw(&query_message(
-            "create extension citext; select 'pglite'::citext = 'PGLITE'::citext",
-        ))
-        .expect("citext extension query succeeds");
-    assert_no_error_message(&citext_response);
-    assert_message_type(&citext_response, b'D');
-    assert_message_type(&citext_response, b'C');
-    assert_message_type(&citext_response, b'Z');
-
-    let pgcrypto_response = runtime
-        .exec_protocol_raw(&query_message(
-            "create extension pgcrypto; select encode(digest('pglite', 'sha256'), 'hex')",
-        ))
-        .expect("pgcrypto extension query succeeds");
-    assert_no_error_message(&pgcrypto_response);
-    assert_message_type(&pgcrypto_response, b'D');
-    assert_message_type(&pgcrypto_response, b'C');
-    assert_message_type(&pgcrypto_response, b'Z');
+    assert_query_ok(
+        &mut runtime,
+        "citext",
+        "create extension citext; select 'pglite'::citext = 'PGLITE'::citext",
+    );
+    assert_query_ok(
+        &mut runtime,
+        "pgcrypto",
+        "create extension pgcrypto; select encode(digest('pglite', 'sha256'), 'hex')",
+    );
+    assert_pglite_other_extensions(&mut runtime);
 
     runtime.shutdown().expect("runtime shuts down");
     drop(runtime);
@@ -655,6 +647,79 @@ fn assert_no_error_message(response: &[u8]) {
         assert_ne!(tag, b'E', "response contained error in {:?}", response);
         offset += 1 + len;
     }
+}
+
+fn assert_query_ok(runtime: &mut DynamicPgliteRuntime, label: &str, sql: &str) {
+    let response = runtime
+        .exec_protocol_raw(&query_message(sql))
+        .unwrap_or_else(|err| panic!("{label} query failed to execute: {err}"));
+    assert_no_error_message_for(label, &response);
+    assert_message_type(&response, b'C');
+    assert_message_type(&response, b'Z');
+}
+
+fn assert_pglite_other_extensions(runtime: &mut DynamicPgliteRuntime) {
+    for (label, sql) in [
+        ("age", "create extension age"),
+        ("pg_hashids", "create extension pg_hashids"),
+        ("pg_ivm", "create extension pg_ivm"),
+        ("pg_textsearch", "create extension pg_textsearch"),
+        ("pg_uuidv7", "create extension pg_uuidv7"),
+        ("pgtap", "create extension pgtap"),
+        (
+            "postgis",
+            "create extension postgis; select postgis_full_version()",
+        ),
+        (
+            "vector",
+            "create extension vector; select '[1,2,3]'::vector(3)",
+        ),
+    ] {
+        assert_query_ok(runtime, label, sql);
+    }
+}
+
+fn assert_no_error_message_for(label: &str, response: &[u8]) {
+    if let Some(error) = protocol_error_message(response) {
+        panic!("{label} response contained PostgreSQL error: {error}");
+    }
+}
+
+fn protocol_error_message(response: &[u8]) -> Option<String> {
+    let mut offset = 0;
+    while offset + 5 <= response.len() {
+        let tag = response[offset];
+        let len = u32::from_be_bytes(
+            response[offset + 1..offset + 5]
+                .try_into()
+                .expect("message length"),
+        ) as usize;
+        assert!(len >= 4, "invalid protocol message length {len}");
+        if tag == b'E' {
+            let end = offset + 1 + len;
+            let fields = &response[offset + 5..end];
+            let mut message = None;
+            let mut cursor = 0;
+            while cursor < fields.len() {
+                let field = fields[cursor];
+                cursor += 1;
+                if field == 0 {
+                    break;
+                }
+                let Some(relative_end) = fields[cursor..].iter().position(|byte| *byte == 0) else {
+                    break;
+                };
+                let value = String::from_utf8_lossy(&fields[cursor..cursor + relative_end]);
+                if field == b'M' {
+                    message = Some(value.into_owned());
+                }
+                cursor += relative_end + 1;
+            }
+            return Some(message.unwrap_or_else(|| "unknown PostgreSQL error".to_string()));
+        }
+        offset += 1 + len;
+    }
+    None
 }
 
 fn test_guard() -> std::sync::MutexGuard<'static, ()> {

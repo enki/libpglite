@@ -61,9 +61,6 @@ The native lane must preserve the PGlite runtime model:
 
 ## Remaining Closure Criteria
 
-- `scripts/preflight-native-plugin-release.sh <version>` passes on macOS with
-  native Postgres/PGlite linked and with the final package doctor self-test
-  exercising the packaged artifact.
 - The same native link and conformance path passes on Linux in the documented
   baseline environment.
 - Raw protocol conformance covers startup, simple query, extended query,
@@ -110,6 +107,12 @@ The native lane must preserve the PGlite runtime model:
   extended-query flow, create contrib extensions, and shut down. The same
   native plugin is also exercised through the `tokio-postgres` client transport
   in an isolated process.
-- Broader extended-query coverage, richer transaction/error cases, full
-  extension parity, packaging hardening, restart lifecycle, and Linux
-  conformance remain open.
+- `scripts/preflight-native-plugin-release.sh v0.1.0` now passes on macOS with
+  native Postgres/PGlite linked, the full materialized PGlite extension parity
+  set built into the packaged prefix, and the package doctor self-test
+  exercising the final archive. This closes the macOS release-path proof for
+  this ADR, but not the ADR itself because Linux remains a supported target.
+- Broader extended-query coverage, richer transaction/error cases, and Linux
+  conformance remain open. Full extension parity, packaging hardening, and the
+  current restart lifecycle now have macOS release-path evidence and remain
+  tracked in their owning ADRs until Linux and production gates close.

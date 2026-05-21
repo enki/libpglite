@@ -187,7 +187,11 @@ echo "==> preflight ${release_version}: pinned native dependency prefix"
 scripts/build-native-dependency-prefix.sh --prefix "$dependency_prefix"
 
 echo "==> preflight ${release_version}: pinned postgres-pglite native archive build"
-scripts/prepare-native-pglite-link.sh --build-postgres --dependency-prefix "$dependency_prefix"
+scripts/prepare-native-pglite-link.sh \
+  --build-postgres \
+  --dependency-prefix "$dependency_prefix" \
+  --fetch-other-extensions \
+  --build-other-extensions
 manifest="$repo_root/target/native-pglite/$(rustc -vV | awk -F': ' '$1 == "host" {print $2}')/libpglite_native_link_manifest.txt"
 initdb_binary="$(awk -F= '$1 == "initdb_binary" {print substr($0, length($1) + 2)}' "$manifest")"
 postgres_lib_dir="$(awk -F= '$1 == "postgres_lib_dir" {print substr($0, length($1) + 2)}' "$manifest")"

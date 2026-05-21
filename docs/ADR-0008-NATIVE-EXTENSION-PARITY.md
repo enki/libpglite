@@ -108,19 +108,16 @@ PGlite-shipped extension.
 
 ## Remaining Closure Criteria
 
-- The native inventory is generated from the pinned `postgres-pglite` source and
-  fails preflight on unpinned, missing-URL, added, or removed PGlite extension
-  entries.
-- Release preflight fetches/materializes and builds every inventoried
-  `pglite/other_extensions` entry, including `vector` and PostGIS, instead of
-  leaving the full build as a manual probe.
-- PostGIS is packaged with its required GEOS, PROJ, json-c, SQLite, and
-  projection-data payload from the controlled native dependency prefix.
-- Packaged-artifact conformance runs `CREATE EXTENSION` for the full parity set,
-  including `vector` and `postgis`.
-- The package doctor rejects any extension whose control file, default-version
-  SQL, loadable module, dependency library, or required data payload is absent or
-  non-relocatable.
+- The Linux release path must fetch/materialize, build, package, and run
+  packaged-artifact `CREATE EXTENSION` conformance for the same inventoried
+  parity set in the documented Ubuntu baseline.
+- The package doctor must keep rejecting any extension whose control file,
+  default-version SQL, loadable module, dependency library, or required data
+  payload is absent or non-relocatable, with regression coverage for the
+  full PGlite `other_extensions` set.
+- Production packaging must have no development fallback that can turn missing
+  PGlite `other_extensions` sources into warnings once this ADR is moved to
+  done.
 
 ## Implementation Notes
 
@@ -139,8 +136,8 @@ PGlite-shipped extension.
   manifest. It now records each PGlite `other_extensions` entry's source path,
   present/missing status, gitlink commit, submodule URL, and branch metadata
   where the pinned source declares it.
-- The current local pinned source has unpopulated `pglite/other_extensions`
-  submodules, but the pinned gitlinks are now visible in the inventory:
+- The pinned source has unpopulated `pglite/other_extensions` submodules in a
+  fresh checkout, but the pinned gitlinks are visible in the inventory:
   `age`, `pg_hashids`, `pg_ivm`, `pg_textsearch`, `pg_uuidv7`, `pgtap`,
   `postgis`, and `vector` each carry exact commits and URLs. Full parity
   requires fetching or vendoring those exact commits before native extension
@@ -150,8 +147,8 @@ PGlite-shipped extension.
   unpinned entries, and populates `pglite/other_extensions/<name>` in the
   patched source tree at the recorded commit. `prepare-native-pglite-link.sh`
   exposes this behind `--fetch-other-extensions` /
-  `LIBPGLITE_FETCH_OTHER_EXTENSIONS=1`; it is opt-in until the native
-  `other_extensions` build itself is wired into preflight.
+  `LIBPGLITE_FETCH_OTHER_EXTENSIONS=1`; macOS release preflight now uses it by
+  default.
 - The native prepare step can now opt into building the materialized
   `other_extensions` with `--build-other-extensions`. This installs those PGXS
   extensions into the generated prefix with the same dynamic lookup model used
@@ -165,10 +162,18 @@ PGlite-shipped extension.
   `pg_ivm`, `pg_textsearch`, `pg_uuidv7`, `pgtap`, `postgis`, and `vector`.
   The installed prefix contains their control and SQL files, native modules
   where those extensions have module code, `postgis-3.dylib`, PostGIS companion
-  controls such as `postgis_topology`, and `share/proj/proj.db`. This is strong
-  build-stage evidence, but not ADR closure: the normal release preflight does
-  not yet promote this full extension build, and the package gate does not yet
-  run a full packaged `CREATE EXTENSION` sweep.
+  controls such as `postgis_topology`, and `share/proj/proj.db`.
+- macOS release preflight now promotes that same shape into the normal package
+  path: it builds the controlled dependency prefix, prepares the native
+  Postgres/PGlite prefix with `--fetch-other-extensions` and
+  `--build-other-extensions`, builds the plugin, packages the resulting prefix,
+  and runs the package doctor against the final `.tar.zst` artifact.
+- The packaged-artifact dynamic-plugin conformance now creates the full PGlite
+  parity smoke set from the packaged prefix: `age`, `pg_hashids`, `pg_ivm`,
+  `pg_textsearch`, `pg_uuidv7`, `pgtap`, `postgis`, and `vector`, in addition
+  to the existing contrib checks for `citext` and `pgcrypto`. The PostGIS smoke
+  also calls `postgis_full_version()` so the extension is loaded far enough to
+  report its dependency-backed runtime.
 - The PostGIS native dependency substrate is now substantially less speculative:
   the macOS full-prefix smoke builds the pinned GEOS, PROJ, json-c, SQLite,
   libtiff, libdeflate, zlib, libxml2, and libxslt inputs into one static
@@ -194,12 +199,11 @@ PGlite-shipped extension.
   source directories individually and validates installed control files.
   Standalone contrib modules and utility programs remain inventoried, but are
   not part of the first `CREATE EXTENSION` parity gate.
-- A dependency-prefixed macOS prepare now builds and installs contrib modules
-  that exercise the controlled prefix handoff, including `pgcrypto`,
-  `uuid-ossp`, and `xml2`. This is useful parity evidence for PostgreSQL
-  `contrib`, but it does not close this ADR because the PGlite
-  `other_extensions` sources are still missing in that smoke manifest and no
-  packaged-artifact `CREATE EXTENSION` sweep has run.
+- A dependency-prefixed macOS prepare builds and installs contrib modules that
+  exercise the controlled prefix handoff, including `pgcrypto`, `uuid-ossp`,
+  and `xml2`. The normal macOS preflight now carries that prefix through the
+  package doctor and packaged-artifact conformance instead of proving it only in
+  build-tree smoke tests.
 - PGlite's WASM build keeps global OpenSSL disabled for the Postgres configure
   step and special-cases `pgcrypto` with explicit OpenSSL side-module link
   flags. The native build should copy that shape: do not enable `sslinfo`
