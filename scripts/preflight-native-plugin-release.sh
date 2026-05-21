@@ -46,6 +46,7 @@ require() {
 }
 
 require cargo
+require rustc
 require python3
 require zstd
 require nm
@@ -74,6 +75,26 @@ cargo check --features dynamic-loading
 
 echo "==> preflight ${release_version}: pinned postgres-pglite native archive build"
 scripts/prepare-native-pglite-link.sh --build-postgres
+manifest="$repo_root/target/native-pglite/$(rustc -vV | awk -F': ' '$1 == "host" {print $2}')/libpglite_native_link_manifest.txt"
+initdb_binary="$(awk -F= '$1 == "initdb_binary" {print substr($0, length($1) + 2)}' "$manifest")"
+postgres_lib_dir="$(awk -F= '$1 == "postgres_lib_dir" {print substr($0, length($1) + 2)}' "$manifest")"
+if [[ -z "$initdb_binary" || ! -x "$initdb_binary" ]]; then
+  echo "native manifest does not provide an executable initdb_binary: ${initdb_binary:-<empty>}" >&2
+  exit 1
+fi
+initdb_tempdir="$(mktemp -d)"
+trap 'rm -rf "$initdb_tempdir"' EXIT
+echo "==> preflight ${release_version}: native initdb prefix smoke test"
+DYLD_LIBRARY_PATH="$postgres_lib_dir${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}" \
+LD_LIBRARY_PATH="$postgres_lib_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  "$initdb_binary" \
+    -D "$initdb_tempdir/pgdata" \
+    --allow-group-access \
+    --encoding UTF8 \
+    --locale=C \
+    --locale-provider=libc \
+    --auth=trust \
+    --no-sync
 
 echo "==> preflight ${release_version}: build native plugin"
 LIBPGLITE_NATIVE_LINK_PGLITE=1 cargo build -p libpglite-plugin-native --release

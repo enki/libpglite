@@ -182,6 +182,7 @@ pglite_copt="-fPIC -O2 -DNDEBUG -D__PGLITE__ \
 -Wno-macro-redefined -Wno-incompatible-pointer-types"
 
 postgres_build_dir="$build_dir/postgres-build"
+postgres_install_prefix="$postgres_build_dir/install"
 backend_archive="$build_dir/libpglite_postgres_backend.a"
 timezone_archive="$build_dir/libpglite_postgres_timezone.a"
 common_archive="$postgres_build_dir/src/common/libpgcommon_srv.a"
@@ -213,7 +214,7 @@ pglite_copt=$pglite_copt"
         --without-libxslt \
         --without-systemd \
         --disable-nls \
-        --prefix="$postgres_build_dir/install"
+        --prefix="$postgres_install_prefix"
     )
   fi
 
@@ -254,6 +255,27 @@ pglite_copt=$pglite_copt"
     fi
   done
 
+  make -C "$postgres_build_dir/src/include" install
+  make -C "$postgres_build_dir/src/interfaces/libpq" install
+  make -C "$postgres_build_dir/src/backend" install \
+    COPT="$pglite_copt" \
+    LDFLAGS_EX="$pglitec_object"
+  make -C "$postgres_build_dir/src/backend/snowball" install
+  make -C "$postgres_build_dir/src/pl/plpgsql/src" install
+  make -C "$postgres_build_dir/src/bin/initdb" install
+
+  for file in \
+    "$postgres_install_prefix/bin/initdb" \
+    "$postgres_install_prefix/bin/postgres" \
+    "$postgres_install_prefix/share/postgres.bki" \
+    "$postgres_install_prefix/share/snowball_create.sql" \
+    "$postgres_install_prefix/share/extension/plpgsql.control"; do
+    if [[ ! -f "$file" ]]; then
+      echo "native Postgres install prefix is missing required initdb/runtime file: $file" >&2
+      exit 1
+    fi
+  done
+
   printf '%s\n' "$build_env_fingerprint" >"$build_env_file"
 fi
 
@@ -279,6 +301,11 @@ fi
     echo "archive=$common_archive"
     echo "archive=$port_archive"
     echo "postgres_build_dir=$postgres_build_dir"
+    echo "postgres_install_prefix=$postgres_install_prefix"
+    echo "initdb_binary=$postgres_install_prefix/bin/initdb"
+    echo "postgres_binary=$postgres_install_prefix/bin/postgres"
+    echo "postgres_share_dir=$postgres_install_prefix/share"
+    echo "postgres_lib_dir=$postgres_install_prefix/lib"
     echo "make_jobs=$make_jobs"
     if [[ -n "${MACOSX_DEPLOYMENT_TARGET:-}" ]]; then
       echo "macos_deployment_target=$MACOSX_DEPLOYMENT_TARGET"

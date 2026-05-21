@@ -173,6 +173,40 @@ validate_plugin_exports "$plugin_binary"
 
 git_commit="$(git -C "$repo_root" rev-parse HEAD)"
 plugin_checksum="$(sha256 "$plugin_binary")"
+native_manifest="${LIBPGLITE_NATIVE_LINK_MANIFEST:-"$repo_root/target/native-pglite/$platform/libpglite_native_link_manifest.txt"}"
+if [[ ! -f "$native_manifest" ]]; then
+  echo "native link manifest not found: $native_manifest" >&2
+  echo "run scripts/prepare-native-pglite-link.sh --build-postgres before packaging" >&2
+  exit 1
+fi
+
+manifest_value() {
+  local key="$1"
+  awk -F= -v key="$key" '$1 == key {print substr($0, length(key) + 2)}' "$native_manifest"
+}
+
+postgres_install_prefix="$(manifest_value postgres_install_prefix)"
+postgres_binary="$(manifest_value postgres_binary)"
+initdb_binary="$(manifest_value initdb_binary)"
+postgres_share_dir="$(manifest_value postgres_share_dir)"
+postgres_lib_dir="$(manifest_value postgres_lib_dir)"
+if [[ -z "$postgres_install_prefix" || ! -d "$postgres_install_prefix" ]]; then
+  echo "native manifest does not provide a valid postgres_install_prefix: ${postgres_install_prefix:-<empty>}" >&2
+  exit 1
+fi
+for file in "$postgres_binary" "$initdb_binary" \
+  "$postgres_share_dir/postgres.bki" \
+  "$postgres_share_dir/snowball_create.sql" \
+  "$postgres_share_dir/extension/plpgsql.control"; do
+  if [[ ! -f "$file" ]]; then
+    echo "native Postgres prefix is missing required package file: $file" >&2
+    exit 1
+  fi
+done
+if [[ ! -d "$postgres_lib_dir" ]]; then
+  echo "native Postgres prefix is missing lib directory: $postgres_lib_dir" >&2
+  exit 1
+fi
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
@@ -182,6 +216,7 @@ source_stage="$tmpdir/source/libpglite-${release_version}"
 mkdir -p "$binary_stage" "$source_stage"
 
 cp "$plugin_binary" "$binary_stage/"
+cp -R "$postgres_install_prefix" "$binary_stage/postgres"
 python3 - "$binary_stage/libpglite-native-bundle.json" "$platform" "$release_version" "$git_commit" "$expected_plugin" "$plugin_checksum" "$runtime_status" "$release_mode" <<'PY'
 import json
 import pathlib
@@ -207,6 +242,14 @@ bundle = {
     "plugin": {
         "filename": plugin_name,
         "sha256": plugin_checksum,
+    },
+    "postgresPrefix": {
+        "path": "postgres",
+        "bin": "postgres/bin",
+        "share": "postgres/share",
+        "lib": "postgres/lib",
+        "initdb": "postgres/bin/initdb",
+        "postgres": "postgres/bin/postgres",
     },
     "sourceArchive": f"libpglite-plugin-native-{release_version}-source.tar.zst",
     "noticeFile": f"libpglite-plugin-native-{release_version}-NOTICE.txt",

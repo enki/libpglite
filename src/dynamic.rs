@@ -14,6 +14,7 @@ use crate::plugin_abi::{
     LibpglitePluginBuffer, LibpglitePluginStatus,
 };
 use crate::release;
+use crate::release::ResolvedNativePlugin;
 use crate::{PgliteConfig, PgliteError, PgliteResult, PgliteRuntime};
 
 type PluginAbiVersionFn = unsafe extern "C" fn() -> u32;
@@ -85,7 +86,7 @@ impl DynamicPgliteRuntime {
         let plugin = release::BundledNativePluginResolver::from_env()
             .with_host_binary_path(host_binary_path.as_ref())
             .resolve()?;
-        Self::load(plugin.path, config)
+        Self::load_resolved(plugin, config)
     }
 
     pub fn initialize_with_plugin_dir(
@@ -95,6 +96,11 @@ impl DynamicPgliteRuntime {
         let plugin = release::BundledNativePluginResolver::from_env()
             .with_plugin_dir(plugin_dir.as_ref())
             .resolve()?;
+        Self::load_resolved(plugin, config)
+    }
+
+    pub fn load_resolved(plugin: ResolvedNativePlugin, config: PgliteConfig) -> PgliteResult<Self> {
+        let config = config_with_resolved_plugin_environment(config, &plugin);
         Self::load(plugin.path, config)
     }
 }
@@ -102,7 +108,7 @@ impl DynamicPgliteRuntime {
 impl PgliteRuntime for DynamicPgliteRuntime {
     fn open(config: PgliteConfig) -> PgliteResult<Self> {
         let plugin = release::resolve_native_plugin()?;
-        Self::load(plugin.path, config)
+        Self::load_resolved(plugin, config)
     }
 
     fn exec_protocol_raw(&mut self, message: &[u8]) -> PgliteResult<Vec<u8>> {
@@ -124,6 +130,27 @@ impl PgliteRuntime for DynamicPgliteRuntime {
         self.shutdown = true;
         Ok(())
     }
+}
+
+fn config_with_resolved_plugin_environment(
+    mut config: PgliteConfig,
+    plugin: &ResolvedNativePlugin,
+) -> PgliteConfig {
+    let Some(prefix) = &plugin.postgres_prefix else {
+        return config;
+    };
+    if config
+        .environment
+        .iter()
+        .any(|(key, _)| key == release::LIBPGLITE_POSTGRES_PREFIX_ENV)
+    {
+        return config;
+    }
+    config.environment.push((
+        release::LIBPGLITE_POSTGRES_PREFIX_ENV.to_string(),
+        prefix.display().to_string(),
+    ));
+    config
 }
 
 impl Drop for DynamicPgliteRuntime {

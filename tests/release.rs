@@ -1,7 +1,7 @@
 use libpglite::release::{
     BundledNativePluginResolver, LIBPGLITE_PLUGIN_PATH_ENV, NativePluginResolver,
-    NativePluginSource, RELEASE_TAG, current_native_plugin_asset, expected_checksum,
-    verify_file_checksum,
+    NativePluginSource, POSTGRES_PREFIX_DIR, RELEASE_TAG, current_native_plugin_asset,
+    expected_checksum, verify_file_checksum,
 };
 
 #[test]
@@ -57,6 +57,7 @@ fn resolver_prefers_explicit_plugin_path() {
         .expect("explicit plugin path resolves");
 
     assert_eq!(resolved.path, plugin_path);
+    assert_eq!(resolved.postgres_prefix, None);
     assert_eq!(resolved.source, NativePluginSource::Environment);
 }
 
@@ -67,6 +68,11 @@ fn resolver_uses_standard_release_cache() {
     let cached_plugin = asset.cached_plugin_path(tempdir.path());
     std::fs::create_dir_all(cached_plugin.parent().expect("plugin parent")).expect("cache dir");
     std::fs::write(&cached_plugin, b"not a real dynamic library").expect("write plugin");
+    let cached_prefix = cached_plugin
+        .parent()
+        .expect("plugin parent")
+        .join(POSTGRES_PREFIX_DIR);
+    std::fs::create_dir_all(&cached_prefix).expect("create cached prefix");
 
     let resolved = NativePluginResolver::new()
         .with_cache_root(tempdir.path())
@@ -74,6 +80,7 @@ fn resolver_uses_standard_release_cache() {
         .expect("cached plugin resolves");
 
     assert_eq!(resolved.path, cached_plugin);
+    assert_eq!(resolved.postgres_prefix, Some(cached_prefix));
     assert_eq!(resolved.source, NativePluginSource::Cache);
 }
 
@@ -83,8 +90,10 @@ fn bundled_resolver_uses_plugin_next_to_host_binary() {
     let tempdir = tempfile::tempdir().expect("tempdir");
     let host_binary = tempdir.path().join("host");
     let plugin_path = tempdir.path().join(asset.plugin_filename);
+    let postgres_prefix = tempdir.path().join(POSTGRES_PREFIX_DIR);
     std::fs::write(&host_binary, b"host").expect("write host placeholder");
     std::fs::write(&plugin_path, b"not a real dynamic library").expect("write plugin placeholder");
+    std::fs::create_dir_all(&postgres_prefix).expect("create bundled prefix");
 
     let resolved = BundledNativePluginResolver::new()
         .with_host_binary_path(&host_binary)
@@ -92,6 +101,7 @@ fn bundled_resolver_uses_plugin_next_to_host_binary() {
         .expect("bundled plugin resolves");
 
     assert_eq!(resolved.path, plugin_path);
+    assert_eq!(resolved.postgres_prefix, Some(postgres_prefix));
     assert_eq!(resolved.source, NativePluginSource::Bundled);
 }
 

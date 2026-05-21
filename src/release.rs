@@ -8,12 +8,14 @@ use crate::PgliteResult;
 
 pub const LIBPGLITE_PLUGIN_PATH_ENV: &str = "LIBPGLITE_PLUGIN_PATH";
 pub const LIBPGLITE_HOME_ENV: &str = "LIBPGLITE_HOME";
+pub const LIBPGLITE_POSTGRES_PREFIX_ENV: &str = "LIBPGLITE_POSTGRES_PREFIX";
 pub const RELEASE_REPOSITORY: &str = "enki/libpglite";
 pub const RELEASE_TAG: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 pub const CHECKSUMS_ASSET_SUFFIX: &str = "checksums.txt";
 pub const NOTICE_ASSET_SUFFIX: &str = "NOTICE.txt";
 pub const SOURCE_ASSET_SUFFIX: &str = "SOURCE.txt";
 pub const LICENSES_ASSET_SUFFIX: &str = "licenses.json";
+pub const POSTGRES_PREFIX_DIR: &str = "postgres";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativePluginAsset {
@@ -34,6 +36,7 @@ pub enum NativePluginSource {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedNativePlugin {
     pub path: PathBuf,
+    pub postgres_prefix: Option<PathBuf>,
     pub source: NativePluginSource,
     pub asset: NativePluginAsset,
 }
@@ -129,6 +132,10 @@ impl NativePluginAsset {
         dir.as_ref().join(self.plugin_filename)
     }
 
+    pub fn postgres_prefix_path_in_dir(&self, dir: impl AsRef<Path>) -> PathBuf {
+        dir.as_ref().join(POSTGRES_PREFIX_DIR)
+    }
+
     fn release_asset_url(&self, asset_name: &str) -> String {
         format!(
             "https://github.com/{}/releases/download/{}/{}",
@@ -167,6 +174,7 @@ impl NativePluginResolver {
             if plugin_path.is_file() {
                 return Ok(ResolvedNativePlugin {
                     path: plugin_path.clone(),
+                    postgres_prefix: packaged_postgres_prefix(plugin_path.parent()),
                     source: NativePluginSource::Environment,
                     asset,
                 });
@@ -182,6 +190,7 @@ impl NativePluginResolver {
             if plugin_path.is_file() {
                 return Ok(ResolvedNativePlugin {
                     path: plugin_path,
+                    postgres_prefix: packaged_postgres_prefix(Some(&asset.cache_dir(cache_root))),
                     source: NativePluginSource::Cache,
                     asset,
                 });
@@ -229,6 +238,7 @@ impl BundledNativePluginResolver {
             if plugin_path.is_file() {
                 return Ok(ResolvedNativePlugin {
                     path: plugin_path.clone(),
+                    postgres_prefix: packaged_postgres_prefix(plugin_path.parent()),
                     source: NativePluginSource::Environment,
                     asset,
                 });
@@ -307,6 +317,7 @@ fn resolve_bundled_plugin_in_dir(
     if plugin_path.is_file() {
         return Ok(ResolvedNativePlugin {
             path: plugin_path,
+            postgres_prefix: packaged_postgres_prefix(Some(plugin_dir)),
             source: NativePluginSource::Bundled,
             asset,
         });
@@ -316,6 +327,11 @@ fn resolve_bundled_plugin_in_dir(
         asset.plugin_filename,
         plugin_dir.display()
     )))
+}
+
+fn packaged_postgres_prefix(dir: Option<&Path>) -> Option<PathBuf> {
+    let prefix = dir?.join(POSTGRES_PREFIX_DIR);
+    prefix.is_dir().then_some(prefix)
 }
 
 fn missing_plugin_message(asset: &NativePluginAsset, cache_root: Option<&Path>) -> String {

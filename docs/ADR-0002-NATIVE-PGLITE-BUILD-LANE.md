@@ -65,6 +65,9 @@ The native lane must preserve the PGlite runtime model:
 - The plugin build reads the manifest when `LIBPGLITE_NATIVE_LINK_PGLITE=1` and
   links the Postgres/PGlite symbols into the cdylib while keeping dynamic
   exports limited to the `libpglite_plugin_*` ABI.
+- The native build lane also emits an install prefix for `initdb` and PostgreSQL
+  runtime support files; ADR-0007 owns making that prefix relocatable and
+  package-ready.
 - The Rust runtime lifecycle still returns a deliberate initialization error;
   startup, data directory initialization, callback transport, recovery, and
   shutdown remain owned by this ADR and ADR-0003.
