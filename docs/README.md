@@ -51,8 +51,10 @@ Current closure frontier:
   `CREATE EXTENSION` conformance from packaged artifacts, and promotion of the
   opt-in non-PostGIS `other_extensions` build into release preflight.
 - ADR-0009: still needs a pinned native dependency prefix instead of repaired
-  local-provider libraries.
+  local-provider libraries; dependency diagnostics now classify those paths
+  structurally so strict/preflight packages can fail on them.
 - ADR-0010: still needs stale-symbol checks against the full extension parity
   set and Linux export/version-script coverage.
 - ADR-0012: still needs structured diagnostic coverage for the remaining
-  extension/dependency/platform gates before it can close.
+  extension/platform gates before it can close; dependency diagnostics now have
+  both raw and structured manifests.

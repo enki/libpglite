@@ -334,6 +334,18 @@ class Doctor:
                         f"provenance={values.get('extension_inventory')!r}"
                     )
 
+            dependency_manifest = diagnostics.get("dependencyManifest")
+            if isinstance(dependency_manifest, str):
+                expected_dependency_manifest = pathlib.PurePosixPath(
+                    dependency_manifest
+                ).name
+                if values.get("dependency_manifest") != expected_dependency_manifest:
+                    self.errors.append(
+                        "build provenance dependency_manifest mismatch: "
+                        f"bundle={expected_dependency_manifest!r} "
+                        f"provenance={values.get('dependency_manifest')!r}"
+                    )
+
         packaged_at = values.get("packaged_at_utc")
         if not isinstance(packaged_at, str) or not re.fullmatch(
             r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", packaged_at
@@ -634,17 +646,100 @@ class Doctor:
             for line in lines
             if looks_like_build_path(line) and not line.startswith("binary=")
         ]
-        if not build_paths:
+        if build_paths:
+            message = (
+                "dependency diagnostics include build-machine paths; this is allowed for "
+                "development artifacts but blocks production relocatability"
+            )
+            if self.strict_relocatable or self.bundle.get("releaseMode") == "production":
+                self.errors.append(message)
+            else:
+                self.warnings.append(message)
+
+        dependency_manifest = self.diagnostic_path("dependencyManifest")
+        if dependency_manifest is None:
+            return
+        try:
+            with dependency_manifest.open() as handle:
+                manifest = json.load(handle)
+        except Exception as err:
+            self.errors.append(f"dependency manifest is not readable: {err}")
+            return
+        if not isinstance(manifest, dict):
+            self.errors.append("dependency manifest root must be an object")
+            return
+        if manifest.get("format") != "libpglite-native-dependencies-v1":
+            self.errors.append("dependency manifest has wrong format")
+        tool = manifest.get("tool")
+        if tool not in {"otool -L", "ldd"}:
+            self.errors.append(f"dependency manifest has unsupported tool: {tool!r}")
+        objects = manifest.get("objects")
+        if not isinstance(objects, list) or not objects:
+            self.errors.append("dependency manifest objects must be a nonempty list")
             return
 
-        message = (
-            "dependency diagnostics include build-machine paths; this is allowed for "
-            "development artifacts but blocks production relocatability"
-        )
-        if self.strict_relocatable or self.bundle.get("releaseMode") == "production":
-            self.errors.append(message)
-        else:
-            self.warnings.append(message)
+        package_object_seen = False
+        bad_dependency_paths: list[str] = []
+        for obj in objects:
+            if not isinstance(obj, dict):
+                self.errors.append("dependency manifest object entry must be an object")
+                continue
+            path = obj.get("path")
+            kind = obj.get("kind")
+            if not isinstance(path, str) or not path:
+                self.errors.append("dependency manifest object path is missing")
+            elif path in joined:
+                package_object_seen = True
+            if kind not in {"plugin", "postgres-lib"}:
+                self.errors.append(f"dependency manifest object has unsupported kind: {kind!r}")
+            if obj.get("toolExitCode") not in {0, None}:
+                self.errors.append(f"dependency scan failed for object: {path}")
+            dependencies_value = obj.get("dependencies")
+            if not isinstance(dependencies_value, list):
+                self.errors.append(f"dependency manifest object has invalid dependencies: {path}")
+                continue
+            for dependency in dependencies_value:
+                if not isinstance(dependency, dict):
+                    self.errors.append(f"dependency manifest dependency must be an object: {path}")
+                    continue
+                raw = dependency.get("raw")
+                classification = dependency.get("classification")
+                if not isinstance(raw, str) or not raw:
+                    self.errors.append(f"dependency manifest dependency raw path is missing: {path}")
+                if classification not in {
+                    "package",
+                    "platform",
+                    "loader-relative",
+                    "local-provider",
+                    "build-machine",
+                    "absolute-external",
+                    "missing",
+                    "unknown",
+                }:
+                    self.errors.append(
+                        f"dependency manifest has unsupported classification: {classification!r}"
+                    )
+                    continue
+                if classification in {
+                    "local-provider",
+                    "build-machine",
+                    "absolute-external",
+                    "missing",
+                    "unknown",
+                }:
+                    bad_dependency_paths.append(f"{path}: {raw} ({classification})")
+
+        if not package_object_seen:
+            self.errors.append("dependency manifest does not correspond to dependencies.txt")
+        if bad_dependency_paths:
+            message = (
+                "dependency manifest contains non-relocatable or unresolved dependencies: "
+                + "; ".join(bad_dependency_paths[:10])
+            )
+            if self.strict_relocatable or self.bundle.get("releaseMode") == "production":
+                self.errors.append(message)
+            else:
+                self.warnings.append(message)
 
     def run_self_test(self) -> None:
         if shutil.which("cargo") is None:

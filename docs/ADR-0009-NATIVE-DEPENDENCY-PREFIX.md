@@ -71,6 +71,12 @@ libraries or runtime data.
   `postgres/lib`.
 - The package doctor now runs with `--strict-relocatable` in preflight, so
   dependency diagnostics containing build-machine paths fail the package gate.
+- Native packages now carry both the raw platform dependency report
+  (`dependencies.txt`) and a structured dependency manifest (`dependencies.json`)
+  that classifies each object dependency as package-local, platform,
+  loader-relative, local-provider, build-machine, missing, unknown, or external.
+  The doctor fails strict/preflight packages on non-relocatable or unresolved
+  classifications instead of relying only on text matching.
 - Preflight extracts the final `.tar.zst` package and runs the native raw
   protocol/contrib smoke against the packaged plugin and packaged Postgres
   prefix. This verifies that the repaired install names work behaviorally, not

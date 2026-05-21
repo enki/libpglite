@@ -46,6 +46,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
                     "plugin_sha256=abc123",
                     "native_manifest=native-link-manifest.txt",
                     "extension_inventory=extension-inventory.txt",
+                    "dependency_manifest=dependencies.json",
                     "packaged_at_utc=2026-05-21T00:00:00Z",
                     "uname=test",
                     "rustc_begin",
@@ -75,6 +76,35 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         (diagnostics / "extension-inventory.txt").write_text(extension_inventory_text)
         (diagnostics / "dependencies.txt").write_text(
             "format=libpglite-native-dependencies-v1\n"
+            "tool=otool -L\n"
+            "binary=liblibpglite_plugin_native.dylib\n"
+        )
+        (diagnostics / "dependencies.json").write_text(
+            json.dumps(
+                {
+                    "format": "libpglite-native-dependencies-v1",
+                    "platform": "Darwin",
+                    "tool": "otool -L",
+                    "packageRoot": ".",
+                    "objects": [
+                        {
+                            "path": "liblibpglite_plugin_native.dylib",
+                            "kind": "plugin",
+                            "toolExitCode": 0,
+                            "dependencies": [
+                                {
+                                    "raw": "/usr/lib/libSystem.B.dylib",
+                                    "path": "/usr/lib/libSystem.B.dylib",
+                                    "classification": "platform",
+                                }
+                            ],
+                        }
+                    ],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
         )
         (diagnostics / "plugin-defined-symbols.txt").write_text(
             "\n".join(sorted(plugin_manifest_symbols)) + "\n"
@@ -121,6 +151,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
                 "nativeLinkManifest": "diagnostics/native-link-manifest.txt",
                 "extensionInventory": "diagnostics/extension-inventory.txt",
                 "dependencies": "diagnostics/dependencies.txt",
+                "dependencyManifest": "diagnostics/dependencies.json",
                 "pluginDefinedSymbols": "diagnostics/plugin-defined-symbols.txt",
                 "backendExportSymbols": "diagnostics/backend-export-symbols.txt",
                 "sourceProvenance": "diagnostics/source-provenance.json",
@@ -356,6 +387,50 @@ class DoctorDiagnosticsTests(unittest.TestCase):
 
         self.assertIn(
             "inventoried extension is missing control file: vector",
+            "\n".join(doctor.errors),
+        )
+
+    def test_dependency_manifest_blocks_local_provider_in_strict_mode(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        dependency_manifest = pathlib.Path(tempdir.name) / "diagnostics" / "dependencies.json"
+        manifest = json.loads(dependency_manifest.read_text())
+        manifest["objects"][0]["dependencies"] = [
+            {
+                "raw": "/opt/homebrew/opt/openssl@3/lib/libcrypto.3.dylib",
+                "path": "/opt/homebrew/opt/openssl@3/lib/libcrypto.3.dylib",
+                "classification": "local-provider",
+            }
+        ]
+        dependency_manifest.write_text(json.dumps(manifest) + "\n")
+        with tempdir:
+            doctor.validate_dependencies()
+
+        self.assertIn(
+            "dependency manifest contains non-relocatable or unresolved dependencies",
+            "\n".join(doctor.errors),
+        )
+
+    def test_dependency_manifest_must_match_raw_dependency_report_objects(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        dependency_manifest = pathlib.Path(tempdir.name) / "diagnostics" / "dependencies.json"
+        manifest = json.loads(dependency_manifest.read_text())
+        manifest["objects"][0]["path"] = "postgres/lib/old.dylib"
+        dependency_manifest.write_text(json.dumps(manifest) + "\n")
+        with tempdir:
+            doctor.validate_dependencies()
+
+        self.assertIn(
+            "dependency manifest does not correspond to dependencies.txt",
             "\n".join(doctor.errors),
         )
 

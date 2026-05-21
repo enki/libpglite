@@ -138,36 +138,14 @@ dependency_report() {
   local package_root="$2"
   local binary="$3"
   local postgres_lib_dir="$4"
+  local json_out="$5"
 
-  : >"$out"
-  case "$(uname -s)" in
-    Darwin)
-      {
-        echo "format=libpglite-native-dependencies-v1"
-        echo "tool=otool -L"
-        echo "binary=${binary#$package_root/}"
-        otool -L "$binary" | sed "s#$package_root#.#g"
-        while IFS= read -r module; do
-          echo
-          echo "module=${module#$package_root/}"
-          otool -L "$module" | sed "s#$package_root#.#g"
-        done < <(find "$postgres_lib_dir" -maxdepth 1 -type f -name '*.dylib' | LC_ALL=C sort)
-      } >"$out"
-      ;;
-    Linux)
-      {
-        echo "format=libpglite-native-dependencies-v1"
-        echo "tool=ldd"
-        echo "binary=${binary#$package_root/}"
-        ldd "$binary" | sed "s#$package_root#.#g" || true
-        while IFS= read -r module; do
-          echo
-          echo "module=${module#$package_root/}"
-          ldd "$module" | sed "s#$package_root#.#g" || true
-        done < <(find "$postgres_lib_dir" -maxdepth 1 -type f -name '*.so' | LC_ALL=C sort)
-      } >"$out"
-      ;;
-  esac
+  python3 "$repo_root/scripts/generate-native-dependency-manifest.py" \
+    --package-root "$package_root" \
+    --plugin "$binary" \
+    --postgres-lib-dir "$postgres_lib_dir" \
+    --text-out "$out" \
+    --json-out "$json_out"
 }
 
 repair_macos_package_install_names() {
@@ -351,7 +329,12 @@ fi
 defined_symbols "$binary_stage/$expected_plugin" | LC_ALL=C sort -u >"$diagnostics_stage/plugin-defined-symbols.txt"
 awk -F= '$1 == "backend_export_symbol" {print substr($0, length($1) + 2)}' "$native_manifest" \
   | LC_ALL=C sort -u >"$diagnostics_stage/backend-export-symbols.txt"
-dependency_report "$diagnostics_stage/dependencies.txt" "$binary_stage" "$binary_stage/$expected_plugin" "$binary_stage/postgres/lib"
+dependency_report \
+  "$diagnostics_stage/dependencies.txt" \
+  "$binary_stage" \
+  "$binary_stage/$expected_plugin" \
+  "$binary_stage/postgres/lib" \
+  "$diagnostics_stage/dependencies.json"
 python3 - "$repo_root" "$native_manifest" "$diagnostics_stage/source-provenance.json" <<'PY'
 import hashlib
 import json
@@ -414,6 +397,7 @@ PY
   echo "plugin_sha256=$plugin_checksum"
   echo "native_manifest=native-link-manifest.txt"
   echo "extension_inventory=extension-inventory.txt"
+  echo "dependency_manifest=dependencies.json"
   echo "packaged_at_utc=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   echo "uname=$(uname -a)"
   echo "rustc_begin"
@@ -465,6 +449,7 @@ bundle = {
         "pluginDefinedSymbols": "diagnostics/plugin-defined-symbols.txt",
         "backendExportSymbols": "diagnostics/backend-export-symbols.txt",
         "dependencies": "diagnostics/dependencies.txt",
+        "dependencyManifest": "diagnostics/dependencies.json",
         "sourceProvenance": "diagnostics/source-provenance.json",
         "runtimeLifecycle": "diagnostics/runtime-lifecycle.json",
         "conformanceResults": "diagnostics/conformance",

@@ -84,11 +84,17 @@ actual plugin and prefix contents.
   - `diagnostics/plugin-defined-symbols.txt`
   - `diagnostics/backend-export-symbols.txt`
   - `diagnostics/dependencies.txt`
+  - `diagnostics/dependencies.json`
   - `diagnostics/source-provenance.json`
   - `diagnostics/runtime-lifecycle.json`
 - `dependencies.txt` is generated with `otool -L` on macOS and `ldd` on Linux.
   This currently exposes remaining relocatability weaknesses, including absolute
   build paths, instead of hiding them.
+- `dependencies.json` records the same dependency scan as structured release
+  data. Each scanned plugin or extension module records the platform tool, exit
+  code, object path, and dependency classifications. The package doctor rejects
+  missing, unknown, build-machine, local-provider, or external dependencies in
+  strict/production mode.
 - `scripts/doctor-native-plugin-package.py` validates either an extracted
   package directory or a `.tar.zst` package without rebuilding it. It checks the
   bundle manifest, plugin checksum, ABI symbols, PostgreSQL prefix files,
