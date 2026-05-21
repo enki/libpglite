@@ -67,6 +67,21 @@ class PackageNativePluginReleaseTests(unittest.TestCase):
         )
         self.assertIn("docs/ADR-0004-RUNTIME-READY-RELEASE-GATE.md", result.stderr)
 
+    def test_production_packaging_requires_dependency_prefix_manifest(self):
+        text = SCRIPT.read_text()
+        self.assertIn(
+            'if [[ "$release_mode" == "production" && -z "$dependency_prefix_manifest" ]]',
+            text,
+        )
+        self.assertIn(
+            "production package requires native_dependency_prefix_manifest",
+            text,
+        )
+        self.assertLess(
+            text.index("production package requires native_dependency_prefix_manifest"),
+            text.index('diagnostics["dependencyPrefix"] = dependency_prefix_diagnostic'),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

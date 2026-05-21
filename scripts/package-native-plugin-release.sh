@@ -352,6 +352,10 @@ else
 fi
 dependency_prefix_manifest="$(manifest_value native_dependency_prefix_manifest)"
 dependency_prefix_diagnostic=""
+if [[ "$release_mode" == "production" && -z "$dependency_prefix_manifest" ]]; then
+  echo "production package requires native_dependency_prefix_manifest in native link manifest" >&2
+  exit 1
+fi
 if [[ -n "$dependency_prefix_manifest" ]]; then
   if [[ ! -f "$dependency_prefix_manifest" ]]; then
     echo "native link manifest provides unreadable native_dependency_prefix_manifest: $dependency_prefix_manifest" >&2
