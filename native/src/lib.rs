@@ -11,6 +11,30 @@ compile_error!(
 
 use libpglite::{PgliteConfig, PgliteError, PgliteResult, PgliteRuntime};
 
+#[cfg(libpglite_native_link_pglite)]
+mod ffi {
+    use std::ffi::c_char;
+    use std::ffi::c_void;
+
+    unsafe extern "C" {
+        pub fn PostgresMainLoopOnce();
+        pub fn PostgresSingleUserMain(argc: i32, argv: *mut *mut c_char, username: *const c_char);
+        pub fn pgl_set_rw_cbs(
+            read_cb: Option<unsafe extern "C" fn(*mut c_void, usize) -> isize>,
+            write_cb: Option<unsafe extern "C" fn(*const c_void, usize) -> isize>,
+        );
+        pub fn pgl_startPGlite();
+    }
+
+    #[inline(never)]
+    pub fn native_link_probe() -> usize {
+        PostgresMainLoopOnce as usize
+            ^ PostgresSingleUserMain as usize
+            ^ pgl_set_rw_cbs as usize
+            ^ pgl_startPGlite as usize
+    }
+}
+
 #[derive(Debug)]
 pub struct NativePgliteRuntime {
     _config: PgliteConfig,
@@ -20,6 +44,9 @@ pub struct NativePgliteRuntime {
 impl PgliteRuntime for NativePgliteRuntime {
     fn open(config: PgliteConfig) -> PgliteResult<Self> {
         config.validate()?;
+        #[cfg(libpglite_native_link_pglite)]
+        std::hint::black_box(ffi::native_link_probe());
+
         Err(PgliteError::initialize(
             "native PGlite runtime is not linked yet; see docs/ADR-0002-NATIVE-PGLITE-BUILD-LANE.md",
         ))

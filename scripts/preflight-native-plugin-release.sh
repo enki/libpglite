@@ -12,13 +12,14 @@ Runs local release-boundary checks:
 
   - crate tests
   - dynamic-loading check
-  - pinned postgres-pglite source validation
-  - native plugin build
+  - pinned postgres-pglite native PIC archive build
+  - native plugin build linked against those archives
+  - native plugin symbol-boundary checks
   - native plugin package smoke test
 
 ADR-0002 still owns the real native PGlite/Postgres runtime. This preflight
-checks the facade/plugin/release boundary without claiming the native runtime is
-complete.
+checks the facade/plugin/release boundary and native link substrate without
+claiming the runtime lifecycle is complete.
 USAGE
 }
 
@@ -71,11 +72,11 @@ cargo test --all-features --workspace
 echo "==> preflight ${release_version}: dynamic-loading check"
 cargo check --features dynamic-loading
 
-echo "==> preflight ${release_version}: pinned postgres-pglite source validation"
-scripts/prepare-native-pglite-link.sh
+echo "==> preflight ${release_version}: pinned postgres-pglite native archive build"
+scripts/prepare-native-pglite-link.sh --build-postgres
 
 echo "==> preflight ${release_version}: build native plugin"
-cargo build -p libpglite-plugin-native --release
+LIBPGLITE_NATIVE_LINK_PGLITE=1 cargo build -p libpglite-plugin-native --release
 
 case "$(uname -s)" in
   Darwin) plugin_name="liblibpglite_plugin_native.dylib" ;;
@@ -95,6 +96,32 @@ plugin_binary="$target_dir/release/$plugin_name"
 
 if [[ ! -f "$plugin_binary" ]]; then
   echo "expected plugin binary was not built: $plugin_binary" >&2
+  exit 1
+fi
+
+echo "==> preflight ${release_version}: native symbol boundary"
+case "$(uname -s)" in
+  Darwin)
+    unexpected_exports="$(
+      nm -gU "$plugin_binary" | awk '{print $3}' | grep -Ev '^_libpglite_plugin_' || true
+    )"
+    ;;
+  Linux)
+    unexpected_exports="$(
+      nm -D --defined-only "$plugin_binary" | awk '{print $3}' | grep -Ev '^libpglite_plugin_' || true
+    )"
+    ;;
+esac
+
+if [[ -n "$unexpected_exports" ]]; then
+  echo "native plugin exports non-ABI symbols:" >&2
+  echo "$unexpected_exports" >&2
+  exit 1
+fi
+
+all_symbols="$(nm -a "$plugin_binary")"
+if ! grep -q 'PostgresSingleUserMain' <<<"$all_symbols"; then
+  echo "native plugin does not contain linked Postgres backend symbols" >&2
   exit 1
 fi
 

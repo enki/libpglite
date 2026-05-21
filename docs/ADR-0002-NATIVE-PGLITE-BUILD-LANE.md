@@ -55,3 +55,16 @@ The native lane must preserve the PGlite runtime model:
 - No JavaScript, Emscripten module object, or wasm runtime is required by the
   production native plugin.
 
+## Implementation Notes
+
+- The source snapshot is pinned in `PGLITE_POSTGRES_SOURCE`.
+- `scripts/prepare-native-pglite-link.sh --build-postgres` configures a native
+  VPATH build of the pinned fork, compiles `pglitec.c` as PIC, builds the
+  backend with the PGlite syscall and longjmp overrides, and emits a manifest
+  with concrete object/archive inputs.
+- The plugin build reads the manifest when `LIBPGLITE_NATIVE_LINK_PGLITE=1` and
+  links the Postgres/PGlite symbols into the cdylib while keeping dynamic
+  exports limited to the `libpglite_plugin_*` ABI.
+- The Rust runtime lifecycle still returns a deliberate initialization error;
+  startup, data directory initialization, callback transport, recovery, and
+  shutdown remain owned by this ADR and ADR-0003.

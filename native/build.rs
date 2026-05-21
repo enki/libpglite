@@ -4,6 +4,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 fn main() {
+    println!("cargo:rustc-check-cfg=cfg(libpglite_native_link_pglite)");
     println!("cargo:rerun-if-env-changed=LIBPGLITE_NATIVE_LINK_PGLITE");
     println!("cargo:rerun-if-env-changed=LIBPGLITE_NATIVE_LINK_MANIFEST");
     println!("cargo:rerun-if-env-changed=LIBPGLITE_NATIVE_BUILD_DIR");
@@ -11,6 +12,7 @@ fn main() {
     if env::var("LIBPGLITE_NATIVE_LINK_PGLITE").as_deref() != Ok("1") {
         return;
     }
+    println!("cargo:rustc-cfg=libpglite_native_link_pglite");
 
     let manifest = env::var_os("LIBPGLITE_NATIVE_LINK_MANIFEST")
         .map(PathBuf::from)
@@ -23,15 +25,28 @@ fn main() {
     });
     let link_inputs = native_link_inputs_from_manifest(&manifest, &contents);
 
-    for path in link_inputs {
-        if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
-            println!("cargo:rustc-link-arg=-Wl,-force_load,{}", path.display());
-        } else {
-            println!("cargo:rustc-link-arg=-Wl,--whole-archive");
-            println!("cargo:rustc-link-arg={}", path.display());
-            println!("cargo:rustc-link-arg=-Wl,--no-whole-archive");
+    for input in link_inputs {
+        match input {
+            NativeLinkInput::Object(path) => {
+                println!("cargo:rustc-link-arg={}", path.display());
+            }
+            NativeLinkInput::Archive(path) => {
+                if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+                    println!("cargo:rustc-link-arg=-Wl,-force_load,{}", path.display());
+                } else {
+                    println!("cargo:rustc-link-arg=-Wl,--whole-archive");
+                    println!("cargo:rustc-link-arg={}", path.display());
+                    println!("cargo:rustc-link-arg=-Wl,--no-whole-archive");
+                }
+            }
         }
     }
+}
+
+#[derive(Debug)]
+enum NativeLinkInput {
+    Object(PathBuf),
+    Archive(PathBuf),
 }
 
 fn default_manifest_path() -> PathBuf {
@@ -53,7 +68,7 @@ fn default_manifest_path() -> PathBuf {
         .join("libpglite_native_link_manifest.txt")
 }
 
-fn native_link_inputs_from_manifest(manifest: &Path, contents: &str) -> Vec<PathBuf> {
+fn native_link_inputs_from_manifest(manifest: &Path, contents: &str) -> Vec<NativeLinkInput> {
     let mut link_inputs = Vec::new();
     let mut has_format = false;
     for line in contents.lines() {
@@ -84,7 +99,12 @@ fn native_link_inputs_from_manifest(manifest: &Path, contents: &str) -> Vec<Path
                 path.display()
             );
         }
-        link_inputs.push(path);
+        let input = match kind {
+            "object" => NativeLinkInput::Object(path),
+            "archive" | "static" => NativeLinkInput::Archive(path),
+            _ => unreachable!("manifest link input kind is already filtered"),
+        };
+        link_inputs.push(input);
     }
 
     if !has_format {
