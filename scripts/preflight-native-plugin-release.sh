@@ -12,6 +12,7 @@ Runs local release-boundary checks:
 
   - crate tests
   - dynamic-loading check
+  - pinned postgres-pglite source validation
   - native plugin build
   - native plugin package smoke test
 
@@ -69,6 +70,9 @@ cargo test --all-features --workspace
 
 echo "==> preflight ${release_version}: dynamic-loading check"
 cargo check --features dynamic-loading
+
+echo "==> preflight ${release_version}: pinned postgres-pglite source validation"
+scripts/prepare-native-pglite-link.sh
 
 echo "==> preflight ${release_version}: build native plugin"
 cargo build -p libpglite-plugin-native --release

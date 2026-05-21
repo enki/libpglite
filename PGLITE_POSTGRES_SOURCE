@@ -1,0 +1,4 @@
+repository=https://github.com/electric-sql/postgres-pglite
+ref=REL_17_5-pglite
+commit=01792c31a62b7045eb22e93d7dad022bb64b1184
+
