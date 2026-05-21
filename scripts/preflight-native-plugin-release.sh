@@ -54,6 +54,14 @@ require nm
 
 cd "$repo_root"
 
+sha256() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  else
+    sha256sum "$1" | awk '{print $1}'
+  fi
+}
+
 conformance_dir="$(mktemp -d)"
 
 write_conformance_result() {
@@ -64,14 +72,25 @@ write_conformance_result() {
   local ended_at="$5"
   local command="$6"
   local log_file="$7"
-  local out_file="$8"
+  local log_sha256="$8"
+  local out_file="$9"
 
-  python3 - "$name" "$status" "$exit_code" "$started_at" "$ended_at" "$command" "$(basename "$log_file")" "$out_file" <<'PY'
+  python3 - "$name" "$status" "$exit_code" "$started_at" "$ended_at" "$command" "$(basename "$log_file")" "$log_sha256" "$out_file" <<'PY'
 import json
 import pathlib
 import sys
 
-name, status, exit_code, started_at, ended_at, command, log_file, out = sys.argv[1:9]
+(
+    name,
+    status,
+    exit_code,
+    started_at,
+    ended_at,
+    command,
+    log_file,
+    log_sha256,
+    out,
+) = sys.argv[1:10]
 result = {
     "format": "libpglite-native-conformance-result-v1",
     "name": name,
@@ -81,6 +100,7 @@ result = {
     "endedAt": ended_at,
     "command": command,
     "log": log_file,
+    "logSha256": log_sha256,
 }
 pathlib.Path(out).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
 PY
@@ -101,10 +121,11 @@ run_conformance_check() {
   code=$?
   set -e
   ended_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  log_sha256="$(sha256 "$log_file")"
   if [[ "$code" == "0" ]]; then
-    write_conformance_result "$name" "passed" "$code" "$started_at" "$ended_at" "$*" "$log_file" "$result_file"
+    write_conformance_result "$name" "passed" "$code" "$started_at" "$ended_at" "$*" "$log_file" "$log_sha256" "$result_file"
   else
-    write_conformance_result "$name" "failed" "$code" "$started_at" "$ended_at" "$*" "$log_file" "$result_file"
+    write_conformance_result "$name" "failed" "$code" "$started_at" "$ended_at" "$*" "$log_file" "$log_sha256" "$result_file"
     echo "conformance check failed: $name" >&2
     exit "$code"
   fi

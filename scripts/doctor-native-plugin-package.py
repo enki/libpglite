@@ -261,6 +261,11 @@ class Doctor:
                 self.errors.append(f"conformance result {name}.json exitCode is not 0")
             if result.get("log") != f"{name}.log":
                 self.errors.append(f"conformance result {name}.json points at wrong log")
+            expected_log_sha = result.get("logSha256")
+            if not isinstance(expected_log_sha, str) or not expected_log_sha:
+                self.errors.append(f"conformance result {name}.json is missing logSha256")
+            elif log_path.is_file() and expected_log_sha != sha256(log_path):
+                self.errors.append(f"conformance result {name}.json logSha256 mismatch")
 
     def validate_extensions(self) -> None:
         inventory = self.diagnostic_path("extensionInventory")
