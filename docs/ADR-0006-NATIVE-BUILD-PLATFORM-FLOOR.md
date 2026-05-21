@@ -110,6 +110,10 @@ still need an explicitly documented Linux baseline.
   link manifest, build provenance records that deployment target, and the doctor
   rejects any disagreement between the native link manifest, package baseline
   diagnostic, and build provenance.
+- The package doctor now rejects platform-baseline diagnostics with missing or
+  empty `system` or `machine` fields, so the platform-floor manifest cannot
+  satisfy the package gate with only a target triple and no observed host
+  identity.
 - After adding the package baseline diagnostic, `scripts/preflight-linux-smolvm.sh`
   with version `0.1.0` passed again in the `ubuntu:24.04` guest on 2026-05-21.
 - `docs/LINUX-RELEASE-POLICY.md` now records Ubuntu `24.04` as the Linux

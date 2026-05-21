@@ -692,6 +692,25 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "\n".join(doctor.errors),
         )
 
+    def test_platform_baseline_requires_system_and_machine(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        baseline_path = pathlib.Path(tempdir.name) / "diagnostics" / "platform-baseline.json"
+        baseline = json.loads(baseline_path.read_text())
+        baseline["system"] = ""
+        del baseline["machine"]
+        baseline_path.write_text(json.dumps(baseline) + "\n")
+        with tempdir:
+            doctor.validate_platform_baseline()
+
+        errors = "\n".join(doctor.errors)
+        self.assertIn("platform baseline is missing system", errors)
+        self.assertIn("platform baseline is missing machine", errors)
+
     def test_linux_platform_baseline_requires_ubuntu_2404(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS,

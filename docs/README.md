@@ -72,8 +72,10 @@ Current closure frontier:
   packages now carry a doctor-validated `platform-baseline.json`. The prepare
   regression suite now pins deployment-target build-cache invalidation.
   The Linux baseline is now documented as release policy and enforced by
-  package-time and doctor diagnostics. Remaining closure is keeping both
-  supported final-artifact preflights current after platform diagnostic changes.
+  package-time and doctor diagnostics, and the doctor rejects platform-baseline
+  diagnostics without observed `system` and `machine` fields. Remaining closure
+  is keeping both supported final-artifact preflights current after platform
+  diagnostic changes.
 - ADR-0007: macOS package doctor self-tests the packaged `postgres/` prefix,
   including the full extension/runtime data surface. The Ubuntu lane now passes
   the same package doctor self-test with Linux RUNPATH repair. The doctor now

@@ -283,13 +283,13 @@ actual plugin and prefix contents.
   ignored.
 - Packaging now writes `diagnostics/platform-baseline.json` and the doctor
   validates it as a package claim. The diagnostic must match the bundle target.
-  Linux packages must record the Ubuntu `24.04` baseline, matching
-  `/etc/os-release`, plus a nonempty `ldd --version` line; packaging rejects a
-  mismatched Linux distro/version before the package is written. Build
-  provenance records the selected Linux baseline too. macOS packages record the
-  deployment target from the native link manifest, and the doctor rejects
-  mismatches between the manifest, build provenance, and platform baseline
-  diagnostic.
+  It must also carry nonempty observed `system` and `machine` fields. Linux
+  packages must record the Ubuntu `24.04` baseline, matching `/etc/os-release`,
+  plus a nonempty `ldd --version` line; packaging rejects a mismatched Linux
+  distro/version before the package is written. Build provenance records the
+  selected Linux baseline too. macOS packages record the deployment target from
+  the native link manifest, and the doctor rejects mismatches between the
+  manifest, build provenance, and platform baseline diagnostic.
 - Native prepare now runs `git apply --check` before applying each downstream
   source patch to the archived pinned source. That makes patch reproducibility
   an explicit preflight gate, so source provenance, patch fingerprints, and

@@ -520,6 +520,10 @@ class Doctor:
             return
         if baseline.get("format") != "libpglite-native-platform-baseline-v1":
             self.errors.append("platform baseline diagnostic has wrong format")
+        for key in ["system", "machine"]:
+            value = baseline.get(key)
+            if not isinstance(value, str) or not value:
+                self.errors.append(f"platform baseline is missing {key}")
         target = self.bundle.get("target")
         if baseline.get("target") != target:
             self.errors.append(
