@@ -96,6 +96,9 @@ actual plugin and prefix contents.
   that both required conformance results passed.
 - In development mode the doctor warns about build-machine dependency paths. In
   production mode, or with `--strict-relocatable`, those paths are hard failures.
+- Native preflight now runs the doctor in strict relocatability mode and then
+  extracts the final package to run the native raw protocol/contrib smoke against
+  the packaged plugin and packaged Postgres prefix.
 - This ADR remains open until diagnostics are generated as structured release
   data across all required gates and production packaging rejects stale
   diagnostics.

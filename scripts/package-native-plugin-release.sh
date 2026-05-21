@@ -72,7 +72,11 @@ require zstd
 require python3
 require nm
 case "$(uname -s)" in
-  Darwin) require otool ;;
+  Darwin)
+    require otool
+    require install_name_tool
+    require codesign
+    ;;
   Linux) require ldd ;;
 esac
 
@@ -130,8 +134,9 @@ defined_symbols() {
 
 dependency_report() {
   local out="$1"
-  local binary="$2"
-  local postgres_lib_dir="$3"
+  local package_root="$2"
+  local binary="$3"
+  local postgres_lib_dir="$4"
 
   : >"$out"
   case "$(uname -s)" in
@@ -139,12 +144,12 @@ dependency_report() {
       {
         echo "format=libpglite-native-dependencies-v1"
         echo "tool=otool -L"
-        echo "binary=$binary"
-        otool -L "$binary"
+        echo "binary=${binary#$package_root/}"
+        otool -L "$binary" | sed "s#$package_root#.#g"
         while IFS= read -r module; do
           echo
-          echo "module=$module"
-          otool -L "$module"
+          echo "module=${module#$package_root/}"
+          otool -L "$module" | sed "s#$package_root#.#g"
         done < <(find "$postgres_lib_dir" -maxdepth 1 -type f -name '*.dylib' | LC_ALL=C sort)
       } >"$out"
       ;;
@@ -152,16 +157,66 @@ dependency_report() {
       {
         echo "format=libpglite-native-dependencies-v1"
         echo "tool=ldd"
-        echo "binary=$binary"
-        ldd "$binary" || true
+        echo "binary=${binary#$package_root/}"
+        ldd "$binary" | sed "s#$package_root#.#g" || true
         while IFS= read -r module; do
           echo
-          echo "module=$module"
-          ldd "$module" || true
+          echo "module=${module#$package_root/}"
+          ldd "$module" | sed "s#$package_root#.#g" || true
         done < <(find "$postgres_lib_dir" -maxdepth 1 -type f -name '*.so' | LC_ALL=C sort)
       } >"$out"
       ;;
   esac
+}
+
+repair_macos_package_install_names() {
+  local package_root="$1"
+  local plugin_name="$2"
+  local plugin="$package_root/$plugin_name"
+  local package_lib_dir="$package_root/postgres/lib"
+
+  [[ "$(uname -s)" == "Darwin" ]] || return 0
+
+  install_name_tool -id "@rpath/$plugin_name" "$plugin"
+
+  while IFS= read -r dylib; do
+    install_name_tool -id "@loader_path/$(basename "$dylib")" "$dylib" || true
+  done < <(find "$package_lib_dir" -maxdepth 1 -type f -name '*.dylib' | LC_ALL=C sort)
+
+  while IFS= read -r object; do
+    while IFS= read -r dependency; do
+      case "$dependency" in
+        "$postgres_install_prefix"/lib/*.dylib|"$package_lib_dir"/*.dylib)
+          install_name_tool \
+            -change "$dependency" "@loader_path/$(basename "$dependency")" \
+            "$object"
+          ;;
+        /opt/homebrew/*/lib/libcrypto.*.dylib|/opt/homebrew/opt/openssl@*/lib/libcrypto.*.dylib)
+          local dependency_name
+          dependency_name="$(basename "$dependency")"
+          if [[ ! -f "$package_lib_dir/$dependency_name" ]]; then
+            cp "$dependency" "$package_lib_dir/$dependency_name"
+            install_name_tool -id "@loader_path/$dependency_name" "$package_lib_dir/$dependency_name"
+          fi
+          install_name_tool -change "$dependency" "@loader_path/$dependency_name" "$object"
+          ;;
+      esac
+    done < <(otool -L "$object" | awk 'NR > 1 {print $1}')
+  done < <(
+    {
+      printf '%s\n' "$plugin"
+      find "$package_lib_dir" -maxdepth 1 -type f -name '*.dylib'
+    } | LC_ALL=C sort
+  )
+
+  while IFS= read -r object; do
+    codesign --force --sign - "$object" >/dev/null 2>&1 || true
+  done < <(
+    {
+      printf '%s\n' "$plugin"
+      find "$package_lib_dir" -maxdepth 1 -type f -name '*.dylib'
+    } | LC_ALL=C sort
+  )
 }
 
 native_manifest="${LIBPGLITE_NATIVE_LINK_MANIFEST:-"$repo_root/target/native-pglite/$platform/libpglite_native_link_manifest.txt"}"
@@ -226,7 +281,6 @@ validate_plugin_exports() {
 validate_plugin_exports "$plugin_binary"
 
 git_commit="$(git -C "$repo_root" rev-parse HEAD)"
-plugin_checksum="$(sha256 "$plugin_binary")"
 
 manifest_value() {
   local key="$1"
@@ -276,6 +330,9 @@ mkdir -p "$binary_stage" "$source_stage"
 
 cp "$plugin_binary" "$binary_stage/"
 cp -R "$postgres_install_prefix" "$binary_stage/postgres"
+repair_macos_package_install_names "$binary_stage" "$expected_plugin"
+validate_plugin_exports "$binary_stage/$expected_plugin"
+plugin_checksum="$(sha256 "$binary_stage/$expected_plugin")"
 diagnostics_stage="$binary_stage/diagnostics"
 mkdir -p "$diagnostics_stage"
 
@@ -290,10 +347,10 @@ else
   echo "native link manifest does not provide a readable extension_inventory: ${extension_inventory:-<empty>}" >&2
   exit 1
 fi
-defined_symbols "$plugin_binary" | LC_ALL=C sort -u >"$diagnostics_stage/plugin-defined-symbols.txt"
+defined_symbols "$binary_stage/$expected_plugin" | LC_ALL=C sort -u >"$diagnostics_stage/plugin-defined-symbols.txt"
 awk -F= '$1 == "backend_export_symbol" {print substr($0, length($1) + 2)}' "$native_manifest" \
   | LC_ALL=C sort -u >"$diagnostics_stage/backend-export-symbols.txt"
-dependency_report "$diagnostics_stage/dependencies.txt" "$plugin_binary" "$postgres_lib_dir"
+dependency_report "$diagnostics_stage/dependencies.txt" "$binary_stage" "$binary_stage/$expected_plugin" "$binary_stage/postgres/lib"
 {
   echo "format=libpglite-native-build-provenance-v1"
   echo "target=$platform"

@@ -64,6 +64,21 @@ libraries or runtime data.
   ADR-0008 owns extension parity and consumes both prefixes.
 - Early macOS bring-up may continue to use `pkg-config` against Homebrew to
   validate build mechanics, but that mode must remain marked as non-release.
+- macOS development packaging now repairs the staged package rather than the
+  build output: plugin and extension install names are rewritten to package-local
+  `@rpath`/`@loader_path` references, `libpq` references are made package-local,
+  and `pgcrypto` carries a bundled `libcrypto.3.dylib` copied into
+  `postgres/lib`.
+- The package doctor now runs with `--strict-relocatable` in preflight, so
+  dependency diagnostics containing build-machine paths fail the package gate.
+- Preflight extracts the final `.tar.zst` package and runs the native raw
+  protocol/contrib smoke against the packaged plugin and packaged Postgres
+  prefix. This verifies that the repaired install names work behaviorally, not
+  just textually.
+- This is still not the final dependency-prefix implementation: OpenSSL is
+  copied from the local provider for macOS development packaging rather than
+  built from a pinned prefix. The reproducible prefix and third-party version
+  inventory remain open.
 - PGlite's WASM build extracts export-symbol lists from dependency archives for
   Emscripten. Native builds do not need the same files verbatim, but they do
   need equivalent link/export discipline for extension module loading.

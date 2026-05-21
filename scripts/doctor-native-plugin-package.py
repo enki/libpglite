@@ -350,7 +350,7 @@ def nonempty_lines(path: pathlib.Path, errors: list[str]) -> list[str]:
 
 
 def looks_like_build_path(line: str) -> bool:
-    if re.search(r"(/Users/|/home/|/private/var/|/tmp/|/var/folders/)", line):
+    if re.search(r"(/Users/|/home/|/private/var/|/tmp/|/var/folders/|/opt/homebrew/)", line):
         return True
     return False
 
