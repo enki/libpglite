@@ -44,6 +44,7 @@ class PreflightLinuxSmolvmTests(unittest.TestCase):
             "curl",
             "git",
             "libtool",
+            "patchelf",
             "pkg-config",
             "python3",
             "zstd",

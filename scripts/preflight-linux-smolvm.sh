@@ -100,6 +100,7 @@ apt-get install -y --no-install-recommends \
   git \
   libtool \
   make \
+  patchelf \
   perl \
   pkg-config \
   python3 \

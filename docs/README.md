@@ -52,23 +52,27 @@ Current closure frontier:
   environment in `../smolvm/` or an equivalent release container. A local
   `scripts/preflight-linux-smolvm.sh` entrypoint now exists for the
   `ubuntu:24.04` guest path and isolates Linux build outputs under `/tmp` in the
-  guest, but the full Linux preflight still has to pass and record baseline
-  diagnostics.
+  guest. The full Ubuntu preflight now passes; remaining closure is to record
+  the Linux distro/toolchain/libc baseline in package diagnostics and reject
+  mismatched baselines.
 - ADR-0007: macOS package doctor self-tests the packaged `postgres/` prefix,
-  including the full extension/runtime data surface. It still needs the same
-  prefix shape and strict relocatability on Linux. The Ubuntu lane now reaches
-  the strict package doctor and fails on Linux prefix dependency repair rather
-  than backend startup.
+  including the full extension/runtime data surface. The Ubuntu lane now passes
+  the same package doctor self-test with Linux RUNPATH repair. Remaining
+  closure is keeping the prefix layout stable across supported packages and
+  ensuring strict diagnostics stay release-gating.
 - ADR-0008: macOS release preflight now materializes all pinned PGlite
   `other_extensions`, builds the full set including `postgis`, packages them,
   and runs packaged-artifact `CREATE EXTENSION` conformance for the parity set.
-  It still needs the same release path and doctor regression coverage on Linux.
+  The Ubuntu lane now passes the same parity path on Linux. Remaining closure is
+  production enforcement and regression coverage that keeps missing extension
+  sources or files from degrading to warnings.
 - ADR-0009: macOS packaged `pgcrypto` and PostGIS now work from the controlled
   dependency prefix under strict package diagnostics. It still needs the Linux
   prefix contract and continued strict dependency-regression coverage. The
-  current Linux blocker is package-local dependency repair for modules such as
-  `dblink` and `postgres_fdw`, which still reference the build prefix's
-  `libpq.so.5` under strict relocatability diagnostics.
+  Ubuntu lane now applies package-local RUNPATH repair with `patchelf` and
+  passes strict package diagnostics. Remaining closure is documenting the Linux
+  prefix contract as release policy and keeping strict dependency-regression
+  coverage in place.
 - ADR-0010: macOS release preflight now generates backend exports from the full
   packaged parity set, including common data symbols, and proves the modules
   load through the globally loaded plugin. Linux now uses a Rust staticlib plus
@@ -76,8 +80,8 @@ Current closure frontier:
   from symbol diagnostics. The Ubuntu lane now reaches the package doctor after
   raw-protocol extension conformance; `pg_ivm` exposed the need to export
   read-only backend data symbols such as `InvalidObjectAddress`, so the scanner
-  now includes `R` symbols. It still needs a passing Ubuntu packaged-runtime
-  proof and full-set stale-symbol regression coverage before it can close.
+  now includes `R` symbols. The Ubuntu packaged-runtime proof now passes; this
+  ADR still needs full-set stale-symbol regression coverage before it can close.
 - ADR-0012: still needs production package enforcement for every
   release-critical diagnostic and Linux schema parity before it can close. The
   normal macOS preflight package path now carries controlled-prefix diagnostics,

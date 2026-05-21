@@ -108,9 +108,6 @@ PGlite-shipped extension.
 
 ## Remaining Closure Criteria
 
-- The Linux release path must fetch/materialize, build, package, and run
-  packaged-artifact `CREATE EXTENSION` conformance for the same inventoried
-  parity set in the documented Ubuntu baseline.
 - The package doctor must keep rejecting any extension whose control file,
   default-version SQL, loadable module, dependency library, or required data
   payload is absent or non-relocatable, with regression coverage for the
@@ -174,6 +171,10 @@ PGlite-shipped extension.
   to the existing contrib checks for `citext` and `pgcrypto`. The PostGIS smoke
   also calls `postgis_full_version()` so the extension is loaded far enough to
   report its dependency-backed runtime.
+- The Ubuntu `smolvm` preflight now proves the same parity path on Linux. It
+  materializes and builds the pinned PGlite `other_extensions`, packages the
+  generated prefix, runs raw-protocol extension conformance, and then runs the
+  package doctor self-test from the final artifact.
 - The PostGIS native dependency substrate is now substantially less speculative:
   the macOS full-prefix smoke builds the pinned GEOS, PROJ, json-c, SQLite,
   libtiff, libdeflate, zlib, libxml2, and libxslt inputs into one static

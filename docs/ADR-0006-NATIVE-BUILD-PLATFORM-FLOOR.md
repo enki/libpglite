@@ -71,9 +71,9 @@ still need an explicitly documented Linux baseline.
   prefix build. This caught SQLite detecting `strchrnul` from the macOS 15 SDK
   despite the macOS 11.0 deployment target; the builder now forces
   `HAVE_STRCHRNUL=0` after SQLite configure.
-- Linux baseline selection remains open, but local Linux testing should use the
-  Ubuntu environment in `../smolvm/` until CI or release containers cover the
-  same path.
+- Linux baseline selection is now exercised locally through the Ubuntu
+  environment in `../smolvm/`. This still needs to become a release-recorded
+  baseline diagnostic, but it is no longer an unproven path.
 - `scripts/preflight-linux-smolvm.sh <version>` is now the local Ubuntu
   baseline entrypoint. It runs `scripts/preflight-native-plugin-release.sh` in
   an `ubuntu:24.04` guest through `../smolvm/target/release/smolvm`, installs
@@ -94,6 +94,8 @@ still need an explicitly documented Linux baseline.
   the wrapper now supplies that mount explicitly. The following run reached
   native `initdb` and exposed a root-execution violation; the wrapper now keeps
   package installation as root but runs the libpglite preflight as an
-  unprivileged `libpglite` user. This does not close the Linux floor yet because
-  the full Linux preflight still has to pass and write baseline diagnostics into
-  the package.
+  unprivileged `libpglite` user.
+- `scripts/preflight-linux-smolvm.sh 0.1.0` passed in the `ubuntu:24.04`
+  guest on 2026-05-21. The remaining Linux floor work is to record the selected
+  distro/toolchain/libc baseline in package diagnostics and make release
+  artifacts reject mismatched Linux baselines.

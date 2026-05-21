@@ -205,6 +205,12 @@ libraries or runtime data.
   PostgreSQL install prefix, and strict relocatability correctly rejects that.
   Linux closure requires the same package-local dependency repair that macOS
   already applies with loader-relative install names/rpaths.
+- Linux packaging now applies the matching package-local repair with `patchelf`:
+  the plugin gets an `$ORIGIN/postgres/lib` RUNPATH, and packaged PostgreSQL
+  modules get an `$ORIGIN` RUNPATH so sibling libraries such as `libpq.so.5`
+  resolve from the final package. The Ubuntu baseline installs `patchelf` as a
+  release preflight prerequisite. This still needs a passing strict package
+  doctor run before the Linux dependency-prefix contract can close.
 - This is still not the final dependency-prefix implementation for all
   supported targets: the checked-in inventory, source fetcher, compile-stage
   entrypoint, and prefix descriptor define the contract, and the normal macOS

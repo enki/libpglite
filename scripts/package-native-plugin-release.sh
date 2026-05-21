@@ -78,7 +78,10 @@ case "$(uname -s)" in
     require install_name_tool
     require codesign
     ;;
-  Linux) require ldd ;;
+  Linux)
+    require ldd
+    require patchelf
+    ;;
 esac
 
 platform="$(uname -m)-$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -204,6 +207,20 @@ repair_macos_package_install_names() {
   )
 }
 
+repair_linux_package_rpaths() {
+  local package_root="$1"
+  local plugin_name="$2"
+  local plugin="$package_root/$plugin_name"
+  local package_lib_dir="$package_root/postgres/lib"
+
+  [[ "$(uname -s)" == "Linux" ]] || return 0
+
+  patchelf --set-rpath '$ORIGIN/postgres/lib' "$plugin"
+  while IFS= read -r object; do
+    patchelf --set-rpath '$ORIGIN' "$object"
+  done < <(find "$package_lib_dir" -maxdepth 1 -type f -name '*.so' | LC_ALL=C sort)
+}
+
 native_manifest="${LIBPGLITE_NATIVE_LINK_MANIFEST:-"$repo_root/target/native-pglite/$platform/libpglite_native_link_manifest.txt"}"
 if [[ ! -f "$native_manifest" ]]; then
   echo "native link manifest not found: $native_manifest" >&2
@@ -316,6 +333,7 @@ mkdir -p "$binary_stage" "$source_stage"
 cp "$plugin_binary" "$binary_stage/"
 cp -R "$postgres_install_prefix" "$binary_stage/postgres"
 repair_macos_package_install_names "$binary_stage" "$expected_plugin"
+repair_linux_package_rpaths "$binary_stage" "$expected_plugin"
 validate_plugin_exports "$binary_stage/$expected_plugin"
 plugin_checksum="$(sha256 "$binary_stage/$expected_plugin")"
 diagnostics_stage="$binary_stage/diagnostics"

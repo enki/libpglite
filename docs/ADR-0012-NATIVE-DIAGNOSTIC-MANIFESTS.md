@@ -170,6 +170,15 @@ actual plugin and prefix contents.
   build-prefix `libpq.so.5` references from modules such as `dblink` and
   `postgres_fdw`, plus unresolved/static-unknown module dependencies, and the
   strict doctor rejects the package before it can be treated as releasable.
+- Linux dependency diagnostics now ignore `ldd`'s `statically linked` marker
+  for modules that have no dynamic dependencies, because that line is an absence
+  of dependencies rather than an unresolved dependency. Real missing,
+  build-machine, or absolute-external dependencies remain strict failures.
+- After Linux RUNPATH repair, `scripts/preflight-linux-smolvm.sh 0.1.0` passes
+  the strict package doctor and final-artifact self-test in the Ubuntu baseline.
+  That gives this ADR Linux schema evidence for the current diagnostics, while
+  production enforcement still depends on closing the remaining release-gating
+  ADRs.
 - The doctor now cross-checks inventoried `contrib` extensions against packaged
   control files, default-version SQL, and referenced native modules. It also
   makes missing PGlite `other_extensions` production-fatal while keeping them

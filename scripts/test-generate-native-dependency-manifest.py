@@ -27,6 +27,7 @@ class DependencyManifestGeneratorTests(unittest.TestCase):
         output = """linux-vdso.so.1 (0x00007ffc)
 libcrypto.so.3 => /tmp/build/libcrypto.so.3 (0x00007f)
 libmissing.so => not found
+statically linked
 /lib64/ld-linux-x86-64.so.2 (0x00007f)
 """
         self.assertEqual(

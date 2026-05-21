@@ -103,6 +103,8 @@ def parse_ldd(output: str) -> list[str]:
         stripped = line.strip()
         if not stripped:
             continue
+        if stripped == "statically linked":
+            continue
         if "=> not found" in stripped:
             dependencies.append(stripped.split("=>", 1)[0].strip() + " => not found")
             continue

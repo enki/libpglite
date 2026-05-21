@@ -47,10 +47,8 @@ the plugin or provide an equivalent generated artifact.
 
 ## Remaining Closure Criteria
 
-- Linux packages contain every runtime file needed by the final extension parity
-  set, matching the macOS packaged prefix shape.
-- Package doctor self-test initializes a missing data directory from the
-  packaged prefix and resumes it from a later process without build-tree
+- Keep package doctor self-tests initializing a missing data directory from the
+  packaged prefix and resuming it from a later process without build-tree
   environment variables on every supported target.
 - Strict package diagnostics reject build-machine absolute paths in prefix
   metadata, extension SQL/control files, loadable module paths, and runtime data
@@ -90,3 +88,8 @@ the plugin or provide an equivalent generated artifact.
   prefix, so the remaining prefix closure is target parity and continued strict
   relocatability rather than proving the macOS prefix contains only core
   runtime files.
+- The Ubuntu `smolvm` preflight now passes the same packaged-prefix path on
+  Linux: native preflight packages the generated `postgres/` prefix, strict
+  dependency diagnostics accept it after Linux RUNPATH repair, and the package
+  doctor self-test initializes/resumes clusters and creates the full extension
+  parity set from the final package.
