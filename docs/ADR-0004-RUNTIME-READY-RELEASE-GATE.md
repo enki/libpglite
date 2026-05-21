@@ -49,6 +49,11 @@ That is still a development/preflight gate, but it moves the release boundary in
 the intended direction: runtime readiness must be proven from the artifact that
 would ship, not only from build-tree outputs.
 
+Production packaging now fails while any root `docs/ADR-*.md` remains open.
+This makes the ADR process itself part of the release gate: an artifact cannot
+claim `runtime-ready` status until every release-gating ADR has been honestly
+moved to `docs/done/` and the remaining package diagnostics pass.
+
 ## Required Work
 
 1. Keep package metadata explicit about `runtimeStatus`.

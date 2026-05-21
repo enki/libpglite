@@ -18,7 +18,6 @@ but the plugin ABI, package layout, metadata, and checksum contract are real.
 Environment:
   LIBPGLITE_RELEASE_MODE=development|production
   LIBPGLITE_CONFORMANCE_DIR=<dir>         structured native conformance results
-  LIBPGLITE_RUNTIME_READY_CONFORMANCE=1  required for production mode
 USAGE
 }
 
@@ -52,8 +51,10 @@ esac
 
 runtime_status="native-runtime-pending-adr-0002"
 if [[ "$release_mode" == "production" ]]; then
-  if [[ "${LIBPGLITE_RUNTIME_READY_CONFORMANCE:-0}" != "1" ]]; then
-    echo "production packaging requires LIBPGLITE_RUNTIME_READY_CONFORMANCE=1 after ADR-0002 and ADR-0003 conformance passes" >&2
+  mapfile -t open_adrs < <(find "$repo_root/docs" -maxdepth 1 -type f -name 'ADR-*.md' | LC_ALL=C sort)
+  if (( ${#open_adrs[@]} > 0 )); then
+    echo "production packaging is blocked while release-gating ADRs remain open:" >&2
+    printf '  %s\n' "${open_adrs[@]#$repo_root/}" >&2
     exit 1
   fi
   runtime_status="runtime-ready"
