@@ -38,9 +38,17 @@ packaging choice.
 
 Native extension support should mirror the WASM shape as closely as practical:
 
+- The native build should follow the pinned PGlite build pipeline structure:
+  build a controlled dependency prefix, configure the pinned Postgres fork
+  against that prefix, build PostgreSQL `contrib`, special-case extensions that
+  PGlite special-cases, build `pglite/other_extensions`, then package the
+  installed extension files and runtime data.
 - Extension C objects and required third-party native libraries are linked into
   the native plugin or otherwise made inseparable from the released native
   bundle.
+- Extension modules may remain loadable PostgreSQL `.dylib` or `.so` files when
+  that matches PostgreSQL's native extension model, but their dependencies must
+  be bundled and relocatable so they are still inseparable from the release.
 - Extension SQL, control files, dictionaries, metadata, and support data are
   installed into the packaged Postgres prefix.
 - PostgreSQL must be able to `CREATE EXTENSION` for the parity set without
@@ -59,17 +67,21 @@ PGlite-shipped extension.
    build scripts, covering both `contrib` and `pglite/other_extensions`.
 2. Extend `scripts/prepare-native-pglite-link.sh` to build the parity extension
    set as native PIC inputs.
-3. Link extension objects and required third-party native libraries into the
-   native plugin with the same always-available semantics as the WASM build.
-4. Install every extension's `.control`, SQL upgrade files, support files,
+3. Build the extension set through a native equivalent of the PGlite WASM build:
+   core `contrib`, PGlite's `pgcrypto` special case, `pglite/other_extensions`,
+   and PGlite's PostGIS special case.
+4. Link extension objects and required third-party native libraries into the
+   native plugin or into bundled loadable modules with the same always-available
+   semantics as the WASM build.
+5. Install every extension's `.control`, SQL upgrade files, support files,
    dictionaries, headers, and data files into the generated Postgres prefix.
-5. Package third-party runtime data required by extensions, including PostGIS
+6. Package third-party runtime data required by extensions, including PostGIS
    projection data.
-6. Record the extension inventory, versions, linked libraries, and data paths in
+7. Record the extension inventory, versions, linked libraries, and data paths in
    the native link manifest and release bundle metadata.
-7. Add preflight checks that fail when the native extension inventory diverges
+8. Add preflight checks that fail when the native extension inventory diverges
    from the pinned PGlite WASM inventory.
-8. Add runtime conformance tests that initialize a clean data directory and run
+9. Add runtime conformance tests that initialize a clean data directory and run
    `CREATE EXTENSION` smoke tests for the full parity set, including `vector`
    and PostGIS.
 
@@ -107,3 +119,20 @@ PGlite-shipped extension.
 - The current local pinned source has unpopulated `pglite/other_extensions`
   submodules. Full parity requires fetching or vendoring those exact submodule
   commits before native extension builds can be made release-gating.
+- The native prepare step now builds extension-bearing PostgreSQL `contrib`
+  source directories individually and validates installed control files.
+  Standalone contrib modules and utility programs remain inventoried, but are
+  not part of the first `CREATE EXTENSION` parity gate.
+- PGlite's WASM build keeps global OpenSSL disabled for the Postgres configure
+  step and special-cases `pgcrypto` with explicit OpenSSL side-module link
+  flags. The native build should copy that shape: do not enable `sslinfo`
+  implicitly just to satisfy `pgcrypto`; instead give `pgcrypto` its explicit
+  native OpenSSL module link inputs.
+- PGlite packages extension artifacts separately from core backend build output.
+  Native releases should do the same conceptually: build/install extension
+  modules and their SQL/control/data into a staged prefix, then package that
+  prefix beside the plugin.
+- PGlite's WASM main module exports the backend symbols required by side-module
+  extensions. Native releases need the platform equivalent: enough backend
+  symbols visible to extension modules at load time while the public plugin ABI
+  remains limited to `libpglite_plugin_*`.

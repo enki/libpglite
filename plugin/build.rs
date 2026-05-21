@@ -79,6 +79,17 @@ fn emit_native_pglite_link_inputs() {
                     println!("cargo:rustc-cdylib-link-arg=-Wl,--no-whole-archive");
                 }
             }
+            NativeLinkInput::LinkArg(arg) => {
+                println!("cargo:rustc-cdylib-link-arg={arg}");
+            }
+            NativeLinkInput::BackendExportSymbol(symbol) => {
+                if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+                    println!(
+                        "cargo:rustc-cdylib-link-arg=-Wl,-exported_symbol,_{}",
+                        symbol
+                    );
+                }
+            }
         }
     }
 }
@@ -87,6 +98,8 @@ fn emit_native_pglite_link_inputs() {
 enum NativeLinkInput {
     Object(PathBuf),
     Archive(PathBuf),
+    LinkArg(String),
+    BackendExportSymbol(String),
 }
 
 fn default_manifest_path() -> PathBuf {
@@ -117,6 +130,14 @@ fn native_link_inputs_from_manifest(manifest: &Path, contents: &str) -> Vec<Nati
         };
         if kind == "format" && raw_path == "libpglite-native-link-manifest-v1" {
             has_format = true;
+            continue;
+        }
+        if kind == "link_arg" {
+            link_inputs.push(NativeLinkInput::LinkArg(raw_path.to_string()));
+            continue;
+        }
+        if kind == "backend_export_symbol" {
+            link_inputs.push(NativeLinkInput::BackendExportSymbol(raw_path.to_string()));
             continue;
         }
         if kind != "archive" && kind != "static" && kind != "object" {

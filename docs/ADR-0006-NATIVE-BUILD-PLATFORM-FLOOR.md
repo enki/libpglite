@@ -22,6 +22,11 @@ the release environment overrides it intentionally.
 Linux needs the same treatment before production release, either through a
 documented build container/toolchain or an explicit libc baseline.
 
+For local Linux validation, this workspace can use the Ubuntu environment in
+`../smolvm/`, matching the local Linux testing route used for comparable native
+library work. That VM path is a development and preflight aid; release artifacts
+still need an explicitly documented Linux baseline.
+
 ## Required Work
 
 1. Set a deterministic macOS deployment target for native C compilation.
@@ -29,6 +34,7 @@ documented build container/toolchain or an explicit libc baseline.
 3. Rebuild native Postgres objects when the platform floor changes.
 4. Add preflight checks that reject mixed deployment-target native inputs.
 5. Define and test the Linux libc/toolchain baseline.
+6. Document and automate the local Ubuntu validation flow through `../smolvm/`.
 
 ## Acceptance Criteria
 
@@ -44,4 +50,6 @@ documented build container/toolchain or an explicit libc baseline.
 - The native build fingerprint includes the deployment target and forces a
   Postgres rebuild when it changes.
 - The native link manifest records `macos_deployment_target`.
-- Linux baseline selection remains open.
+- Linux baseline selection remains open, but local Linux testing should use the
+  Ubuntu environment in `../smolvm/` until CI or release containers cover the
+  same path.

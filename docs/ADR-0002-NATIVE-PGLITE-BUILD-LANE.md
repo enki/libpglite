@@ -40,7 +40,9 @@ The native lane must preserve the PGlite runtime model:
 3. Compile PGlite-specific C support as PIC.
 4. Compile the required Postgres backend objects as PIC.
 5. Link only release-grade native inputs into the plugin.
-6. Hide all native implementation symbols behind the plugin C ABI.
+6. Keep the public host-facing ABI limited to `libpglite_plugin_*` symbols while
+   allowing the native backend symbol exports required by PostgreSQL extension
+   modules.
 7. Add preflight checks for missing objects, debug objects, and unexpected
    dynamic exports.
 8. Add protocol conformance fixtures that prove startup, simple query, extended
@@ -49,7 +51,9 @@ The native lane must preserve the PGlite runtime model:
 ## Acceptance Criteria
 
 - The plugin links on supported macOS and Linux targets.
-- The plugin exports only `libpglite_plugin_*` ABI symbols on Linux.
+- The plugin's public host-facing ABI is limited to `libpglite_plugin_*`
+  symbols; any additional dynamic exports are generated backend symbols required
+  for PostgreSQL extension module loading.
 - A Rust test can open a temporary data directory, run `select 1`, and shut down.
 - A protocol error does not poison the runtime if PostgreSQL can recover.
 - No JavaScript, Emscripten module object, or wasm runtime is required by the
@@ -63,8 +67,9 @@ The native lane must preserve the PGlite runtime model:
   backend with the PGlite syscall and longjmp overrides, and emits a manifest
   with concrete object/archive inputs.
 - The plugin build reads the manifest when `LIBPGLITE_NATIVE_LINK_PGLITE=1` and
-  links the Postgres/PGlite symbols into the cdylib while keeping dynamic
-  exports limited to the `libpglite_plugin_*` ABI.
+  links the Postgres/PGlite symbols into the cdylib while keeping the public
+  host-facing ABI limited to the `libpglite_plugin_*` symbols. ADR-0010 owns the
+  generated backend-symbol export set needed by PostgreSQL extension modules.
 - The native build lane also emits an install prefix for `initdb` and PostgreSQL
   runtime support files; ADR-0007 owns making that prefix relocatable and
   package-ready.
@@ -79,7 +84,8 @@ The native lane must preserve the PGlite runtime model:
   object/archive changes from the preparation script invalidate stale plugin
   link arguments.
 - On macOS the release plugin links the native Postgres/PGlite objects while
-  exporting only the `libpglite_plugin_*` ABI symbols; Postgres and
+  exporting the `libpglite_plugin_*` ABI symbols and the generated backend
+  symbol set needed by bundled PostgreSQL extension modules. Other Postgres and
   `libpglite_native_*` symbols remain local implementation details.
 - The native runtime now has a macOS smoke path through the dynamic plugin:
   initialize a clean data directory with the generated Postgres prefix, install

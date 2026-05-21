@@ -169,6 +169,7 @@ python3 "$repo_root/scripts/inventory-native-pglite-extensions.py" \
 
 pglitec_object="$object_dir/pglitec.o"
 cc -fPIC -O2 -DNDEBUG \
+  -Dexit=libpglite_native_exit \
   -c "$patched_source/pglite/src/pglitec/pglitec.c" \
   -o "$pglitec_object"
 native_exit_object="$object_dir/libpglite_native_exit.o"
@@ -213,12 +214,95 @@ common_archive="$postgres_build_dir/src/common/libpgcommon_srv.a"
 port_archive="$postgres_build_dir/src/port/libpgport_srv.a"
 native_trap_fingerprint="$(git -C "$repo_root" hash-object "$repo_root/native/c/libpglite_native_trap.c")"
 
+unique_contrib_sources_from_inventory() {
+  awk -F'[=;]' '
+    ($1 == "contrib_extension") {
+      for (i = 2; i <= NF; i++) {
+        if ($i == "source" && (i + 1) <= NF) {
+          print $(i + 1)
+        }
+      }
+    }
+  ' "$extension_inventory" | LC_ALL=C sort -u
+}
+
+native_extension_required_symbols() {
+  if [[ ! -d "$postgres_install_prefix/lib" ]]; then
+    return
+  fi
+
+  local undefined_symbols
+  local defined_symbols
+  undefined_symbols="$(mktemp)"
+  defined_symbols="$(mktemp)"
+
+  case "$(uname -s)" in
+    Darwin)
+      while IFS= read -r -d '' module; do
+        nm -u "$module" 2>/dev/null || true
+      done < <(find "$postgres_install_prefix/lib" -maxdepth 1 -type f -name '*.dylib' -print0) \
+        | awk '{print $NF}' \
+        | sed 's/^_//' \
+        | grep -Ev '^(dyld_stub_binder|memcmp|memcpy|memmove|memset|strcmp|strlen|strncmp|strnlen|strchr|strrchr|strstr|strcasecmp|strncasecmp|malloc|calloc|realloc|free|abort|exit|__.*|_.*)$' \
+        | LC_ALL=C sort -u >"$undefined_symbols"
+      ;;
+    Linux)
+      while IFS= read -r -d '' module; do
+        nm -u "$module" 2>/dev/null || true
+      done < <(find "$postgres_install_prefix/lib" -maxdepth 1 -type f -name '*.so' -print0) \
+        | awk '{print $NF}' \
+        | sed 's/@.*//' \
+        | grep -Ev '^(memcmp|memcpy|memmove|memset|strcmp|strlen|strncmp|strnlen|strchr|strrchr|strstr|strcasecmp|strncasecmp|malloc|calloc|realloc|free|abort|exit|__.*|_.*)$' \
+        | LC_ALL=C sort -u >"$undefined_symbols"
+      ;;
+  esac
+
+  nm -g "$pglitec_object" "$native_trap_object" \
+    "$backend_archive" "$timezone_archive" "$common_archive" "$port_archive" 2>/dev/null \
+    | awk '$2 ~ /^[TDBS]$/ {print $3}' \
+    | sed 's/^_//' \
+    | LC_ALL=C sort -u >"$defined_symbols"
+
+  comm -12 "$undefined_symbols" "$defined_symbols"
+  rm -f "$undefined_symbols" "$defined_symbols"
+}
+
 if [[ "$build_postgres" == "1" ]]; then
+  require pkg-config
+
+  native_dependency_packages=(libxslt libxml-2.0 zlib uuid)
+  native_backend_link_packages=(libxslt libxml-2.0 zlib)
+  native_crypto_packages=(openssl)
+  for package in "${native_dependency_packages[@]}" "${native_crypto_packages[@]}"; do
+    if ! pkg-config --exists "$package"; then
+      echo "missing native dependency pkg-config package required for extension parity: $package" >&2
+      exit 2
+    fi
+  done
+
+  native_dependency_cppflags="$(pkg-config --cflags "${native_dependency_packages[@]}" "${native_crypto_packages[@]}")"
+  native_dependency_ldflags="$(pkg-config --libs-only-L "${native_backend_link_packages[@]}")"
+  native_dependency_libs="$(pkg-config --libs-only-l "${native_backend_link_packages[@]}")"
+  native_crypto_ldflags="$(pkg-config --libs-only-L "${native_crypto_packages[@]}")"
+  native_crypto_libs="$(pkg-config --libs-only-l "${native_crypto_packages[@]}")"
+  native_uuid_impl="e2fs"
+  native_extension_be_dlllibs=""
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    native_extension_be_dlllibs="-undefined dynamic_lookup"
+  fi
+
   build_env_fingerprint="source_commit=$source_commit
 macos_deployment_target=${MACOSX_DEPLOYMENT_TARGET:-}
 patch_fingerprint=$patch_fingerprint
 native_trap_fingerprint=$native_trap_fingerprint
-pglite_copt=$pglite_copt"
+pglite_copt=$pglite_copt
+native_dependency_cppflags=$native_dependency_cppflags
+native_dependency_ldflags=$native_dependency_ldflags
+native_dependency_libs=$native_dependency_libs
+native_crypto_ldflags=$native_crypto_ldflags
+native_crypto_libs=$native_crypto_libs
+native_uuid_impl=$native_uuid_impl
+native_extension_be_dlllibs=$native_extension_be_dlllibs"
   build_env_file="$postgres_build_dir/.libpglite-native-build-env"
   if [[ ! -f "$build_env_file" || "$(cat "$build_env_file")" != "$build_env_fingerprint" ]]; then
     rm -rf "$postgres_build_dir"
@@ -228,17 +312,21 @@ pglite_copt=$pglite_copt"
   if [[ ! -x "$postgres_build_dir/config.status" ]]; then
     (
       cd "$postgres_build_dir"
+      CPPFLAGS="$native_dependency_cppflags" \
+      LDFLAGS="$native_dependency_ldflags" \
+      LIBS="$native_dependency_libs" \
       "$patched_source/configure" \
         --without-readline \
         --without-icu \
         --without-llvm \
         --without-pam \
-        --without-zlib \
+        --with-zlib \
         --without-openssl \
         --without-gssapi \
         --without-ldap \
-        --without-libxml \
-        --without-libxslt \
+        --with-libxml \
+        --with-libxslt \
+        --with-uuid="$native_uuid_impl" \
         --without-systemd \
         --disable-nls \
         --prefix="$postgres_install_prefix"
@@ -291,6 +379,15 @@ pglite_copt=$pglite_copt"
   make -C "$postgres_build_dir/src/pl/plpgsql/src" install
   make -C "$postgres_build_dir/src/bin/initdb" install
 
+  while IFS= read -r contrib_source; do
+    find "$postgres_build_dir/$contrib_source" -maxdepth 1 -type f -name '*.dylib' -delete
+    make -C "$postgres_build_dir/$contrib_source" install \
+      COPT="$pglite_copt" \
+      LDFLAGS_SL="$native_dependency_ldflags $native_crypto_ldflags" \
+      BE_DLLLIBS="$native_extension_be_dlllibs" \
+      LIBS="$native_dependency_ldflags $native_dependency_libs $native_crypto_ldflags $native_crypto_libs"
+  done < <(unique_contrib_sources_from_inventory)
+
   for file in \
     "$postgres_install_prefix/bin/initdb" \
     "$postgres_install_prefix/bin/postgres" \
@@ -302,6 +399,20 @@ pglite_copt=$pglite_copt"
       exit 1
     fi
   done
+
+  while IFS= read -r inventory_line; do
+    case "$inventory_line" in
+      contrib_extension=*)
+        extension="${inventory_line#contrib_extension=}"
+        extension="${extension%%;*}"
+        control_file="$postgres_install_prefix/share/extension/$extension.control"
+        if [[ ! -f "$control_file" ]]; then
+          echo "native Postgres install prefix is missing inventoried contrib extension control file: $control_file" >&2
+          exit 1
+        fi
+        ;;
+    esac
+  done <"$extension_inventory"
 
   printf '%s\n' "$build_env_fingerprint" >"$build_env_file"
 fi
@@ -343,6 +454,15 @@ fi
     echo "archive=$timezone_archive"
     echo "archive=$common_archive"
     echo "archive=$port_archive"
+    for flag in $native_dependency_ldflags $native_dependency_libs; do
+      case "$flag" in
+        -L*|-l*) echo "link_arg=$flag" ;;
+      esac
+    done
+    while IFS= read -r symbol; do
+      [[ -n "$symbol" ]] || continue
+      echo "backend_export_symbol=$symbol"
+    done < <(native_extension_required_symbols)
     echo "postgres_build_dir=$postgres_build_dir"
     echo "postgres_install_prefix=$postgres_install_prefix"
     echo "initdb_binary=$postgres_install_prefix/bin/initdb"

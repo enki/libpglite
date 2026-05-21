@@ -172,7 +172,7 @@ fn dynamic_runtime_guard() -> &'static Mutex<()> {
 
 impl DynamicPlugin {
     fn load(path: &Path) -> PgliteResult<Self> {
-        let library = unsafe { Library::new(path) }.map_err(|err| {
+        let library = load_plugin_library(path).map_err(|err| {
             PgliteError::initialize(format!(
                 "dynamic plugin load failed at {}: {err}",
                 path.display()
@@ -243,6 +243,18 @@ impl DynamicPlugin {
         unsafe { (self.buffer_free)(buffer) };
         bytes
     }
+}
+
+#[cfg(unix)]
+fn load_plugin_library(path: &Path) -> Result<Library, libloading::Error> {
+    use libloading::os::unix::{Library as UnixLibrary, RTLD_GLOBAL, RTLD_NOW};
+
+    unsafe { UnixLibrary::open(Some(path), RTLD_NOW | RTLD_GLOBAL).map(Into::into) }
+}
+
+#[cfg(not(unix))]
+fn load_plugin_library(path: &Path) -> Result<Library, libloading::Error> {
+    unsafe { Library::new(path) }
 }
 
 unsafe fn symbol<T: Copy>(library: &Library, name: &[u8]) -> PgliteResult<T> {

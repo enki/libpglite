@@ -121,21 +121,32 @@ if [[ ! -f "$plugin_binary" ]]; then
 fi
 
 echo "==> preflight ${release_version}: native symbol boundary"
+allowed_backend_exports="$(mktemp)"
+awk -F= '$1 == "backend_export_symbol" {print substr($0, length($1) + 2)}' "$manifest" | sort -u >"$allowed_backend_exports"
 case "$(uname -s)" in
   Darwin)
     unexpected_exports="$(
-      nm -gU "$plugin_binary" | awk '{print $3}' | grep -Ev '^_libpglite_plugin_' || true
+      nm -gU "$plugin_binary" |
+        awk '{print $3}' |
+        sed 's/^_//' |
+        grep -Ev '^libpglite_plugin_' |
+        grep -Fxv -f "$allowed_backend_exports" || true
     )"
     ;;
   Linux)
     unexpected_exports="$(
-      nm -D --defined-only "$plugin_binary" | awk '{print $3}' | grep -Ev '^libpglite_plugin_' || true
+      nm -D --defined-only "$plugin_binary" |
+        awk '{print $3}' |
+        sed 's/@@.*//' |
+        sed 's/@.*//' |
+        grep -Ev '^libpglite_plugin_' |
+        grep -Fxv -f "$allowed_backend_exports" || true
     )"
     ;;
 esac
 
 if [[ -n "$unexpected_exports" ]]; then
-  echo "native plugin exports non-ABI symbols:" >&2
+  echo "native plugin exports symbols outside the host ABI and generated backend export set:" >&2
   echo "$unexpected_exports" >&2
   exit 1
 fi
@@ -147,7 +158,9 @@ if ! grep -q 'PostgresSingleUserMain' <<<"$all_symbols"; then
 fi
 
 echo "==> preflight ${release_version}: dynamic plugin load check"
-LIBPGLITE_TEST_PLUGIN_PATH="$plugin_binary" cargo test --features dynamic-loading --test dynamic_plugin
+LIBPGLITE_TEST_PLUGIN_PATH="$plugin_binary" \
+LIBPGLITE_TEST_POSTGRES_PREFIX="$(awk -F= '$1 == "postgres_install_prefix" {print substr($0, length($1) + 2)}' "$manifest")" \
+  cargo test --features dynamic-loading --test dynamic_plugin
 
 out_dir="${LIBPGLITE_RELEASE_OUT_DIR:-"$repo_root/dist/preflight-native-plugin"}"
 rm -rf "$out_dir"

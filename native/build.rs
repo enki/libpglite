@@ -40,6 +40,10 @@ fn main() {
                     println!("cargo:rustc-link-arg=-Wl,--no-whole-archive");
                 }
             }
+            NativeLinkInput::LinkArg(arg) => {
+                println!("cargo:rustc-link-arg={arg}");
+            }
+            NativeLinkInput::BackendExportSymbol => {}
         }
     }
 }
@@ -48,6 +52,8 @@ fn main() {
 enum NativeLinkInput {
     Object(PathBuf),
     Archive(PathBuf),
+    LinkArg(String),
+    BackendExportSymbol,
 }
 
 fn default_manifest_path() -> PathBuf {
@@ -78,6 +84,14 @@ fn native_link_inputs_from_manifest(manifest: &Path, contents: &str) -> Vec<Nati
         };
         if kind == "format" && raw_path == "libpglite-native-link-manifest-v1" {
             has_format = true;
+            continue;
+        }
+        if kind == "link_arg" {
+            link_inputs.push(NativeLinkInput::LinkArg(raw_path.to_string()));
+            continue;
+        }
+        if kind == "backend_export_symbol" {
+            link_inputs.push(NativeLinkInput::BackendExportSymbol);
             continue;
         }
         if kind != "archive" && kind != "static" && kind != "object" {

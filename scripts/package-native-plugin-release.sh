@@ -123,6 +123,13 @@ defined_symbols() {
   esac
 }
 
+native_manifest="${LIBPGLITE_NATIVE_LINK_MANIFEST:-"$repo_root/target/native-pglite/$platform/libpglite_native_link_manifest.txt"}"
+if [[ ! -f "$native_manifest" ]]; then
+  echo "native link manifest not found: $native_manifest" >&2
+  echo "run scripts/prepare-native-pglite-link.sh --build-postgres before packaging" >&2
+  exit 1
+fi
+
 validate_plugin_exports() {
   local binary="$1"
   local required=(
@@ -144,6 +151,9 @@ validate_plugin_exports() {
   done
 
   if [[ "$(uname -s)" == "Linux" ]]; then
+    local allowed_backend_exports
+    allowed_backend_exports="$(mktemp)"
+    awk -F= '$1 == "backend_export_symbol" {print substr($0, length($1) + 2)}' "$native_manifest" | sort -u >"$allowed_backend_exports"
     local unexpected=0
     while read -r symbol; do
       [[ -z "$symbol" ]] && continue
@@ -156,14 +166,17 @@ validate_plugin_exports() {
         libpglite_plugin_runtime_shutdown)
           ;;
         *)
-          echo "Linux native plugin exports non-ABI symbol: $symbol" >&2
-          unexpected=1
+          if ! grep -Fx "$symbol" "$allowed_backend_exports" >/dev/null; then
+            echo "Linux native plugin exports symbol outside the host ABI and generated backend export set: $symbol" >&2
+            unexpected=1
+          fi
           ;;
       esac
     done <<<"$symbols"
+    rm -f "$allowed_backend_exports"
 
     if [[ "$unexpected" != "0" ]]; then
-      echo "Linux native plugin must export only the libpglite plugin C ABI" >&2
+      echo "Linux native plugin must export only the libpglite plugin C ABI plus generated backend symbols" >&2
       exit 1
     fi
   fi
@@ -173,12 +186,6 @@ validate_plugin_exports "$plugin_binary"
 
 git_commit="$(git -C "$repo_root" rev-parse HEAD)"
 plugin_checksum="$(sha256 "$plugin_binary")"
-native_manifest="${LIBPGLITE_NATIVE_LINK_MANIFEST:-"$repo_root/target/native-pglite/$platform/libpglite_native_link_manifest.txt"}"
-if [[ ! -f "$native_manifest" ]]; then
-  echo "native link manifest not found: $native_manifest" >&2
-  echo "run scripts/prepare-native-pglite-link.sh --build-postgres before packaging" >&2
-  exit 1
-fi
 
 manifest_value() {
   local key="$1"
