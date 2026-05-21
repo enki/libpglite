@@ -99,6 +99,12 @@ libraries or runtime data.
   prefix descriptor. The script mirrors the PGlite build order and can run
   focused smoke builds with `--only <name>` while the full macOS prefix is being
   brought up.
+- macOS focused smoke builds have proven locked-source `zlib` and OpenSSL
+  static prefix builds. The OpenSSL native path uses `no-module` in addition to
+  `no-shared` so the prefix does not silently acquire a loadable
+  `legacy.dylib`. The next local blocker for the full prefix is the GNU
+  autotools prerequisite needed by PGlite's libxml2/libxslt/libtiff `autogen.sh`
+  path.
 - `scripts/describe-native-dependency-prefix.py` validates a native dependency
   prefix against that inventory and writes
   `libpglite-native-dependency-prefix-v1`. The native prepare step accepts

@@ -88,6 +88,9 @@ export PATH
 require() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "missing required command: $1" >&2
+    if [[ "$(uname -s)" == "Darwin" && "$1" == "automake" ]]; then
+      echo "install the PGlite-aligned autotools prerequisite with: brew install automake" >&2
+    fi
     exit 2
   fi
 }
@@ -266,7 +269,7 @@ build_openssl() {
   (
     cd "$src"
     CFLAGS="$common_cflags" CXXFLAGS="$common_cxxflags" ./Configure \
-      no-asm no-tests no-threads no-shared \
+      no-asm no-tests no-threads no-shared no-module \
       --prefix="$prefix" \
       "$target"
     make -j"$jobs"
