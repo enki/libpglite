@@ -66,3 +66,8 @@ the plugin or provide an equivalent generated artifact.
   opens the plugin by package directory without `LIBPGLITE_TEST_POSTGRES_PREFIX`.
   This proves the release artifact can find the packaged `postgres/` prefix
   beside the plugin instead of relying on build-machine prefix paths.
+- The generated prefix now includes `pg_config` and the PGXS makefile substrate
+  (`lib/pgxs/src/Makefile.global` and `lib/pgxs/src/makefiles/pgxs.mk`) so
+  fetched PGlite `other_extensions` can build against the same native prefix
+  rather than a host PostgreSQL installation. The package doctor treats those
+  files as required prefix contents.

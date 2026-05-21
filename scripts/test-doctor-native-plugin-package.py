@@ -335,6 +335,30 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "\n".join(doctor.errors),
         )
 
+    def test_present_other_extension_requires_packaged_control_files(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+            extension_inventory_text=(
+                "format=libpglite-native-extension-inventory-v1\n"
+                "other_extension=vector;"
+                "source=pglite/other_extensions/vector;"
+                "submodule_state=?;"
+                "submodule_commit=35ab919bf5da677709b2ebb8be07480bb25e97cf;"
+                "status=present;"
+                "submodule_url=https://github.com/pgvector/pgvector.git\n"
+            ),
+        )
+        with tempdir:
+            doctor.validate_extensions()
+
+        self.assertIn(
+            "inventoried extension is missing control file: vector",
+            "\n".join(doctor.errors),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

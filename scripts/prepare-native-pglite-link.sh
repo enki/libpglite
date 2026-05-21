@@ -6,6 +6,7 @@ source_dir="${LIBPGLITE_POSTGRES_SOURCE_DIR:-}"
 out="${LIBPGLITE_NATIVE_LINK_MANIFEST:-}"
 build_postgres="${LIBPGLITE_BUILD_POSTGRES:-0}"
 fetch_other_extensions="${LIBPGLITE_FETCH_OTHER_EXTENSIONS:-0}"
+build_other_extensions="${LIBPGLITE_BUILD_OTHER_EXTENSIONS:-0}"
 
 if [[ "$(uname -s)" == "Darwin" && -z "${MACOSX_DEPLOYMENT_TARGET:-}" ]]; then
   export MACOSX_DEPLOYMENT_TARGET=11.0
@@ -13,7 +14,7 @@ fi
 
 usage() {
   cat >&2 <<'USAGE'
-usage: scripts/prepare-native-pglite-link.sh [--source-dir <path>] [--out <manifest>] [--build-postgres] [--fetch-other-extensions]
+usage: scripts/prepare-native-pglite-link.sh [--source-dir <path>] [--out <manifest>] [--build-postgres] [--fetch-other-extensions] [--build-other-extensions]
 
 Validates the pinned postgres-pglite source substrate and writes a native link
 manifest. By default it validates the source and compiles PGlite-specific C
@@ -25,6 +26,7 @@ Environment:
   LIBPGLITE_NATIVE_LINK_MANIFEST=<path>
   LIBPGLITE_BUILD_POSTGRES=1
   LIBPGLITE_FETCH_OTHER_EXTENSIONS=1
+  LIBPGLITE_BUILD_OTHER_EXTENSIONS=1
   LIBPGLITE_NATIVE_MAKE_JOBS=<jobs>
   MACOSX_DEPLOYMENT_TARGET=<version>  default: 11.0 on Darwin
 USAGE
@@ -46,6 +48,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     --fetch-other-extensions)
       fetch_other_extensions=1
+      shift
+      ;;
+    --build-other-extensions)
+      fetch_other_extensions=1
+      build_other_extensions=1
       shift
       ;;
     -h|--help)
@@ -155,6 +162,10 @@ if [[ -z "$out" ]]; then
   target="$(rustc -vV | awk -F': ' '$1 == "host" {print $2}')"
   out="$repo_root/target/native-pglite/$target/libpglite_native_link_manifest.txt"
 fi
+case "$out" in
+  /*) ;;
+  *) out="$repo_root/$out" ;;
+esac
 
 build_dir="$(dirname "$out")"
 patched_source="$build_dir/patched-postgres-pglite"
@@ -185,6 +196,9 @@ if [[ "$fetch_other_extensions" == "1" ]]; then
   python3 "$repo_root/scripts/materialize-native-pglite-other-extensions.py" \
     --inventory "$extension_inventory" \
     --out-root "$patched_source"
+  python3 "$repo_root/scripts/inventory-native-pglite-extensions.py" \
+    --source-dir "$patched_source" \
+    --out "$extension_inventory"
 fi
 
 pglitec_object="$object_dir/pglitec.o"
@@ -241,6 +255,23 @@ unique_contrib_sources_from_inventory() {
         if ($i == "source" && (i + 1) <= NF) {
           print $(i + 1)
         }
+      }
+    }
+  ' "$extension_inventory" | LC_ALL=C sort -u
+}
+
+present_other_extensions_from_inventory() {
+  awk -F'[=;]' '
+    ($1 == "other_extension") {
+      name = $2
+      status = ""
+      for (i = 3; i <= NF; i++) {
+        if ($i == "status" && (i + 1) <= NF) {
+          status = $(i + 1)
+        }
+      }
+      if (status == "present") {
+        print name
       }
     }
   ' "$extension_inventory" | LC_ALL=C sort -u
@@ -310,10 +341,13 @@ if [[ "$build_postgres" == "1" ]]; then
   if [[ "$(uname -s)" == "Darwin" ]]; then
     native_extension_be_dlllibs="-undefined dynamic_lookup"
   fi
+  extension_inventory_fingerprint="$(sha256 "$extension_inventory")"
 
   build_env_fingerprint="source_commit=$source_commit
 macos_deployment_target=${MACOSX_DEPLOYMENT_TARGET:-}
 patch_fingerprint=$patch_fingerprint
+extension_inventory_fingerprint=$extension_inventory_fingerprint
+build_other_extensions=$build_other_extensions
 native_trap_fingerprint=$native_trap_fingerprint
 pglite_copt=$pglite_copt
 native_dependency_cppflags=$native_dependency_cppflags
@@ -398,6 +432,9 @@ native_extension_be_dlllibs=$native_extension_be_dlllibs"
   make -C "$postgres_build_dir/src/backend/snowball" install
   make -C "$postgres_build_dir/src/pl/plpgsql/src" install
   make -C "$postgres_build_dir/src/bin/initdb" install
+  make -C "$postgres_build_dir/src" install-local
+  make -C "$postgres_build_dir/src/makefiles" install
+  make -C "$postgres_build_dir/src/bin/pg_config" install
 
   while IFS= read -r contrib_source; do
     find "$postgres_build_dir/$contrib_source" -maxdepth 1 -type f -name '*.dylib' -delete
@@ -408,9 +445,42 @@ native_extension_be_dlllibs=$native_extension_be_dlllibs"
       LIBS="$native_dependency_ldflags $native_dependency_libs $native_crypto_ldflags $native_crypto_libs"
   done < <(unique_contrib_sources_from_inventory)
 
+  if [[ "$build_other_extensions" == "1" ]]; then
+    while IFS= read -r extension; do
+      if [[ "$extension" == "postgis" ]]; then
+        echo "native PGlite other extension build does not yet handle PostGIS" >&2
+        continue
+      fi
+      extension_source="$patched_source/pglite/other_extensions/$extension"
+      if [[ ! -d "$extension_source" ]]; then
+        echo "native PGlite other extension source is missing: $extension_source" >&2
+        exit 1
+      fi
+      make -C "$extension_source" clean \
+        PG_CONFIG="$postgres_install_prefix/bin/pg_config" \
+        OPTFLAGS="" >/dev/null || true
+      make -C "$extension_source" \
+        PG_CONFIG="$postgres_install_prefix/bin/pg_config" \
+        OPTFLAGS="" \
+        BE_DLLLIBS="$native_extension_be_dlllibs"
+      make -C "$extension_source" install \
+        PG_CONFIG="$postgres_install_prefix/bin/pg_config" \
+        OPTFLAGS="" \
+        BE_DLLLIBS="$native_extension_be_dlllibs"
+      control_file="$postgres_install_prefix/share/extension/$extension.control"
+      if [[ ! -f "$control_file" ]]; then
+        echo "native Postgres install prefix is missing built PGlite other extension control file: $control_file" >&2
+        exit 1
+      fi
+    done < <(present_other_extensions_from_inventory)
+  fi
+
   for file in \
     "$postgres_install_prefix/bin/initdb" \
+    "$postgres_install_prefix/bin/pg_config" \
     "$postgres_install_prefix/bin/postgres" \
+    "$postgres_install_prefix/lib/pgxs/src/Makefile.global" \
+    "$postgres_install_prefix/lib/pgxs/src/makefiles/pgxs.mk" \
     "$postgres_install_prefix/share/postgres.bki" \
     "$postgres_install_prefix/share/snowball_create.sql" \
     "$postgres_install_prefix/share/extension/plpgsql.control"; do

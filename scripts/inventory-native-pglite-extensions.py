@@ -6,6 +6,7 @@ import subprocess
 
 
 PGLITE_CONTRIB_CONDITIONALS = ("pgcrypto", "uuid-ossp", "xml2")
+MATERIALIZED_PROVENANCE = ".libpglite-extension-source"
 
 
 def parse_initial_subdirs(makefile: pathlib.Path) -> list[str]:
@@ -113,6 +114,22 @@ def submodule_metadata(source: pathlib.Path) -> dict[str, dict[str, str]]:
     return metadata
 
 
+def materialized_metadata(path: pathlib.Path) -> dict[str, str]:
+    provenance = path / MATERIALIZED_PROVENANCE
+    if not provenance.is_file():
+        return {}
+
+    values: dict[str, str] = {}
+    for raw_line in provenance.read_text().splitlines():
+        if "=" not in raw_line:
+            continue
+        key, value = raw_line.split("=", 1)
+        values[key] = value
+    if values.get("format") != "libpglite-native-other-extension-source-v1":
+        return {}
+    return values
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-dir", required=True, type=pathlib.Path)
@@ -144,7 +161,12 @@ def main() -> None:
         commit = gitlinks.get(rel, status_commit)
         submodule = metadata.get(rel, {})
         path = source / rel
+        materialized = materialized_metadata(path)
         present = any(path.iterdir()) if path.is_dir() else False
+        if not commit:
+            commit = materialized.get("commit", "")
+        if not submodule.get("url") and materialized.get("url"):
+            submodule["url"] = materialized["url"]
         status = "present" if present and state != "-" else "missing"
         line = (
             "other_extension="

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -102,6 +103,64 @@ class ExtensionInventoryTests(unittest.TestCase):
                 f"submodule_commit={POSTGIS_COMMIT};"
                 "status=missing;"
                 "submodule_url=https://github.com/postgis/postgis.git",
+                inventory,
+            )
+
+    def test_materialized_patched_tree_preserves_other_extension_provenance(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = pathlib.Path(tempdir)
+            (root / "contrib").mkdir()
+            (root / "contrib" / "Makefile").write_text("SUBDIRS =\n")
+            other = root / "pglite" / "other_extensions"
+            (other / "vector").mkdir(parents=True)
+            (other / "Makefile").write_text("SUBDIRS = vector\n")
+            (root / ".gitmodules").write_text(
+                "\n".join(
+                    [
+                        '[submodule "pglite/other_extensions/vector"]',
+                        "\tpath = pglite/other_extensions/vector",
+                        "\turl = https://github.com/pgvector/pgvector.git",
+                        "",
+                    ]
+                )
+            )
+            (other / "vector" / "vector.control").write_text("# fixture\n")
+            (other / "vector" / ".libpglite-extension-source").write_text(
+                "\n".join(
+                    [
+                        "format=libpglite-native-other-extension-source-v1",
+                        "name=vector",
+                        "source=pglite/other_extensions/vector",
+                        "url=https://github.com/pgvector/pgvector.git",
+                        f"commit={VECTOR_COMMIT}",
+                        "",
+                    ]
+                )
+            )
+            shutil.rmtree(root / ".git", ignore_errors=True)
+
+            out = root / "inventory.txt"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--source-dir",
+                    str(root),
+                    "--out",
+                    str(out),
+                ],
+                check=True,
+                text=True,
+            )
+
+            inventory = out.read_text()
+            self.assertIn(
+                "other_extension=vector;"
+                "source=pglite/other_extensions/vector;"
+                "submodule_state=?;"
+                f"submodule_commit={VECTOR_COMMIT};"
+                "status=present;"
+                "submodule_url=https://github.com/pgvector/pgvector.git",
                 inventory,
             )
 

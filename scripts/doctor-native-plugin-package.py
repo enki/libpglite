@@ -185,6 +185,9 @@ class Doctor:
                 self.errors.append(f"postgresPrefix.{key} file is missing: {value}")
 
         for rel in [
+            "postgres/bin/pg_config",
+            "postgres/lib/pgxs/src/Makefile.global",
+            "postgres/lib/pgxs/src/makefiles/pgxs.mk",
             "postgres/share/postgres.bki",
             "postgres/share/snowball_create.sql",
             "postgres/share/extension/plpgsql.control",
@@ -574,6 +577,8 @@ class Doctor:
                 self.errors.append(message)
             else:
                 self.warnings.append(message)
+        else:
+            self.validate_contrib_extension(extension)
 
     def validate_contrib_extension(self, extension: str) -> None:
         extension_dir = self.root / "postgres" / "share" / "extension"

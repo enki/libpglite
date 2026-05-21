@@ -125,6 +125,10 @@ actual plugin and prefix contents.
   inventory that is packaged as diagnostics. This keeps fetch/build inputs and
   package claims tied to one generated source of truth instead of separate
   handwritten extension lists.
+- The doctor now distinguishes missing source from present source for PGlite
+  `other_extensions`: missing materialized sources remain development warnings
+  and production failures, while present sources must also have their packaged
+  control files, install SQL, and referenced native modules.
 - The package now includes a structured runtime lifecycle diagnostic. The doctor
   validates that it matches the current single-start-per-process contract and
   cites raw protocol conformance as evidence.

@@ -136,6 +136,15 @@ PGlite-shipped extension.
   exposes this behind `--fetch-other-extensions` /
   `LIBPGLITE_FETCH_OTHER_EXTENSIONS=1`; it is opt-in until the native
   `other_extensions` build itself is wired into preflight.
+- The native prepare step can now opt into building the materialized non-PostGIS
+  `other_extensions` with `--build-other-extensions`. This installs those PGXS
+  extensions into the generated prefix with the same dynamic lookup model used
+  by contrib. PostGIS remains a separate open item because it needs the pinned
+  GEOS/PROJ/json-c/SQLite dependency prefix and projection data from ADR-0009.
+- When materialized sources are present, the inventory is regenerated from the
+  patched tree and records `status=present`; the package doctor then validates
+  the corresponding packaged control/SQL/module files instead of treating
+  source presence as sufficient evidence.
 - The package doctor now validates inventoried PostgreSQL `contrib` extensions
   beyond control-file presence: it checks each extension's `default_version`
   SQL and verifies native `$libdir`/`MODULE_PATHNAME` modules are present in the

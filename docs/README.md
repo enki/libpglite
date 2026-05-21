@@ -42,8 +42,9 @@ Current closure frontier:
   environment in `../smolvm/` or an equivalent release container.
 - ADR-0007: still needs final relocatable prefix closure after extension parity
   expands the prefix beyond current contrib coverage.
-- ADR-0008: still needs populated and built `pglite/other_extensions`, full
-  `CREATE EXTENSION` conformance, and third-party data packaging.
+- ADR-0008: still needs PostGIS native dependency/data packaging, full
+  `CREATE EXTENSION` conformance from packaged artifacts, and promotion of the
+  opt-in non-PostGIS `other_extensions` build into release preflight.
 - ADR-0009: still needs a pinned native dependency prefix instead of repaired
   local-provider libraries.
 - ADR-0010: still needs stale-symbol checks against the full extension parity
