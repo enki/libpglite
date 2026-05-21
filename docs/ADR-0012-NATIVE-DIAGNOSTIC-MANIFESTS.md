@@ -129,6 +129,11 @@ actual plugin and prefix contents.
   commit, plugin filename/checksum, packaged diagnostic filenames, timestamp
   shape, Rust toolchain block, C compiler block, and `uname` must be present and
   current.
+- The doctor now cross-checks `source-provenance.json` against the native link
+  manifest for pinned `postgres-pglite` repository/ref/commit, patch
+  fingerprint, patch list, and per-patch SHA-256 values. A stale source
+  provenance file can no longer satisfy the package diagnostic gate by carrying
+  only plausible-looking checksums.
 - This ADR remains open until diagnostics are generated as structured release
   data across all required gates and production packaging rejects stale
   diagnostics.

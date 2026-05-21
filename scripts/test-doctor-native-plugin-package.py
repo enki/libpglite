@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import importlib.util
+import json
 import pathlib
 import tempfile
 import unittest
@@ -14,6 +15,9 @@ SPEC.loader.exec_module(doctor_module)
 
 
 ABI_SYMBOLS = set(doctor_module.ABI_SYMBOLS)
+PATCH_PATH = "patches/postgres-pglite/0001-test.patch"
+PATCH_SHA256 = "a" * 64
+SOURCE_COMMIT = "0123456789abcdef0123456789abcdef01234567"
 
 
 class DoctorDiagnosticsTests(unittest.TestCase):
@@ -36,7 +40,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
                     "release_version=v0.1.0",
                     "release_mode=development",
                     "runtime_status=native-runtime-pending-adr-0002",
-                    "libpglite_git_commit=0123456789abcdef0123456789abcdef01234567",
+                    f"libpglite_git_commit={SOURCE_COMMIT}",
                     "plugin_filename=liblibpglite_plugin_native.dylib",
                     "plugin_sha256=abc123",
                     "native_manifest=native-link-manifest.txt",
@@ -51,7 +55,15 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             )
             + "\n"
         )
-        native_manifest_lines = ["format=libpglite-native-link-manifest-v1"]
+        native_manifest_lines = [
+            "format=libpglite-native-link-manifest-v1",
+            "source_repository=https://github.com/electric-sql/postgres-pglite",
+            "source_ref=pglite-test",
+            f"source_commit={SOURCE_COMMIT}",
+            f"patch={PATCH_PATH}",
+            f"patch_sha256={PATCH_PATH};sha256={PATCH_SHA256}",
+            "patch_fingerprint=1234567890abcdef1234567890abcdef12345678",
+        ]
         native_manifest_lines.extend(
             f"backend_export_symbol={symbol}"
             for symbol in sorted(native_manifest_backend_symbols)
@@ -71,6 +83,28 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         (diagnostics / "backend-export-symbols.txt").write_text(
             "\n".join(sorted(backend_manifest_symbols)) + "\n"
         )
+        (diagnostics / "source-provenance.json").write_text(
+            json.dumps(
+                {
+                    "format": "libpglite-native-source-provenance-v1",
+                    "postgresPglite": {
+                        "repository": "https://github.com/electric-sql/postgres-pglite",
+                        "ref": "pglite-test",
+                        "commit": SOURCE_COMMIT,
+                    },
+                    "patchFingerprint": "1234567890abcdef1234567890abcdef12345678",
+                    "patches": [
+                        {
+                            "path": PATCH_PATH,
+                            "sha256": PATCH_SHA256,
+                        }
+                    ],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        )
 
         doctor = doctor_module.Doctor(root, strict_relocatable=True)
         doctor.bundle = {
@@ -78,7 +112,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "libpgliteReleaseVersion": "v0.1.0",
             "releaseMode": "development",
             "runtimeStatus": "native-runtime-pending-adr-0002",
-            "libpgliteGitCommit": "0123456789abcdef0123456789abcdef01234567",
+            "libpgliteGitCommit": SOURCE_COMMIT,
             "plugin": {
                 "filename": "liblibpglite_plugin_native.dylib",
                 "sha256": "abc123",
@@ -90,6 +124,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
                 "dependencies": "diagnostics/dependencies.txt",
                 "pluginDefinedSymbols": "diagnostics/plugin-defined-symbols.txt",
                 "backendExportSymbols": "diagnostics/backend-export-symbols.txt",
+                "sourceProvenance": "diagnostics/source-provenance.json",
             }
         }
         doctor.actual_plugin_symbols = plugin_symbols
@@ -184,6 +219,48 @@ class DoctorDiagnosticsTests(unittest.TestCase):
 
         self.assertIn(
             "build provenance native_manifest mismatch",
+            "\n".join(doctor.errors),
+        )
+
+    def test_source_provenance_patch_sha256_must_match_native_manifest(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        source_provenance = (
+            pathlib.Path(tempdir.name) / "diagnostics" / "source-provenance.json"
+        )
+        provenance = json.loads(source_provenance.read_text())
+        provenance["patches"][0]["sha256"] = "b" * 64
+        source_provenance.write_text(json.dumps(provenance) + "\n")
+        with tempdir:
+            doctor.validate_source_provenance()
+
+        self.assertIn(
+            "source provenance patch sha256 mismatch",
+            "\n".join(doctor.errors),
+        )
+
+    def test_source_provenance_identity_must_match_native_manifest(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        source_provenance = (
+            pathlib.Path(tempdir.name) / "diagnostics" / "source-provenance.json"
+        )
+        provenance = json.loads(source_provenance.read_text())
+        provenance["postgresPglite"]["commit"] = "f" * 40
+        source_provenance.write_text(json.dumps(provenance) + "\n")
+        with tempdir:
+            doctor.validate_source_provenance()
+
+        self.assertIn(
+            "source provenance postgresPglite.commit mismatch",
             "\n".join(doctor.errors),
         )
 

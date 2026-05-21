@@ -375,10 +375,48 @@ class Doctor:
 
         native_manifest = self.diagnostic_path("nativeLinkManifest")
         manifest_patch_paths: set[str] = set()
+        manifest_patch_digests: dict[str, str] = {}
         if native_manifest is not None:
-            for line in nonempty_lines(native_manifest, self.errors):
-                if line.startswith("patch="):
-                    manifest_patch_paths.add(line.split("=", 1)[1])
+            manifest_source = {
+                "repository": first_manifest_value(native_manifest, "source_repository", self.errors),
+                "ref": first_manifest_value(native_manifest, "source_ref", self.errors),
+                "commit": first_manifest_value(native_manifest, "source_commit", self.errors),
+            }
+            if isinstance(postgres_pglite, dict):
+                for key, expected_value in manifest_source.items():
+                    actual_value = postgres_pglite.get(key)
+                    if expected_value and actual_value != expected_value:
+                        self.errors.append(
+                            f"source provenance postgresPglite.{key} mismatch: "
+                            f"manifest={expected_value!r} provenance={actual_value!r}"
+                        )
+
+            manifest_fingerprint = first_manifest_value(
+                native_manifest, "patch_fingerprint", self.errors
+            )
+            provenance_fingerprint = provenance.get("patchFingerprint")
+            if manifest_fingerprint and provenance_fingerprint != manifest_fingerprint:
+                self.errors.append(
+                    "source provenance patchFingerprint mismatch: "
+                    f"manifest={manifest_fingerprint!r} "
+                    f"provenance={provenance_fingerprint!r}"
+                )
+
+            manifest_patch_paths = set(manifest_values(native_manifest, "patch", self.errors))
+            manifest_patch_digests = manifest_patch_sha256s(native_manifest, self.errors)
+
+            patches_missing_digests = sorted(manifest_patch_paths - manifest_patch_digests.keys())
+            digest_without_patch = sorted(manifest_patch_digests.keys() - manifest_patch_paths)
+            if patches_missing_digests:
+                self.errors.append(
+                    "native link manifest is missing patch_sha256 entries for patches: "
+                    f"{', '.join(patches_missing_digests)}"
+                )
+            if digest_without_patch:
+                self.errors.append(
+                    "native link manifest has patch_sha256 entries without patch entries: "
+                    f"{', '.join(digest_without_patch)}"
+                )
 
         seen_paths: set[str] = set()
         for patch in patches:
@@ -395,6 +433,13 @@ class Doctor:
                 seen_paths.add(rel)
             if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
                 self.errors.append(f"source provenance patch has invalid sha256: {rel}")
+            elif isinstance(rel, str) and rel in manifest_patch_digests:
+                expected_digest = manifest_patch_digests[rel]
+                if digest != expected_digest:
+                    self.errors.append(
+                        f"source provenance patch sha256 mismatch for {rel}: "
+                        f"manifest={expected_digest} provenance={digest}"
+                    )
 
         missing = sorted(manifest_patch_paths - seen_paths)
         extra = sorted(seen_paths - manifest_patch_paths)
@@ -699,6 +744,32 @@ def manifest_values(path: pathlib.Path, key: str, errors: list[str]) -> list[str
     return values
 
 
+def first_manifest_value(path: pathlib.Path, key: str, errors: list[str]) -> str | None:
+    values = manifest_values(path, key, errors)
+    if not values:
+        return None
+    if len(values) > 1:
+        errors.append(f"native link manifest repeats singleton key: {key}")
+    return values[0]
+
+
+def manifest_patch_sha256s(path: pathlib.Path, errors: list[str]) -> dict[str, str]:
+    digests: dict[str, str] = {}
+    for value in manifest_values(path, "patch_sha256", errors):
+        rel, fields = parse_semicolon_fields(value)
+        digest = fields.get("sha256")
+        if not rel:
+            errors.append("native link manifest patch_sha256 entry is missing path")
+            continue
+        if rel in digests:
+            errors.append(f"native link manifest repeats patch_sha256 path: {rel}")
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            errors.append(f"native link manifest patch_sha256 has invalid digest: {rel}")
+            continue
+        digests[rel] = digest
+    return digests
+
+
 def format_symbol_delta(symbols: list[str], limit: int = 20) -> str:
     if len(symbols) <= limit:
         return ", ".join(symbols)
@@ -708,14 +779,20 @@ def format_symbol_delta(symbols: list[str], limit: int = 20) -> str:
 
 def parse_inventory_line(line: str) -> tuple[str, dict[str, str]]:
     key, raw_value = line.split("=", 1)
+    name, fields = parse_semicolon_fields(raw_value)
+    fields["name"] = name
+    return key, fields
+
+
+def parse_semicolon_fields(raw_value: str) -> tuple[str, dict[str, str]]:
     parts = raw_value.split(";")
-    fields = {"name": parts[0]}
+    fields = {}
     for part in parts[1:]:
         if "=" not in part:
             continue
         field, value = part.split("=", 1)
         fields[field] = value
-    return key, fields
+    return parts[0], fields
 
 
 def control_value(control_text: str, key: str) -> str | None:
