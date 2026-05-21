@@ -9,9 +9,14 @@ PGlite frontend transport details as the public API.
 
 ## Status
 
-Initial scaffold. The facade, dynamic loader, plugin ABI, plugin crate, and
-internal native crate are present. The native Postgres/PGlite implementation is
-intentionally not wired yet; the required work is documented under `docs/`.
+Runtime-ready native plugin. The facade, dynamic loader, plugin ABI, plugin
+crate, internal native crate, native Postgres/PGlite runtime, packaged Postgres
+prefix, extension parity set, dependency prefix, diagnostics, and package doctor
+are implemented.
+
+The current release gate has passed on macOS and on Ubuntu 24.04 through
+`../smolvm/`. All design records for the first native release scope are closed
+under `docs/done/`.
 
 ## Intended Use
 
@@ -59,10 +64,10 @@ this crate.
 
 ## Design Records
 
-- `docs/done/ADR-0002-NATIVE-PGLITE-BUILD-LANE.md`
-- `docs/done/ADR-0004-RUNTIME-READY-RELEASE-GATE.md`
 - `docs/done/ADR-0001-RUST-FACADE-AND-DYNAMIC-PLUGIN.md`
+- `docs/done/ADR-0002-NATIVE-PGLITE-BUILD-LANE.md`
 - `docs/done/ADR-0003-POSTGRES-CLIENT-TRANSPORT.md`
+- `docs/done/ADR-0004-RUNTIME-READY-RELEASE-GATE.md`
 - `docs/done/ADR-0005-PGLITEC-NATIVE-PORTABILITY.md`
 - `docs/done/ADR-0006-NATIVE-BUILD-PLATFORM-FLOOR.md`
 - `docs/done/ADR-0007-NATIVE-INITDB-AND-PREFIX-ARTIFACT.md`
