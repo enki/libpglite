@@ -320,6 +320,30 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             errors,
         )
 
+    def test_postgres_prefix_text_metadata_rejects_build_machine_paths(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        root = pathlib.Path(tempdir.name)
+        extension_dir = root / "postgres" / "share" / "extension"
+        extension_dir.mkdir(parents=True)
+        (extension_dir / "leaky.control").write_text(
+            "default_version = '1.0'\ncomment = '/Users/paul/build/prefix'\n"
+        )
+        (extension_dir / "leaky--1.0.sql").write_text(
+            "select '/tmp/libpglite-native/install';\n"
+        )
+        with tempdir:
+            doctor.validate_postgres_prefix_text_paths()
+
+        errors = "\n".join(doctor.errors)
+        self.assertIn("PostgreSQL prefix text metadata contains build-machine paths", errors)
+        self.assertIn("postgres/share/extension/leaky.control", errors)
+        self.assertIn("postgres/share/extension/leaky--1.0.sql", errors)
+
     def test_build_provenance_must_match_bundle(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS,

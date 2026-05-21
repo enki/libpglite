@@ -50,9 +50,9 @@ the plugin or provide an equivalent generated artifact.
 - Keep package doctor self-tests initializing a missing data directory from the
   packaged prefix and resuming it from a later process without build-tree
   environment variables on every supported target.
-- Strict package diagnostics reject build-machine absolute paths in prefix
-  metadata, extension SQL/control files, loadable module paths, and runtime data
-  references.
+- Strict package diagnostics keep rejecting build-machine absolute paths in
+  prefix metadata, extension SQL/control files, loadable module paths, and
+  runtime data references across both supported package layouts.
 - The prefix layout remains stable across macOS and Linux packages.
 
 ## Implementation Notes
@@ -93,3 +93,8 @@ the plugin or provide an equivalent generated artifact.
   dependency diagnostics accept it after Linux RUNPATH repair, and the package
   doctor self-test initializes/resumes clusters and creates the full extension
   parity set from the final package.
+- The package doctor now scans packaged PostgreSQL prefix text metadata,
+  including extension `.control` and `.sql` files, for build-machine absolute
+  paths. In strict/preflight or production mode those leaks are package errors;
+  `scripts/test-doctor-native-plugin-package.py` pins both control-file and SQL
+  leak failures.

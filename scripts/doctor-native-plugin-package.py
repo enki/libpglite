@@ -197,6 +197,30 @@ class Doctor:
             if not (self.root / rel).is_file():
                 self.errors.append(f"required PostgreSQL prefix file is missing: {rel}")
 
+        self.validate_postgres_prefix_text_paths()
+
+    def validate_postgres_prefix_text_paths(self) -> None:
+        postgres = self.root / "postgres"
+        if not postgres.is_dir():
+            return
+        text_suffixes = {".control", ".sql", ".conf", ".sample", ".txt"}
+        leaked_paths: list[str] = []
+        for path in sorted(postgres.rglob("*")):
+            if not path.is_file() or path.suffix.lower() not in text_suffixes:
+                continue
+            text = read_text(path, self.errors)
+            if looks_like_build_path(text):
+                leaked_paths.append(path.relative_to(self.root).as_posix())
+        if leaked_paths:
+            message = (
+                "PostgreSQL prefix text metadata contains build-machine paths: "
+                + ", ".join(leaked_paths[:10])
+            )
+            if self.strict_relocatable or self.bundle.get("releaseMode") == "production":
+                self.errors.append(message)
+            else:
+                self.warnings.append(message)
+
     def validate_native_only_payload(self) -> None:
         forbidden_suffixes = {".wasm", ".js", ".mjs", ".bc"}
         forbidden_fragments = {"emscripten", "wasm2c"}

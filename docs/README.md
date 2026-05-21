@@ -67,9 +67,10 @@ Current closure frontier:
   diagnostic changes.
 - ADR-0007: macOS package doctor self-tests the packaged `postgres/` prefix,
   including the full extension/runtime data surface. The Ubuntu lane now passes
-  the same package doctor self-test with Linux RUNPATH repair. Remaining
-  closure is keeping the prefix layout stable across supported packages and
-  ensuring strict diagnostics stay release-gating.
+  the same package doctor self-test with Linux RUNPATH repair. The doctor now
+  rejects build-machine absolute paths in packaged prefix text metadata under
+  strict diagnostics. Remaining closure is keeping the prefix layout stable
+  across supported packages and ensuring strict diagnostics stay release-gating.
 - ADR-0008: macOS release preflight now materializes all pinned PGlite
   `other_extensions`, builds the full set including `postgis`, packages them,
   and runs packaged-artifact `CREATE EXTENSION` conformance for the parity set.
