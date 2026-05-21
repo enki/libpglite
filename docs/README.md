@@ -90,8 +90,10 @@ Current closure frontier:
   applies package-local RUNPATH repair with `patchelf` and passes strict package
   diagnostics. The Linux controlled-prefix release policy is now documented and
   pinned to the local Ubuntu preflight test. Production packages now require a
-  controlled dependency-prefix diagnostic. Remaining closure is keeping strict
-  dependency-regression coverage in place across package layouts.
+  controlled dependency-prefix diagnostic, and the doctor rejects
+  loader-relative dependency paths that escape the package with `..`. Remaining
+  closure is keeping strict dependency-regression coverage in place across
+  package layouts.
 - ADR-0010: macOS release preflight now generates backend exports from the full
   packaged parity set, including common data symbols, and proves the modules
   load through the globally loaded plugin. Linux now uses a Rust staticlib plus

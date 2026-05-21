@@ -106,6 +106,9 @@ libraries or runtime data.
   dynamic-plugin extension sweep, and accepts only relocatable dependency
   classifications. `otool -L` for the PostGIS modules reports platform
   libraries only after static closure through the controlled prefix.
+- Strict package diagnostics now reject loader-relative dependency paths that
+  contain parent-directory traversal, so `@loader_path` or `$ORIGIN` entries
+  cannot satisfy relocatability by escaping the packaged layout.
 
 ## Implementation Notes
 

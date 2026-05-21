@@ -1031,6 +1031,36 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "\n".join(doctor.errors),
         )
 
+    def test_dependency_manifest_blocks_loader_relative_parent_traversal(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        dependency_manifest = pathlib.Path(tempdir.name) / "diagnostics" / "dependencies.json"
+        manifest = json.loads(dependency_manifest.read_text())
+        manifest["objects"][0]["dependencies"] = [
+            {
+                "raw": "@loader_path/../../outside/libcrypto.3.dylib",
+                "path": "@loader_path/../../outside/libcrypto.3.dylib",
+                "classification": "loader-relative",
+            },
+            {
+                "raw": "$ORIGIN/../outside/libgeos.so",
+                "path": "$ORIGIN/../outside/libgeos.so",
+                "classification": "loader-relative",
+            },
+        ]
+        dependency_manifest.write_text(json.dumps(manifest) + "\n")
+        with tempdir:
+            doctor.validate_dependencies()
+
+        errors = "\n".join(doctor.errors)
+        self.assertIn("loader-relative parent traversal", errors)
+        self.assertIn("@loader_path/../../outside/libcrypto.3.dylib", errors)
+        self.assertIn("$ORIGIN/../outside/libgeos.so", errors)
+
     def test_dependency_manifest_must_match_raw_dependency_report_objects(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS,

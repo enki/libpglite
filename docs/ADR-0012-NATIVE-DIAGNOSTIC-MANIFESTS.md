@@ -209,6 +209,9 @@ actual plugin and prefix contents.
   native modules, missing PostGIS projection data, and unreadable packaged
   PostGIS projection databases. That gives the final-artifact diagnostics
   concrete failure modes instead of relying only on a green package smoke.
+- Dependency diagnostics now treat loader-relative parent traversal as a
+  package error. That keeps `@loader_path` and `$ORIGIN` entries from being
+  accepted as relocatable when they can escape the final package layout.
 - The materialization step for PGlite `other_extensions` consumes the same
   inventory that is packaged as diagnostics. This keeps fetch/build inputs and
   package claims tied to one generated source of truth instead of separate

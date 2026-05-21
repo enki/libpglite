@@ -965,6 +965,11 @@ class Doctor:
                     "unknown",
                 }:
                     bad_dependency_paths.append(f"{path}: {raw} ({classification})")
+                elif classification == "loader-relative" and isinstance(raw, str):
+                    if loader_relative_escapes_package(raw):
+                        bad_dependency_paths.append(
+                            f"{path}: {raw} (loader-relative parent traversal)"
+                        )
 
         if not package_object_seen:
             self.errors.append("dependency manifest does not correspond to dependencies.txt")
@@ -1309,6 +1314,14 @@ def extension_can_install_version(
 def looks_like_build_path(line: str) -> bool:
     if re.search(r"(/Users/|/home/|/private/var/|/tmp/|/var/folders/|/opt/homebrew/)", line):
         return True
+    return False
+
+
+def loader_relative_escapes_package(raw: str) -> bool:
+    for prefix in ["@loader_path/", "@rpath/", "@executable_path/", "$ORIGIN/"]:
+        if raw.startswith(prefix):
+            suffix = raw[len(prefix):]
+            return ".." in pathlib.PurePosixPath(suffix).parts
     return False
 
 
