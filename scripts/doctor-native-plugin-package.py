@@ -601,6 +601,15 @@ class Doctor:
                 self.warnings.append(message)
         else:
             self.validate_contrib_extension(extension)
+            if extension == "postgis":
+                self.validate_postgis_runtime_data()
+
+    def validate_postgis_runtime_data(self) -> None:
+        proj_db = self.root / "postgres" / "share" / "proj" / "proj.db"
+        if not proj_db.is_file():
+            self.errors.append(
+                "PostGIS projection data is missing: postgres/share/proj/proj.db"
+            )
 
     def validate_contrib_extension(self, extension: str) -> None:
         extension_dir = self.root / "postgres" / "share" / "extension"

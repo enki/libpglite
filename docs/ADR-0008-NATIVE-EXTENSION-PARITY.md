@@ -188,6 +188,10 @@ PGlite-shipped extension.
   beyond control-file presence: it checks each extension's `default_version`
   SQL and verifies native `$libdir`/`MODULE_PATHNAME` modules are present in the
   packaged Postgres prefix.
+- The same package doctor checks now apply when PGlite `other_extensions` are
+  materialized as `status=present`. Regression tests cover missing control
+  files, missing default-version install SQL, missing referenced native modules,
+  and missing PostGIS projection data.
 - Missing PGlite `other_extensions` submodules are warnings for development
   packages and production-package failures. Missing submodule commits or URLs
   are package errors in all modes because they mean the native inventory cannot

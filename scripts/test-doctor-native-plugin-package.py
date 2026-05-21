@@ -160,6 +160,24 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         doctor.actual_plugin_symbols = plugin_symbols
         return tempdir, doctor
 
+    def write_packaged_extension(
+        self,
+        doctor,
+        extension: str,
+        control_text: str,
+        sql_files: dict[str, str],
+        modules: list[str] | None = None,
+    ):
+        extension_dir = doctor.root / "postgres" / "share" / "extension"
+        lib_dir = doctor.root / "postgres" / "lib"
+        extension_dir.mkdir(parents=True, exist_ok=True)
+        lib_dir.mkdir(parents=True, exist_ok=True)
+        (extension_dir / f"{extension}.control").write_text(control_text)
+        for name, text in sql_files.items():
+            (extension_dir / name).write_text(text)
+        for module in modules or []:
+            (lib_dir / module).write_text("")
+
     def test_plugin_symbol_diagnostic_must_match_actual_exports(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS | {"ActualBackendSymbol"},
@@ -387,6 +405,102 @@ class DoctorDiagnosticsTests(unittest.TestCase):
 
         self.assertIn(
             "inventoried extension is missing control file: vector",
+            "\n".join(doctor.errors),
+        )
+
+    def test_present_other_extension_requires_default_version_install_sql(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+            extension_inventory_text=(
+                "format=libpglite-native-extension-inventory-v1\n"
+                "other_extension=vector;"
+                "source=pglite/other_extensions/vector;"
+                "submodule_state=?;"
+                "submodule_commit=35ab919bf5da677709b2ebb8be07480bb25e97cf;"
+                "status=present;"
+                "submodule_url=https://github.com/pgvector/pgvector.git\n"
+            ),
+        )
+        self.write_packaged_extension(
+            doctor,
+            "vector",
+            "default_version = '0.8.1'\n",
+            {"vector--0.1.0.sql": "select 1;\n"},
+        )
+        with tempdir:
+            doctor.validate_extensions()
+
+        self.assertIn(
+            "extension has no SQL install path to default_version 0.8.1: vector",
+            "\n".join(doctor.errors),
+        )
+
+    def test_present_other_extension_requires_referenced_native_module(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+            extension_inventory_text=(
+                "format=libpglite-native-extension-inventory-v1\n"
+                "other_extension=vector;"
+                "source=pglite/other_extensions/vector;"
+                "submodule_state=?;"
+                "submodule_commit=35ab919bf5da677709b2ebb8be07480bb25e97cf;"
+                "status=present;"
+                "submodule_url=https://github.com/pgvector/pgvector.git\n"
+            ),
+        )
+        self.write_packaged_extension(
+            doctor,
+            "vector",
+            "default_version = '0.8.1'\nmodule_pathname = '$libdir/vector'\n",
+            {
+                "vector--0.8.1.sql": (
+                    "create function vector_recv() returns void "
+                    "as 'MODULE_PATHNAME';\n"
+                )
+            },
+        )
+        with tempdir:
+            doctor.validate_extensions()
+
+        self.assertIn(
+            "extension vector references missing native module: vector",
+            "\n".join(doctor.errors),
+        )
+
+    def test_present_postgis_requires_projection_data(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+            extension_inventory_text=(
+                "format=libpglite-native-extension-inventory-v1\n"
+                "other_extension=postgis;"
+                "source=pglite/other_extensions/postgis;"
+                "submodule_state=?;"
+                "submodule_commit=35ab919bf5da677709b2ebb8be07480bb25e97cf;"
+                "status=present;"
+                "submodule_url=https://github.com/postgis/postgis.git\n"
+            ),
+        )
+        self.write_packaged_extension(
+            doctor,
+            "postgis",
+            "default_version = '3.5.2'\nmodule_pathname = '$libdir/postgis-3'\n",
+            {"postgis--3.5.2.sql": "select '$libdir/postgis-3';\n"},
+            modules=["postgis-3.dylib"],
+        )
+        with tempdir:
+            doctor.validate_extensions()
+
+        self.assertIn(
+            "PostGIS projection data is missing: postgres/share/proj/proj.db",
             "\n".join(doctor.errors),
         )
 
