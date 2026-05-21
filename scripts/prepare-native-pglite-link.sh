@@ -289,6 +289,132 @@ present_other_extensions_from_inventory() {
   ' "$extension_inventory" | LC_ALL=C sort -u
 }
 
+write_postgis_config_wrappers() {
+  if [[ -z "$dependency_prefix" ]]; then
+    echo "native PostGIS build requires --dependency-prefix" >&2
+    exit 2
+  fi
+  local pkg_config_bin
+  pkg_config_bin="$(command -v pkg-config)"
+  postgis_config_wrapper_dir="$build_dir/postgis-config-wrappers"
+  mkdir -p "$postgis_config_wrapper_dir"
+  cat >"$postgis_config_wrapper_dir/geos-config" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "\${1:-}" == "--clibs" ]]; then
+  "$dependency_prefix/bin/geos-config" --static-clibs | sed 's/-lstdc++/$native_postgis_cxx_lib/g'
+else
+  "$dependency_prefix/bin/geos-config" "\$@"
+fi
+EOF
+  chmod +x "$postgis_config_wrapper_dir/geos-config"
+  cat >"$postgis_config_wrapper_dir/pkg-config" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ " \$* " == *" --libs "* && " \$* " == *" proj "* ]]; then
+  PKG_CONFIG_LIBDIR="$dependency_prefix/lib/pkgconfig:$dependency_prefix/share/pkgconfig" "$pkg_config_bin" --static "\$@" | sed 's/-lstdc++/$native_postgis_cxx_lib/g'
+else
+  PKG_CONFIG_LIBDIR="$dependency_prefix/lib/pkgconfig:$dependency_prefix/share/pkgconfig" "$pkg_config_bin" "\$@"
+fi
+EOF
+  chmod +x "$postgis_config_wrapper_dir/pkg-config"
+}
+
+build_native_postgis_extension() {
+  if [[ -z "$dependency_prefix" ]]; then
+    echo "native PostGIS build requires --dependency-prefix" >&2
+    exit 2
+  fi
+
+  local extension_source="$patched_source/pglite/other_extensions/postgis"
+  if [[ ! -d "$extension_source" ]]; then
+    echo "native PGlite PostGIS source is missing: $extension_source" >&2
+    exit 1
+  fi
+
+  write_postgis_config_wrappers
+
+  python3 - "$extension_source/GNUmakefile.in" <<'PY'
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+text = text.replace("SUBDIRS += @RASTER@ loader", "SUBDIRS += @RASTER@")
+path.write_text(text)
+PY
+
+  (
+    cd "$extension_source"
+    if [[ ! -x ./configure ]]; then
+      ./autogen.sh
+    fi
+    PROJ_VERSION=9.7.0 \
+    PKG_CONFIG="$postgis_config_wrapper_dir/pkg-config" \
+    PKG_CONFIG_LIBDIR="$dependency_prefix/lib/pkgconfig:$dependency_prefix/share/pkgconfig" \
+    PATH="$dependency_prefix/bin:$PATH" \
+    LDFLAGS="-L$dependency_prefix/lib" \
+    CFLAGS="$native_dependency_cppflags" \
+    CXXFLAGS="$native_dependency_cppflags" \
+    ./configure \
+      --with-pgconfig="$postgres_install_prefix/bin/pg_config" \
+      --with-pic \
+      --without-protobuf \
+      --without-raster \
+      --enable-static=no \
+      --enable-shared=yes \
+      --with-geosconfig="$postgis_config_wrapper_dir/geos-config" \
+      --with-xml2config="$dependency_prefix/bin/xml2-config" \
+      --with-jsondir="$dependency_prefix"
+
+    make clean >/dev/null || true
+    make \
+      PG_CONFIG="$postgres_install_prefix/bin/pg_config" \
+      prefix="$postgres_install_prefix" \
+      exec_prefix="$postgres_install_prefix" \
+      bindir="$postgres_install_prefix/bin" \
+      BE_DLLLIBS="$native_extension_be_dlllibs" \
+      LDFLAGS_SL="$native_postgis_ldflags_sl" \
+      CFLAGS_SL="$native_dependency_cppflags" \
+      CXXFLAGS_SL="$native_dependency_cppflags" \
+      -j1
+    make install \
+      PG_CONFIG="$postgres_install_prefix/bin/pg_config" \
+      prefix="$postgres_install_prefix" \
+      exec_prefix="$postgres_install_prefix" \
+      bindir="$postgres_install_prefix/bin" \
+      BE_DLLLIBS="$native_extension_be_dlllibs" \
+      LDFLAGS_SL="$native_postgis_ldflags_sl" \
+      CFLAGS_SL="$native_dependency_cppflags" \
+      CXXFLAGS_SL="$native_dependency_cppflags" \
+      -j1
+  )
+
+  if [[ -d "$dependency_prefix/share/proj" ]]; then
+    rm -rf "$postgres_install_prefix/share/proj"
+    mkdir -p "$postgres_install_prefix/share"
+    cp -R "$dependency_prefix/share/proj" "$postgres_install_prefix/share/proj"
+  fi
+
+  if [[ ! -f "$postgres_install_prefix/share/extension/postgis.control" ]]; then
+    echo "native Postgres install prefix is missing PostGIS control file" >&2
+    exit 1
+  fi
+  case "$(uname -s)" in
+    Darwin) postgis_module="$postgres_install_prefix/lib/postgis-3.dylib" ;;
+    Linux) postgis_module="$postgres_install_prefix/lib/postgis-3.so" ;;
+    *) postgis_module="$postgres_install_prefix/lib/postgis-3" ;;
+  esac
+  if [[ ! -f "$postgis_module" ]]; then
+    echo "native Postgres install prefix is missing PostGIS module: $postgis_module" >&2
+    exit 1
+  fi
+  if [[ ! -f "$postgres_install_prefix/share/proj/proj.db" ]]; then
+    echo "native Postgres install prefix is missing PostGIS projection data" >&2
+    exit 1
+  fi
+}
+
 native_extension_required_symbols() {
   if [[ ! -d "$postgres_install_prefix/lib" ]]; then
     return
@@ -370,6 +496,28 @@ if [[ "$build_postgres" == "1" ]]; then
   native_dependency_libs="$(pkg-config --libs-only-l "${native_backend_link_packages[@]}")"
   native_crypto_ldflags="$(pkg-config --libs-only-L "${native_crypto_packages[@]}")"
   native_crypto_libs="$(pkg-config --libs-only-l "${native_crypto_packages[@]}")"
+  native_postgis_ldflags_sl=""
+  if [[ -n "$dependency_prefix" ]]; then
+    native_postgis_cxx_lib="-lstdc++"
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      native_postgis_cxx_lib="-lc++"
+    fi
+    native_postgis_ldflags_sl=(
+      -L"$dependency_prefix/lib"
+      -lgeos_c
+      -lgeos
+      -lproj
+      -ljson-c
+      -lsqlite3
+      -ltiff
+      -ldeflate
+      -lz
+      -lxml2
+      "$native_postgis_cxx_lib"
+      -lm
+    )
+    native_postgis_ldflags_sl="${native_postgis_ldflags_sl[*]}"
+  fi
   native_extension_be_dlllibs=""
   if [[ "$(uname -s)" == "Darwin" ]]; then
     native_extension_be_dlllibs="-undefined dynamic_lookup"
@@ -391,6 +539,8 @@ native_dependency_ldflags=$native_dependency_ldflags
 native_dependency_libs=$native_dependency_libs
 native_crypto_ldflags=$native_crypto_ldflags
 native_crypto_libs=$native_crypto_libs
+native_postgis_cxx_lib=${native_postgis_cxx_lib:-}
+native_postgis_ldflags_sl=$native_postgis_ldflags_sl
 native_uuid_impl=$native_uuid_impl
 native_extension_be_dlllibs=$native_extension_be_dlllibs"
   build_env_file="$postgres_build_dir/.libpglite-native-build-env"
@@ -484,7 +634,7 @@ native_extension_be_dlllibs=$native_extension_be_dlllibs"
   if [[ "$build_other_extensions" == "1" ]]; then
     while IFS= read -r extension; do
       if [[ "$extension" == "postgis" ]]; then
-        echo "native PGlite other extension build does not yet handle PostGIS" >&2
+        build_native_postgis_extension
         continue
       fi
       extension_source="$patched_source/pglite/other_extensions/$extension"

@@ -8,7 +8,7 @@ SCRIPT = pathlib.Path(__file__).with_name("check-native-other-extension-build.sh
 
 
 class CheckNativeOtherExtensionBuildTests(unittest.TestCase):
-    def test_postgis_gap_is_explicit_opt_in(self):
+    def test_postgis_gap_escape_hatch_is_explicit_opt_in(self):
         text = SCRIPT.read_text()
         self.assertIn("--allow-postgis-gap", text)
         self.assertIn("allow_postgis_gap=0", text)

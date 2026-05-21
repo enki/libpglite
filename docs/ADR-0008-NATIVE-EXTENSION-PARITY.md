@@ -112,11 +112,10 @@ PGlite-shipped extension.
   fails preflight on unpinned, missing-URL, added, or removed PGlite extension
   entries.
 - Release preflight fetches/materializes and builds every inventoried
-  `pglite/other_extensions` entry, including `vector` and PostGIS.
-- The release path treats the current non-PostGIS `other_extensions` proof as a
-  promoted gate rather than a manual probe.
-- PostGIS is built with the controlled native dependency prefix and packaged
-  with its required GEOS, PROJ, json-c, SQLite, and projection-data payload.
+  `pglite/other_extensions` entry, including `vector` and PostGIS, instead of
+  leaving the full build as a manual probe.
+- PostGIS is packaged with its required GEOS, PROJ, json-c, SQLite, and
+  projection-data payload from the controlled native dependency prefix.
 - Packaged-artifact conformance runs `CREATE EXTENSION` for the full parity set,
   including `vector` and `postgis`.
 - The package doctor rejects any extension whose control file, default-version
@@ -153,23 +152,23 @@ PGlite-shipped extension.
   exposes this behind `--fetch-other-extensions` /
   `LIBPGLITE_FETCH_OTHER_EXTENSIONS=1`; it is opt-in until the native
   `other_extensions` build itself is wired into preflight.
-- The native prepare step can now opt into building the materialized non-PostGIS
+- The native prepare step can now opt into building the materialized
   `other_extensions` with `--build-other-extensions`. This installs those PGXS
   extensions into the generated prefix with the same dynamic lookup model used
-  by contrib. PostGIS remains a separate open item because it needs the pinned
-  GEOS/PROJ/json-c/SQLite dependency prefix and projection data from ADR-0009.
-- On macOS, the controlled-prefix opt-in probe
-  `scripts/check-native-other-extension-build.sh --allow-postgis-gap`
+  by contrib, and special-cases PostGIS with the controlled
+  GEOS/PROJ/json-c/SQLite/libtiff/libdeflate/zlib/libxml2 prefix and bundled
+  PROJ data.
+- On macOS, the controlled-prefix probe
+  `scripts/check-native-other-extension-build.sh --skip-dependency-prefix-build`
   now materializes all eight pinned PGlite `other_extensions` gitlinks and
-  builds the non-PostGIS set into the generated prefix: `age`, `pg_hashids`,
-  `pg_ivm`, `pg_textsearch`, `pg_uuidv7`, `pgtap`, and `vector`. The installed
-  prefix contains their control and SQL files, and native modules where those
-  extensions have module code (`age`, `pg_hashids`, `pg_ivm`, `pg_textsearch`,
-  `pg_uuidv7`, and `vector`). This is strong substrate evidence, but not ADR
-  closure: the default probe still fails unless the PostGIS gap is explicitly
-  allowed, the normal release preflight does not yet promote this opt-in build,
-  and the package gate does not yet run a full packaged `CREATE EXTENSION`
-  sweep.
+  builds the full set into the generated prefix: `age`, `pg_hashids`,
+  `pg_ivm`, `pg_textsearch`, `pg_uuidv7`, `pgtap`, `postgis`, and `vector`.
+  The installed prefix contains their control and SQL files, native modules
+  where those extensions have module code, `postgis-3.dylib`, PostGIS companion
+  controls such as `postgis_topology`, and `share/proj/proj.db`. This is strong
+  build-stage evidence, but not ADR closure: the normal release preflight does
+  not yet promote this full extension build, and the package gate does not yet
+  run a full packaged `CREATE EXTENSION` sweep.
 - The PostGIS native dependency substrate is now substantially less speculative:
   the macOS full-prefix smoke builds the pinned GEOS, PROJ, json-c, SQLite,
   libtiff, libdeflate, zlib, libxml2, and libxslt inputs into one static

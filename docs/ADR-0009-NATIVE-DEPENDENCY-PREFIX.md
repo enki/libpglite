@@ -62,8 +62,8 @@ libraries or runtime data.
 
 - `pgcrypto` links against the controlled OpenSSL inputs and works from the
   packaged artifact without an external OpenSSL install.
-- PostGIS links against controlled GEOS, PROJ, json-c, SQLite, and related
-  dependency/data inputs and works from the packaged artifact.
+- PostGIS works from the packaged artifact with controlled GEOS, PROJ, json-c,
+  SQLite, related dependency inputs, and projection data.
 - Strict package diagnostics reject host-provider, build-machine, external, or
   unresolved dependency paths in plugin and extension modules.
 - The same prefix contract is implemented for the Linux baseline after macOS is
@@ -96,10 +96,15 @@ libraries or runtime data.
   artifact includes `diagnostics/native-dependency-prefix.json` and passed the
   strict package doctor/self-test.
 - A macOS controlled-prefix opt-in prepare also materialized PGlite
-  `other_extensions` and built the non-PostGIS PGXS set against the same prefix,
-  including `vector`. This proves the prefix handoff is not limited to core
-  `contrib`, but it does not close this ADR until `pgcrypto` and PostGIS are
-  proven from the packaged artifact with strict dependency diagnostics.
+  `other_extensions` and built the full PGXS set against the same prefix,
+  including `vector` and `postgis`. The PostGIS path uses prefix-local
+  GEOS/PROJ/json-c/SQLite/libtiff/libdeflate/zlib/libxml2 inputs, forces
+  static dependency closure through wrapper `geos-config` and `pkg-config`
+  scripts, disables the PostGIS loader/raster scope for the native extension
+  build, and copies `share/proj/proj.db` into the generated Postgres prefix.
+  This proves the prefix handoff is not limited to core `contrib`, but it does
+  not close this ADR until `pgcrypto` and PostGIS are proven from the packaged
+  artifact with strict dependency diagnostics.
 
 ## Implementation Notes
 
@@ -185,10 +190,11 @@ libraries or runtime data.
 - This is still not the final dependency-prefix implementation: the checked-in
   inventory, source fetcher, compile-stage entrypoint, and prefix descriptor
   define the contract, and the clean macOS full-prefix smoke now passes. Native
-  preflight now uses this prefix by default for macOS. The remaining closure
-  work is proving `pgcrypto` and PostGIS from the packaged artifact across the
-  final extension surface, tightening strict diagnostics over that full surface,
-  and then repeating the prefix contract on Linux.
+  preflight now uses this prefix by default for macOS, and the full-extension
+  build probe has shown PostGIS can consume it. The remaining closure work is
+  proving `pgcrypto` and PostGIS from the packaged artifact across the final
+  extension surface, tightening strict diagnostics over that full surface, and
+  then repeating the prefix contract on Linux.
 - PGlite's WASM build extracts export-symbol lists from dependency archives for
   Emscripten. Native builds do not need the same files verbatim, but they do
   need equivalent link/export discipline for extension module loading.

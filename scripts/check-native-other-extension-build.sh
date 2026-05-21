@@ -14,9 +14,9 @@ Builds the controlled native dependency prefix, materializes pinned PGlite
 other_extensions, builds the native PGXS extensions, and verifies that the
 generated Postgres prefix contains the installed extension artifacts.
 
-By default every inventoried PGlite other_extension must be built. During macOS
-bring-up, --allow-postgis-gap documents the one known remaining parity gap
-without allowing any other extension to disappear.
+By default every inventoried PGlite other_extension must be built. The
+--allow-postgis-gap flag is retained only for diagnosing older partial builds;
+normal macOS proof runs must not use it.
 
 Environment:
   LIBPGLITE_NATIVE_DEPENDENCY_PREFIX=<path>
