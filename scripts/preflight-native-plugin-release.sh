@@ -54,6 +54,62 @@ require nm
 
 cd "$repo_root"
 
+conformance_dir="$(mktemp -d)"
+
+write_conformance_result() {
+  local name="$1"
+  local status="$2"
+  local exit_code="$3"
+  local started_at="$4"
+  local ended_at="$5"
+  local command="$6"
+  local log_file="$7"
+  local out_file="$8"
+
+  python3 - "$name" "$status" "$exit_code" "$started_at" "$ended_at" "$command" "$(basename "$log_file")" "$out_file" <<'PY'
+import json
+import pathlib
+import sys
+
+name, status, exit_code, started_at, ended_at, command, log_file, out = sys.argv[1:9]
+result = {
+    "format": "libpglite-native-conformance-result-v1",
+    "name": name,
+    "status": status,
+    "exitCode": int(exit_code),
+    "startedAt": started_at,
+    "endedAt": ended_at,
+    "command": command,
+    "log": log_file,
+}
+pathlib.Path(out).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+PY
+}
+
+run_conformance_check() {
+  local name="$1"
+  shift
+  local log_file="$conformance_dir/$name.log"
+  local result_file="$conformance_dir/$name.json"
+  local started_at
+  local ended_at
+  local code
+  started_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  echo "==> preflight ${release_version}: ${name}"
+  set +e
+  "$@" > >(tee "$log_file") 2>&1
+  code=$?
+  set -e
+  ended_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  if [[ "$code" == "0" ]]; then
+    write_conformance_result "$name" "passed" "$code" "$started_at" "$ended_at" "$*" "$log_file" "$result_file"
+  else
+    write_conformance_result "$name" "failed" "$code" "$started_at" "$ended_at" "$*" "$log_file" "$result_file"
+    echo "conformance check failed: $name" >&2
+    exit "$code"
+  fi
+}
+
 crate_version="$(python3 - <<'PY'
 import pathlib
 import tomllib
@@ -84,7 +140,7 @@ if [[ -z "$initdb_binary" || ! -x "$initdb_binary" ]]; then
   exit 1
 fi
 initdb_tempdir="$(mktemp -d)"
-trap 'rm -rf "$initdb_tempdir"' EXIT
+trap 'rm -rf "$initdb_tempdir" "$conformance_dir"' EXIT
 echo "==> preflight ${release_version}: native initdb prefix smoke test"
 DYLD_LIBRARY_PATH="$postgres_lib_dir${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}" \
 LD_LIBRARY_PATH="$postgres_lib_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
@@ -158,22 +214,26 @@ if ! grep -q 'PostgresSingleUserMain' <<<"$all_symbols"; then
   exit 1
 fi
 
-echo "==> preflight ${release_version}: dynamic plugin load check"
-LIBPGLITE_TEST_PLUGIN_PATH="$plugin_binary" \
-LIBPGLITE_TEST_POSTGRES_PREFIX="$(awk -F= '$1 == "postgres_install_prefix" {print substr($0, length($1) + 2)}' "$manifest")" \
-  cargo test --features dynamic-loading --test dynamic_plugin
+postgres_prefix="$(awk -F= '$1 == "postgres_install_prefix" {print substr($0, length($1) + 2)}' "$manifest")"
+run_conformance_check raw-protocol \
+  env \
+    LIBPGLITE_TEST_PLUGIN_PATH="$plugin_binary" \
+    LIBPGLITE_TEST_POSTGRES_PREFIX="$postgres_prefix" \
+    cargo test --features dynamic-loading --test dynamic_plugin
 
-echo "==> preflight ${release_version}: tokio-postgres client transport check"
-LIBPGLITE_RUN_TOKIO_POSTGRES_CHILD=1 \
-LIBPGLITE_TEST_PLUGIN_PATH="$plugin_binary" \
-LIBPGLITE_TEST_POSTGRES_PREFIX="$(awk -F= '$1 == "postgres_install_prefix" {print substr($0, length($1) + 2)}' "$manifest")" \
-  cargo test --features dynamic-loading,client-tokio-postgres --test dynamic_plugin \
-    dynamic_plugin_tokio_postgres_client_child -- --nocapture
+run_conformance_check tokio-postgres-client \
+  env \
+    LIBPGLITE_RUN_TOKIO_POSTGRES_CHILD=1 \
+    LIBPGLITE_TEST_PLUGIN_PATH="$plugin_binary" \
+    LIBPGLITE_TEST_POSTGRES_PREFIX="$postgres_prefix" \
+    cargo test --features dynamic-loading,client-tokio-postgres --test dynamic_plugin \
+      dynamic_plugin_tokio_postgres_client_child -- --nocapture
 
 out_dir="${LIBPGLITE_RELEASE_OUT_DIR:-"$repo_root/dist/preflight-native-plugin"}"
 rm -rf "$out_dir"
 echo "==> preflight ${release_version}: package smoke test"
-scripts/package-native-plugin-release.sh "$release_version" "$plugin_binary" "$out_dir"
+LIBPGLITE_CONFORMANCE_DIR="$conformance_dir" \
+  scripts/package-native-plugin-release.sh "$release_version" "$plugin_binary" "$out_dir"
 echo "==> preflight ${release_version}: package doctor"
 scripts/doctor-native-plugin-package.py "$out_dir/libpglite-plugin-native-${release_version}-$(rustc -vV | awk -F': ' '$1 == "host" {print $2}').tar.zst"
 

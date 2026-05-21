@@ -86,8 +86,16 @@ actual plugin and prefix contents.
   diagnostic manifests, extension control files, and dependency report shape.
 - Packaging now runs the doctor against the staged native package before writing
   the binary archive, and preflight runs it again against the archive.
+- Native preflight now writes structured conformance diagnostics under
+  `diagnostics/conformance/`. The initial result set records `raw-protocol` and
+  `tokio-postgres-client` as separate JSON files with logs, preserving the
+  process-level attribution required by the current single-start lifecycle
+  contract.
+- Packaging requires `LIBPGLITE_CONFORMANCE_DIR` so native artifacts are tied to
+  explicit runtime evidence instead of only console output. The doctor validates
+  that both required conformance results passed.
 - In development mode the doctor warns about build-machine dependency paths. In
   production mode, or with `--strict-relocatable`, those paths are hard failures.
 - This ADR remains open until diagnostics are generated as structured release
-  data, production packaging rejects stale diagnostics, and conformance results
-  are written as structured diagnostics.
+  data across all required gates and production packaging rejects stale
+  diagnostics.

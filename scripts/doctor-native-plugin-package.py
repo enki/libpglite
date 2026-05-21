@@ -77,6 +77,7 @@ class Doctor:
         self.validate_plugin()
         self.validate_postgres_prefix()
         self.validate_diagnostics()
+        self.validate_conformance()
         self.validate_extensions()
         self.validate_dependencies()
 
@@ -215,6 +216,44 @@ class Doctor:
                 self.errors.append(
                     f"pluginDefinedSymbols is missing ABI symbols: {', '.join(missing)}"
                 )
+
+    def validate_conformance(self) -> None:
+        diagnostics = self.bundle.get("diagnostics")
+        if not isinstance(diagnostics, dict):
+            return
+        value = diagnostics.get("conformanceResults")
+        if not isinstance(value, str) or not value:
+            self.errors.append("bundle diagnostics.conformanceResults is missing")
+            return
+        conformance_dir = self.root / value
+        if not conformance_dir.is_dir():
+            self.errors.append(f"conformance diagnostics directory is missing: {value}")
+            return
+
+        for name in ["raw-protocol", "tokio-postgres-client"]:
+            result_path = conformance_dir / f"{name}.json"
+            log_path = conformance_dir / f"{name}.log"
+            if not result_path.is_file():
+                self.errors.append(f"conformance result is missing: {name}.json")
+                continue
+            if not log_path.is_file():
+                self.errors.append(f"conformance log is missing: {name}.log")
+            try:
+                with result_path.open() as handle:
+                    result = json.load(handle)
+            except Exception as err:
+                self.errors.append(f"conformance result {name}.json is not readable: {err}")
+                continue
+            if result.get("format") != "libpglite-native-conformance-result-v1":
+                self.errors.append(f"conformance result {name}.json has wrong format")
+            if result.get("name") != name:
+                self.errors.append(f"conformance result {name}.json has wrong name")
+            if result.get("status") != "passed":
+                self.errors.append(f"conformance result {name}.json did not pass")
+            if result.get("exitCode") != 0:
+                self.errors.append(f"conformance result {name}.json exitCode is not 0")
+            if result.get("log") != f"{name}.log":
+                self.errors.append(f"conformance result {name}.json points at wrong log")
 
     def validate_extensions(self) -> None:
         inventory = self.diagnostic_path("extensionInventory")

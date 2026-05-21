@@ -17,6 +17,7 @@ but the plugin ABI, package layout, metadata, and checksum contract are real.
 
 Environment:
   LIBPGLITE_RELEASE_MODE=development|production
+  LIBPGLITE_CONFORMANCE_DIR=<dir>         structured native conformance results
   LIBPGLITE_RUNTIME_READY_CONFORMANCE=1  required for production mode
 USAGE
 }
@@ -254,6 +255,17 @@ if [[ ! -d "$postgres_lib_dir" ]]; then
   echo "native Postgres prefix is missing lib directory: $postgres_lib_dir" >&2
   exit 1
 fi
+conformance_dir="${LIBPGLITE_CONFORMANCE_DIR:-}"
+if [[ -z "$conformance_dir" || ! -d "$conformance_dir" ]]; then
+  echo "LIBPGLITE_CONFORMANCE_DIR must point at structured native conformance results" >&2
+  exit 1
+fi
+for result in raw-protocol tokio-postgres-client; do
+  if [[ ! -f "$conformance_dir/$result.json" || ! -f "$conformance_dir/$result.log" ]]; then
+    echo "native conformance directory is missing required result pair: $result" >&2
+    exit 1
+  fi
+done
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
@@ -267,6 +279,9 @@ cp -R "$postgres_install_prefix" "$binary_stage/postgres"
 diagnostics_stage="$binary_stage/diagnostics"
 mkdir -p "$diagnostics_stage"
 
+mkdir -p "$diagnostics_stage/conformance"
+cp "$conformance_dir"/*.json "$diagnostics_stage/conformance/"
+cp "$conformance_dir"/*.log "$diagnostics_stage/conformance/"
 cp "$native_manifest" "$diagnostics_stage/native-link-manifest.txt"
 extension_inventory="$(manifest_value extension_inventory)"
 if [[ -n "$extension_inventory" && -f "$extension_inventory" ]]; then
@@ -341,6 +356,7 @@ bundle = {
         "pluginDefinedSymbols": "diagnostics/plugin-defined-symbols.txt",
         "backendExportSymbols": "diagnostics/backend-export-symbols.txt",
         "dependencies": "diagnostics/dependencies.txt",
+        "conformanceResults": "diagnostics/conformance",
     },
     "sourceArchive": f"libpglite-plugin-native-{release_version}-source.tar.zst",
     "noticeFile": f"libpglite-plugin-native-{release_version}-NOTICE.txt",
