@@ -1,0 +1,31 @@
+diff --git a/src/backend/tcop/backend_startup.c b/src/backend/tcop/backend_startup.c
+index 7294dce..b349188 100644
+--- a/src/backend/tcop/backend_startup.c
++++ b/src/backend/tcop/backend_startup.c
+@@ -39,6 +39,8 @@
+ 
+ #if defined(__EMSCRIPTEN__)
+ #include "emscripten.h"
++#elif defined(__PGLITE__)
++#define EMSCRIPTEN_KEEPALIVE
+ #endif
+ 
+ /* GUCs */
+@@ -47,7 +49,7 @@ bool		Trace_connection_negotiation = false;
+ static void BackendInitialize(ClientSocket *client_sock, CAC_state cac);
+ static int	ProcessSSLStartup(Port *port);
+ 
+-#if defined(__EMSCRIPTEN__)
++#if defined(__EMSCRIPTEN__) || defined(__PGLITE__)
+ int	ProcessStartupPacket(Port *port, bool ssl_done, bool gss_done);
+ #else
+ static int	ProcessStartupPacket(Port *port, bool ssl_done, bool gss_done);
+@@ -459,7 +461,7 @@ process_startup_packet_die(SIGNAL_ARGS)
+  * should make no assumption here about the order in which the client may make
+  * requests.
+  */
+-#if defined(__EMSCRIPTEN__)
++#if defined(__EMSCRIPTEN__) || defined(__PGLITE__)
+ int EMSCRIPTEN_KEEPALIVE
+ #else
+ static int

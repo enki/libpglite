@@ -195,7 +195,7 @@ backend_archive="$build_dir/libpglite_postgres_backend.a"
 timezone_archive="$build_dir/libpglite_postgres_timezone.a"
 common_archive="$postgres_build_dir/src/common/libpgcommon_srv.a"
 port_archive="$postgres_build_dir/src/port/libpgport_srv.a"
-patch_fingerprint="$(git -C "$repo_root" hash-object "$repo_root/patches/postgres-pglite/0001-pglitec-native-portability.patch")"
+patch_fingerprint="$(cd "$repo_root" && git hash-object patches/postgres-pglite/*.patch | git hash-object --stdin)"
 native_trap_fingerprint="$(git -C "$repo_root" hash-object "$repo_root/native/c/libpglite_native_trap.c")"
 
 if [[ "$build_postgres" == "1" ]]; then
@@ -305,7 +305,10 @@ fi
   for file in "${required_files[@]}"; do
     echo "required_file=$file"
   done
-  echo "patch=patches/postgres-pglite/0001-pglitec-native-portability.patch"
+  for patch_file in "$repo_root"/patches/postgres-pglite/*.patch; do
+    [[ -e "$patch_file" ]] || continue
+    echo "patch=${patch_file#$repo_root/}"
+  done
   echo "patch_fingerprint=$patch_fingerprint"
   echo "object=$pglitec_object"
   echo "object=$native_trap_object"
