@@ -50,15 +50,14 @@ clear preprocessor gates.
 
 - The carried PGlite native patch set is reduced to documented, fingerprinted
   source patches applied by `scripts/prepare-native-pglite-link.sh`.
-- `pglitec.c` compiles as PIC without broad permissive compiler flags on macOS
-  and Linux.
-- The Linux compile proves the shared-memory portability gates in the same
-  source path used by the release build.
 - The release prepare path proves backend objects reference the PGlite callback
   transport shims (`pgl_recv`, `pgl_send`, `pgl_poll`, and related socket
   wrappers) instead of the corresponding libc socket APIs.
 - The ADR records the final carry/upstream decision for each portability patch
   before moving to `docs/done/`.
+- A focused regression keeps the Linux forced-include ordering and jump-buffer
+  address comparison in place, because those are the portability fixes most
+  likely to be broken by future patch refreshes.
 
 ## Implementation Notes
 

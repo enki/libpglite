@@ -369,6 +369,78 @@ dependency_report \
   "$binary_stage/$expected_plugin" \
   "$binary_stage/postgres/lib" \
   "$diagnostics_stage/dependencies.json"
+python3 - "$diagnostics_stage/platform-baseline.json" "$platform" "$native_manifest" <<'PY'
+import json
+import os
+import pathlib
+import platform
+import subprocess
+import sys
+
+out = pathlib.Path(sys.argv[1])
+target = sys.argv[2]
+native_manifest = pathlib.Path(sys.argv[3])
+
+manifest_values: dict[str, str] = {}
+for line in native_manifest.read_text().splitlines():
+    if "=" in line:
+        key, value = line.split("=", 1)
+        manifest_values.setdefault(key, value)
+
+baseline: dict[str, object] = {
+    "format": "libpglite-native-platform-baseline-v1",
+    "target": target,
+    "system": platform.system(),
+    "machine": platform.machine(),
+}
+
+if target.endswith("linux-gnu"):
+    os_release: dict[str, str] = {}
+    for line in pathlib.Path("/etc/os-release").read_text().splitlines():
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os_release[key] = value.strip().strip('"')
+    expected_id = os.environ.get("LIBPGLITE_LINUX_BASELINE_ID", "ubuntu")
+    expected_version = os.environ.get("LIBPGLITE_LINUX_BASELINE_VERSION_ID", "24.04")
+    actual_id = os_release.get("ID", "")
+    actual_version = os_release.get("VERSION_ID", "")
+    if actual_id != expected_id or actual_version != expected_version:
+        raise SystemExit(
+            "Linux native package baseline mismatch: "
+            f"expected {expected_id}:{expected_version}, got {actual_id}:{actual_version}"
+        )
+    libc = subprocess.run(["ldd", "--version"], text=True, capture_output=True, check=False)
+    libc_lines = (libc.stdout or libc.stderr).splitlines()
+    if not libc_lines:
+        raise SystemExit("Linux native package baseline could not read ldd --version")
+    baseline.update(
+        {
+            "baseline": {
+                "kind": "linux-distro",
+                "id": expected_id,
+                "versionId": expected_version,
+            },
+            "osRelease": {
+                "id": actual_id,
+                "versionId": actual_version,
+                "prettyName": os_release.get("PRETTY_NAME", ""),
+            },
+            "libcVersionLine": libc_lines[0],
+        }
+    )
+elif target.endswith("apple-darwin"):
+    baseline.update(
+        {
+            "baseline": {
+                "kind": "macos-deployment-target",
+                "deploymentTarget": manifest_values.get("macos_deployment_target", ""),
+            }
+        }
+    )
+
+out.write_text(json.dumps(baseline, indent=2, sort_keys=True) + "\n")
+PY
 python3 - "$repo_root" "$native_manifest" "$diagnostics_stage/source-provenance.json" <<'PY'
 import hashlib
 import json
@@ -432,6 +504,7 @@ PY
   echo "native_manifest=native-link-manifest.txt"
   echo "extension_inventory=extension-inventory.txt"
   echo "dependency_manifest=dependencies.json"
+  echo "platform_baseline=platform-baseline.json"
   if [[ -n "$dependency_prefix_diagnostic" ]]; then
     echo "dependency_prefix=$(basename "$dependency_prefix_diagnostic")"
   fi
@@ -469,6 +542,7 @@ diagnostics = {
     "backendExportSymbols": "diagnostics/backend-export-symbols.txt",
     "dependencies": "diagnostics/dependencies.txt",
     "dependencyManifest": "diagnostics/dependencies.json",
+    "platformBaseline": "diagnostics/platform-baseline.json",
     "sourceProvenance": "diagnostics/source-provenance.json",
     "runtimeLifecycle": "diagnostics/runtime-lifecycle.json",
     "conformanceResults": "diagnostics/conformance",

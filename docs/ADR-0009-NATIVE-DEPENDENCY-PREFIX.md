@@ -60,11 +60,12 @@ libraries or runtime data.
 
 ## Remaining Closure Criteria
 
-- The same controlled-prefix contract is implemented for the Linux baseline
-  after macOS is closed.
-- Linux packaged-artifact conformance proves `pgcrypto` and PostGIS work with
-  controlled OpenSSL, GEOS, PROJ, json-c, SQLite, related dependency inputs, and
-  projection data.
+- The Linux controlled-prefix contract is documented as release policy: Ubuntu
+  `24.04` is the current baseline, package-local RUNPATH repair is required,
+  and `patchelf` is a release preflight prerequisite for that lane.
+- Linux packaged-artifact conformance continues to prove `pgcrypto` and PostGIS
+  work with controlled OpenSSL, GEOS, PROJ, json-c, SQLite, related dependency
+  inputs, and projection data from the final package.
 - Strict package diagnostics keep rejecting host-provider, build-machine,
   external, or unresolved dependency paths in plugin and extension modules, with
   regression coverage for both macOS and Linux package layouts.
@@ -199,24 +200,18 @@ libraries or runtime data.
   protocol/contrib smoke against the packaged plugin and packaged Postgres
   prefix. This verifies that the repaired install names work behaviorally, not
   just textually.
-- The Ubuntu lane now reaches strict package dependency diagnostics. The current
-  Linux blocker is not native backend startup: modules such as `dblink` and
-  `postgres_fdw` still resolve `libpq.so.5` through the build-machine
-  PostgreSQL install prefix, and strict relocatability correctly rejects that.
-  Linux closure requires the same package-local dependency repair that macOS
-  already applies with loader-relative install names/rpaths.
 - Linux packaging now applies the matching package-local repair with `patchelf`:
   the plugin gets an `$ORIGIN/postgres/lib` RUNPATH, and packaged PostgreSQL
   modules get an `$ORIGIN` RUNPATH so sibling libraries such as `libpq.so.5`
   resolve from the final package. The Ubuntu baseline installs `patchelf` as a
-  release preflight prerequisite. This still needs a passing strict package
-  doctor run before the Linux dependency-prefix contract can close.
+  release preflight prerequisite, and the strict package doctor now passes from
+  the final Ubuntu package artifact.
 - This is still not the final dependency-prefix implementation for all
   supported targets: the checked-in inventory, source fetcher, compile-stage
   entrypoint, and prefix descriptor define the contract, and the normal macOS
-  preflight now proves the full extension surface from the packaged artifact.
-  The remaining closure work is keeping that strictness under regression and
-  repeating the prefix contract on Linux.
+  and Ubuntu preflights now prove the full extension surface from the packaged
+  artifact. The remaining closure work is keeping that strictness under
+  regression and writing the Linux contract down as release policy.
 - PGlite's WASM build extracts export-symbol lists from dependency archives for
   Emscripten. Native builds do not need the same files verbatim, but they do
   need equivalent link/export discipline for extension module loading.

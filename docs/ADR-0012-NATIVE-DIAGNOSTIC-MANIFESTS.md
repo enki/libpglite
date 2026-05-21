@@ -101,6 +101,7 @@ actual plugin and prefix contents.
   - `diagnostics/backend-export-symbols.txt`
   - `diagnostics/dependencies.txt`
   - `diagnostics/dependencies.json`
+  - `diagnostics/platform-baseline.json`
   - `diagnostics/native-dependency-prefix.json` when the native link manifest
     was built from a controlled dependency prefix
   - `diagnostics/source-provenance.json`
@@ -237,6 +238,12 @@ actual plugin and prefix contents.
   fingerprint, patch list, and per-patch SHA-256 values. A stale source
   provenance file can no longer satisfy the package diagnostic gate by carrying
   only plausible-looking checksums.
+- Packaging now writes `diagnostics/platform-baseline.json` and the doctor
+  validates it as a package claim. The diagnostic must match the bundle target.
+  Linux packages must record the Ubuntu `24.04` baseline, matching
+  `/etc/os-release`, plus a nonempty `ldd --version` line; packaging rejects a
+  mismatched Linux distro/version before the package is written. macOS packages
+  record the deployment target from the native link manifest.
 - This ADR remains open until diagnostics are generated as structured release
   data across all required gates and production packaging rejects stale
   diagnostics.

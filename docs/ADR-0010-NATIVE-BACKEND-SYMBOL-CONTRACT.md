@@ -73,17 +73,15 @@ set changes.
 
 ## Remaining Closure Criteria
 
-- Linux preflight implements the equivalent export/version-script contract with
-  one authoritative final link step, then proves bundled extension modules
-  resolve against the globally loaded plugin.
 - The package doctor keeps failing on stale backend-symbol diagnostics, missing
   exported backend symbols, and extension modules with unresolved backend
   references, with regression coverage for the full parity set.
-- Linux packaged-artifact conformance creates representative extension modules
-  that require backend symbol resolution, including `pgcrypto` and PostGIS.
 - Linux symbol-boundary checks tolerate only the GNU version node plus the
   stable host ABI and generated backend-symbol set; they must not accept
   accidental exports from Rust, PostgreSQL, or dependency archives.
+- A focused regression proves the Linux final-link script remains the only
+  export boundary and cannot silently fall back to Cargo's `cdylib` version
+  script.
 
 ## Implementation Notes
 
@@ -148,11 +146,14 @@ set changes.
   package doctor verifies that the diagnostic set agrees with the native link
   manifest and that every recorded backend export is actually exported by the
   packaged plugin.
+- Linux now builds the plugin through a Rust `staticlib` and one final GNU ld
+  link step with the generated version script owning both the host ABI and the
+  backend export set. The package symbol diagnostic filters the expected GNU
+  version node, and the Ubuntu packaged-runtime proof now creates the parity
+  extension set from the final package through the globally loaded plugin.
 - A macOS controlled-prefix prepare now generates the backend export set after
   building the full PGlite `other_extensions` set, including `vector` and
-  PostGIS, and that prepare is part of normal macOS preflight. This ADR remains
-  open because Linux still needs the equivalent exported-symbol/version-script
-  contract.
+  PostGIS, and that prepare is part of normal macOS preflight.
 - The Linux plugin build now uses a Rust `staticlib` plus a final native link
   script, giving GNU ld one version-script boundary that owns both the stable
   `libpglite_plugin_*` ABI and the generated `backend_export_symbol=` manifest
@@ -171,6 +172,5 @@ set changes.
 - Linux runtime bring-up then reached `pgl_startPGlite` and exposed a separate
   portability issue: PostgreSQL selected its epoll latch implementation for a
   dummy PGlite socket descriptor. Native prepare now forces poll/self-pipe on
-  Linux. The remaining Linux runtime failure is no longer the export boundary;
-  it is proving that the callback socket transport reaches
-  `ProcessStartupPacket` exactly as it does in the WASM lane.
+  Linux, and the Ubuntu packaged-runtime proof now reaches the parity extension
+  sweep from the final package.

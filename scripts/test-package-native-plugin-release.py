@@ -27,6 +27,15 @@ class PackageNativePluginReleaseTests(unittest.TestCase):
             text.index("dependency_report \\"),
         )
 
+    def test_package_records_platform_baseline_diagnostic(self):
+        text = SCRIPT.read_text()
+        self.assertIn("platform-baseline.json", text)
+        self.assertIn("LIBPGLITE_LINUX_BASELINE_ID", text)
+        self.assertIn("LIBPGLITE_LINUX_BASELINE_VERSION_ID", text)
+        self.assertIn("Linux native package baseline mismatch", text)
+        self.assertIn('"platformBaseline": "diagnostics/platform-baseline.json"', text)
+        self.assertIn('echo "platform_baseline=platform-baseline.json"', text)
+
 
 if __name__ == "__main__":
     unittest.main()

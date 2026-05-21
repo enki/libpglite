@@ -86,6 +86,7 @@ class Doctor:
         self.validate_postgres_prefix()
         self.validate_diagnostics()
         self.validate_build_provenance()
+        self.validate_platform_baseline()
         self.validate_source_provenance()
         self.validate_lifecycle()
         self.validate_conformance()
@@ -346,6 +347,18 @@ class Doctor:
                         f"provenance={values.get('dependency_manifest')!r}"
                     )
 
+            platform_baseline = diagnostics.get("platformBaseline")
+            if isinstance(platform_baseline, str):
+                expected_platform_baseline = pathlib.PurePosixPath(
+                    platform_baseline
+                ).name
+                if values.get("platform_baseline") != expected_platform_baseline:
+                    self.errors.append(
+                        "build provenance platform_baseline mismatch: "
+                        f"bundle={expected_platform_baseline!r} "
+                        f"provenance={values.get('platform_baseline')!r}"
+                    )
+
             dependency_prefix = diagnostics.get("dependencyPrefix")
             if isinstance(dependency_prefix, str):
                 expected_dependency_prefix = pathlib.PurePosixPath(dependency_prefix).name
@@ -365,6 +378,63 @@ class Doctor:
         for key in ["uname", "rustc_begin", "rustc_end", "cc_begin", "cc_end"]:
             if key not in values:
                 self.errors.append(f"build provenance is missing {key}")
+
+    def validate_platform_baseline(self) -> None:
+        path = self.diagnostic_path("platformBaseline")
+        if path is None:
+            return
+        try:
+            with path.open() as handle:
+                baseline = json.load(handle)
+        except Exception as err:
+            self.errors.append(f"platform baseline diagnostic is not readable: {err}")
+            return
+        if not isinstance(baseline, dict):
+            self.errors.append("platform baseline diagnostic root must be an object")
+            return
+        if baseline.get("format") != "libpglite-native-platform-baseline-v1":
+            self.errors.append("platform baseline diagnostic has wrong format")
+        target = self.bundle.get("target")
+        if baseline.get("target") != target:
+            self.errors.append(
+                "platform baseline target mismatch: "
+                f"bundle={target!r} diagnostic={baseline.get('target')!r}"
+            )
+        if isinstance(target, str) and target.endswith("linux-gnu"):
+            expected = baseline.get("baseline")
+            os_release = baseline.get("osRelease")
+            if not isinstance(expected, dict):
+                self.errors.append("Linux platform baseline is missing baseline object")
+                return
+            if expected.get("kind") != "linux-distro":
+                self.errors.append("Linux platform baseline kind must be linux-distro")
+            if expected.get("id") != "ubuntu" or expected.get("versionId") != "24.04":
+                self.errors.append(
+                    "Linux platform baseline must be ubuntu 24.04: "
+                    f"{expected.get('id')!r} {expected.get('versionId')!r}"
+                )
+            if not isinstance(os_release, dict):
+                self.errors.append("Linux platform baseline is missing osRelease object")
+            else:
+                if os_release.get("id") != expected.get("id") or os_release.get(
+                    "versionId"
+                ) != expected.get("versionId"):
+                    self.errors.append("Linux platform baseline osRelease mismatch")
+            libc_line = baseline.get("libcVersionLine")
+            if not isinstance(libc_line, str) or not libc_line:
+                self.errors.append("Linux platform baseline is missing libcVersionLine")
+        elif isinstance(target, str) and target.endswith("apple-darwin"):
+            expected = baseline.get("baseline")
+            if not isinstance(expected, dict):
+                self.errors.append("macOS platform baseline is missing baseline object")
+                return
+            if expected.get("kind") != "macos-deployment-target":
+                self.errors.append(
+                    "macOS platform baseline kind must be macos-deployment-target"
+                )
+            deployment_target = expected.get("deploymentTarget")
+            if not isinstance(deployment_target, str) or not deployment_target:
+                self.errors.append("macOS platform baseline is missing deploymentTarget")
 
     def validate_source_provenance(self) -> None:
         path = self.diagnostic_path("sourceProvenance")

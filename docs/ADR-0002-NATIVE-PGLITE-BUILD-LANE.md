@@ -61,8 +61,6 @@ The native lane must preserve the PGlite runtime model:
 
 ## Remaining Closure Criteria
 
-- The same native link and conformance path passes on Linux in the documented
-  baseline environment.
 - Raw protocol conformance covers startup, simple query, extended query,
   transaction success, transaction rollback, recoverable protocol error, and
   deterministic shutdown from the dynamic plugin.
@@ -70,6 +68,9 @@ The native lane must preserve the PGlite runtime model:
   packaged prefix used by the raw protocol checks.
 - Production packaging contains no JavaScript, Emscripten module object, wasm
   runtime, or wasm2c fallback input.
+- Linux and macOS preflight keep proving the same final-package path whenever
+  the native link, package, platform-floor, dependency, or extension substrate
+  changes.
 
 ## Implementation Notes
 
@@ -112,7 +113,7 @@ The native lane must preserve the PGlite runtime model:
   set built into the packaged prefix, and the package doctor self-test
   exercising the final archive. This closes the macOS release-path proof for
   this ADR, but not the ADR itself because Linux remains a supported target.
-- Broader extended-query coverage, richer transaction/error cases, and Linux
-  conformance remain open. Full extension parity, packaging hardening, and the
-  current restart lifecycle now have macOS release-path evidence and remain
-  tracked in their owning ADRs until Linux and production gates close.
+- Broader extended-query coverage and richer transaction/error cases remain
+  open. Full extension parity, packaging hardening, and the current restart
+  lifecycle now have macOS and Ubuntu final-package evidence and remain tracked
+  in their owning ADRs until production gates close.

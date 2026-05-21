@@ -45,15 +45,18 @@ still need an explicitly documented Linux baseline.
 
 ## Remaining Closure Criteria
 
-- macOS preflight records one deployment target in the native link manifest and
-  package provenance, and no linked native C input reports a mismatched floor.
-- Changing `MACOSX_DEPLOYMENT_TARGET` forces a native Postgres/PGlite rebuild
-  instead of reusing stale objects.
-- The Linux baseline is documented as a concrete distro/toolchain/libc contract
-  and validated through the Ubuntu environment in `../smolvm/` or an equivalent
-  release container.
-- Linux preflight records the selected baseline in diagnostics and rejects
-  artifacts built outside that baseline.
+- The package doctor rejects missing, empty, stale, or contradictory
+  platform-floor diagnostics for both supported targets. On macOS that means the
+  native link manifest, `platform-baseline.json`, and build provenance agree on
+  the deployment target. On Linux that means the package records and validates
+  the selected distro/libc baseline.
+- A focused regression proves changing `MACOSX_DEPLOYMENT_TARGET` invalidates
+  the native Postgres/PGlite build fingerprint instead of reusing stale objects.
+- The Linux baseline is treated as release policy, not only a local preflight
+  habit: production packages must reject artifacts that were not built on the
+  documented Ubuntu baseline or an explicitly documented successor baseline.
+- After platform-floor diagnostics change, the full macOS preflight and the
+  Ubuntu `../smolvm/` preflight both pass from the final package artifact.
 
 ## Implementation Notes
 
@@ -72,8 +75,7 @@ still need an explicitly documented Linux baseline.
   despite the macOS 11.0 deployment target; the builder now forces
   `HAVE_STRCHRNUL=0` after SQLite configure.
 - Linux baseline selection is now exercised locally through the Ubuntu
-  environment in `../smolvm/`. This still needs to become a release-recorded
-  baseline diagnostic, but it is no longer an unproven path.
+  environment in `../smolvm/`.
 - `scripts/preflight-linux-smolvm.sh <version>` is now the local Ubuntu
   baseline entrypoint. It runs `scripts/preflight-native-plugin-release.sh` in
   an `ubuntu:24.04` guest through `../smolvm/target/release/smolvm`, installs
@@ -96,6 +98,14 @@ still need an explicitly documented Linux baseline.
   package installation as root but runs the libpglite preflight as an
   unprivileged `libpglite` user.
 - `scripts/preflight-linux-smolvm.sh 0.1.0` passed in the `ubuntu:24.04`
-  guest on 2026-05-21. The remaining Linux floor work is to record the selected
-  distro/toolchain/libc baseline in package diagnostics and make release
-  artifacts reject mismatched Linux baselines.
+  guest on 2026-05-21.
+- Native packaging now writes `diagnostics/platform-baseline.json` and names it
+  from both the bundle manifest and `build-provenance.txt`. On Linux, packaging
+  defaults the expected baseline to Ubuntu `24.04`, records the `/etc/os-release`
+  identity and `ldd --version` first line, and fails immediately if the actual
+  distro/version differs. The package doctor validates the diagnostic target,
+  Linux baseline identity, recorded OS release, and Linux libc version line. On
+  macOS, the same diagnostic records the deployment target from the native link
+  manifest so the package has one place to explain its platform floor.
+- After adding the package baseline diagnostic, `scripts/preflight-linux-smolvm.sh`
+  with version `0.1.0` passed again in the `ubuntu:24.04` guest on 2026-05-21.

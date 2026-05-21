@@ -48,6 +48,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
                     "native_manifest=native-link-manifest.txt",
                     "extension_inventory=extension-inventory.txt",
                     "dependency_manifest=dependencies.json",
+                    "platform_baseline=platform-baseline.json",
                     "packaged_at_utc=2026-05-21T00:00:00Z",
                     "uname=test",
                     "rustc_begin",
@@ -107,6 +108,22 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             )
             + "\n"
         )
+        (diagnostics / "platform-baseline.json").write_text(
+            json.dumps(
+                {
+                    "format": "libpglite-native-platform-baseline-v1",
+                    "target": "test-target",
+                    "system": "TestOS",
+                    "machine": "test-machine",
+                    "baseline": {
+                        "kind": "test",
+                    },
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        )
         (diagnostics / "plugin-defined-symbols.txt").write_text(
             "\n".join(sorted(plugin_manifest_symbols)) + "\n"
         )
@@ -153,6 +170,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
                 "extensionInventory": "diagnostics/extension-inventory.txt",
                 "dependencies": "diagnostics/dependencies.txt",
                 "dependencyManifest": "diagnostics/dependencies.json",
+                "platformBaseline": "diagnostics/platform-baseline.json",
                 "pluginDefinedSymbols": "diagnostics/plugin-defined-symbols.txt",
                 "backendExportSymbols": "diagnostics/backend-export-symbols.txt",
                 "sourceProvenance": "diagnostics/source-provenance.json",
@@ -321,6 +339,63 @@ class DoctorDiagnosticsTests(unittest.TestCase):
 
         self.assertIn(
             "source provenance postgresPglite.commit mismatch",
+            "\n".join(doctor.errors),
+        )
+
+    def test_platform_baseline_must_match_bundle_target(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        baseline_path = pathlib.Path(tempdir.name) / "diagnostics" / "platform-baseline.json"
+        baseline = json.loads(baseline_path.read_text())
+        baseline["target"] = "other-target"
+        baseline_path.write_text(json.dumps(baseline) + "\n")
+        with tempdir:
+            doctor.validate_platform_baseline()
+
+        self.assertIn(
+            "platform baseline target mismatch",
+            "\n".join(doctor.errors),
+        )
+
+    def test_linux_platform_baseline_requires_ubuntu_2404(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        doctor.bundle["target"] = "aarch64-unknown-linux-gnu"
+        baseline_path = pathlib.Path(tempdir.name) / "diagnostics" / "platform-baseline.json"
+        baseline_path.write_text(
+            json.dumps(
+                {
+                    "format": "libpglite-native-platform-baseline-v1",
+                    "target": "aarch64-unknown-linux-gnu",
+                    "system": "Linux",
+                    "machine": "aarch64",
+                    "baseline": {
+                        "kind": "linux-distro",
+                        "id": "debian",
+                        "versionId": "12",
+                    },
+                    "osRelease": {
+                        "id": "debian",
+                        "versionId": "12",
+                    },
+                    "libcVersionLine": "ldd (Debian GLIBC) 2.36",
+                }
+            )
+            + "\n"
+        )
+        with tempdir:
+            doctor.validate_platform_baseline()
+
+        self.assertIn(
+            "Linux platform baseline must be ubuntu 24.04",
             "\n".join(doctor.errors),
         )
 

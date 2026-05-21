@@ -39,22 +39,21 @@ Current closure frontier:
 
 - ADR-0002: macOS release preflight now passes from the final package artifact
   with native Postgres/PGlite linked and full extension parity exercised. It
-  still needs Linux native link/conformance and broader protocol coverage before
-  the native build lane is complete.
+  still needs broader protocol coverage before the native build lane is
+  complete; the Ubuntu package path now proves the Linux final artifact for the
+  current conformance set.
 - ADR-0004: still needs every root ADR closed before production packages can
   claim runtime-ready status.
 - ADR-0005: still needs the final upstream/carry decision for the native
-  portability patches and a passing Linux release preflight. The backend
-  archive now audits that PostgreSQL socket I/O binds to PGlite callback shims
-  instead of libc socket APIs, and Linux prepare forces the poll/self-pipe latch
-  path for the dummy PGlite socket descriptor.
-- ADR-0006: still needs Linux baseline automation through the Ubuntu
-  environment in `../smolvm/` or an equivalent release container. A local
-  `scripts/preflight-linux-smolvm.sh` entrypoint now exists for the
-  `ubuntu:24.04` guest path and isolates Linux build outputs under `/tmp` in the
-  guest. The full Ubuntu preflight now passes; remaining closure is to record
-  the Linux distro/toolchain/libc baseline in package diagnostics and reject
-  mismatched baselines.
+  portability patches. The backend archive now audits that PostgreSQL socket
+  I/O binds to PGlite callback shims instead of libc socket APIs, Linux prepare
+  forces the poll/self-pipe latch path for the dummy PGlite socket descriptor,
+  and the Ubuntu preflight passes the current release path.
+- ADR-0006: the full Ubuntu preflight now passes through `../smolvm/`, and
+  packages now carry a doctor-validated `platform-baseline.json`. Remaining
+  closure is macOS floor-mismatch regression coverage, build-fingerprint
+  invalidation proof for deployment-target changes, and a final preflight pass
+  after the new baseline diagnostic.
 - ADR-0007: macOS package doctor self-tests the packaged `postgres/` prefix,
   including the full extension/runtime data surface. The Ubuntu lane now passes
   the same package doctor self-test with Linux RUNPATH repair. Remaining
@@ -67,12 +66,10 @@ Current closure frontier:
   production enforcement and regression coverage that keeps missing extension
   sources or files from degrading to warnings.
 - ADR-0009: macOS packaged `pgcrypto` and PostGIS now work from the controlled
-  dependency prefix under strict package diagnostics. It still needs the Linux
-  prefix contract and continued strict dependency-regression coverage. The
-  Ubuntu lane now applies package-local RUNPATH repair with `patchelf` and
-  passes strict package diagnostics. Remaining closure is documenting the Linux
-  prefix contract as release policy and keeping strict dependency-regression
-  coverage in place.
+  dependency prefix under strict package diagnostics. The Ubuntu lane now
+  applies package-local RUNPATH repair with `patchelf` and passes strict package
+  diagnostics. Remaining closure is documenting the Linux prefix contract as
+  release policy and keeping strict dependency-regression coverage in place.
 - ADR-0010: macOS release preflight now generates backend exports from the full
   packaged parity set, including common data symbols, and proves the modules
   load through the globally loaded plugin. Linux now uses a Rust staticlib plus
@@ -86,4 +83,6 @@ Current closure frontier:
   release-critical diagnostic and Linux schema parity before it can close. The
   normal macOS preflight package path now carries controlled-prefix diagnostics,
   source/patch provenance, symbol manifests, conformance logs, and full
-  extension package claims into the final-artifact doctor.
+  extension package claims into the final-artifact doctor. Linux now uses the
+  same dependency schema, and the platform baseline diagnostic has joined the
+  package doctor gate.
