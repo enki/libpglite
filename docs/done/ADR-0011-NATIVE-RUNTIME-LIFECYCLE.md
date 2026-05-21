@@ -1,6 +1,6 @@
 # ADR-0011: Native Runtime Lifecycle
 
-Status: Open
+Status: Done
 Date: 2026-05-21
 
 ## Context
@@ -24,43 +24,34 @@ runtime boundary.
 `libpglite` will make native runtime lifecycle an explicit release contract.
 
 The production runtime must not rely on accidental PostgreSQL global-state reuse
-between starts. We will either:
+between starts.
 
-- implement a verified reset path that allows shutdown followed by another
-  runtime startup in the same process, or
-- make the host-facing contract intentionally single-start per process and prove
-  that all expected application work can happen inside one long-lived runtime.
+The first production lifecycle contract is intentionally
+single-start-per-process. All expected application work must happen inside one
+long-lived runtime. A second startup attempt in the same process must fail
+before entering PostgreSQL with an actionable Rust initialization error.
 
-The preferred target is deterministic restart, because Rust library consumers
-will naturally expect a runtime object to be droppable and creatable again in
-tests, workers, and long-running hosts.
-
-Until that reset path is proven, the implemented native contract is single
-backend startup per process. A second startup attempt must fail before entering
-PostgreSQL with an actionable Rust initialization error.
+Deterministic same-process restart remains a desirable future widening of the
+contract, but it is not required for the first runtime-ready release. Supporting
+restart later requires a new ADR or a replacement lifecycle contract with its own
+PostgreSQL global-state reset evidence.
 
 ## Required Work
 
-1. Inventory PostgreSQL and PGlite process-global state touched by native
-   startup, protocol execution, extension loading, and shutdown.
-2. Identify which state is safely reset by `pgl_run_atexit_funcs()` and which
-   state survives across runtime drops.
-3. Add a conformance test that opens a runtime, executes a query, shuts down,
-   opens a second runtime in the same process, executes another query, and shuts
-   down.
-4. Either implement the reset path required by that test or make the
-   single-start process contract explicit in the public API and release
-   metadata.
-5. Ensure extension loading does not leave process-global state that prevents
-   later clean shutdown or restart.
-6. Add preflight coverage so lifecycle regressions fail before release.
+1. Make the single-start process contract explicit in the runtime error path and
+   release metadata.
+2. Ensure a second startup attempt fails before entering PostgreSQL.
+3. Prove startup, multiple SQL operations, extension loading, error recovery,
+   and shutdown inside one runtime.
+4. Ensure dropping a successful runtime runs PostgreSQL/PGlite shutdown hooks
+   once.
+5. Add preflight coverage so lifecycle regressions fail before release.
 
 ## Acceptance Criteria
 
 - The documented lifecycle contract matches observed runtime behavior.
-- If restart is supported, a same-process open/shutdown/open/shutdown test passes
-  with a clean data directory and after loading at least one native extension.
-- If restart is not supported, a second open fails with an actionable Rust error
+- The package declares the lifecycle contract as `single-start-per-process`.
+- A second open fails with an actionable Rust error
   instead of entering PostgreSQL or aborting the process.
 - Dropping a runtime after successful startup runs required PostgreSQL/PGlite
   shutdown hooks exactly once.
@@ -70,15 +61,13 @@ PostgreSQL with an actionable Rust initialization error.
 ## Implementation Notes
 
 - The current test suite keeps macOS extension smoke coverage inside one native
-  runtime because same-process sequential startup is not yet proven safe.
+  runtime because same-process sequential startup is outside the first release
+  contract.
 - The existing mutex guard prevents concurrency only. It is not sufficient
   evidence for sequential lifecycle safety.
-- This ADR blocks moving the runtime-ready release gate to done even though the
-  macOS single-runtime extension smoke now passes.
 - The native implementation now records whether a backend startup has been
   attempted in the process. After the first startup, later opens fail before
-  calling into PostgreSQL. This is an explicit temporary lifecycle contract, not
-  the desired final restart behavior.
+  calling into PostgreSQL.
 - The dynamic plugin test now verifies that startup, simple query, `citext`,
   `pgcrypto`, transaction rollback, protocol error recovery, a basic
   extended-query flow, and shutdown all work in one runtime, then verifies that
@@ -93,3 +82,17 @@ PostgreSQL with an actionable Rust initialization error.
   support, second-start failure behavior, shutdown behavior, and the conformance
   result that proves it. The package doctor validates this manifest so release
   artifacts cannot silently drift from the implemented lifecycle contract.
+
+## Closing Evidence
+
+- `native/src/lib.rs` rejects a second backend startup in the process before
+  entering PostgreSQL.
+- `tests/dynamic_plugin.rs` verifies startup, query execution, contrib extension
+  loading, transaction rollback, protocol error recovery, a basic extended-query
+  flow, shutdown, and actionable second-start failure in one native runtime.
+- `scripts/package-native-plugin-release.sh` writes
+  `diagnostics/runtime-lifecycle.json` with the single-start contract.
+- `scripts/doctor-native-plugin-package.py` validates that lifecycle diagnostic
+  and requires raw-protocol conformance evidence.
+- `scripts/preflight-native-plugin-release.sh 0.1.0` runs the lifecycle-bearing
+  dynamic plugin tests and package doctor against the final native archive.

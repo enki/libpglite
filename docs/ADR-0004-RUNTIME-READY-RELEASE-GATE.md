@@ -40,8 +40,10 @@ including startup, simple query, a basic extended-query flow, transaction
 rollback, protocol error recovery, contrib extension loading, and deterministic
 shutdown. ADR-0003 also adds a `tokio-postgres` transport check against the real
 native plugin. Runtime-ready status remains blocked on broader conformance, full
-extension parity, Linux coverage, packaging relocatability, and the explicit
-lifecycle contract in ADR-0011.
+extension parity, Linux coverage, and packaging relocatability. ADR-0011 now
+closes the first lifecycle contract as single-start-per-process; deterministic
+same-process restart is a future widening of that contract, not a production
+release prerequisite.
 
 The package doctor now owns the packaged-artifact runtime smoke through
 `--self-test`, and native preflight runs that mode against the final archive.

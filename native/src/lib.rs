@@ -315,7 +315,7 @@ fn claim_native_backend_start() -> PgliteResult<()> {
         .map_err(|_| {
             PgliteError::initialize(
                 "native PGlite currently supports only one backend startup per process; \
-                 restart is blocked until ADR-0011 defines a verified PostgreSQL global-state reset path",
+                 deterministic same-process restart requires a future PostgreSQL global-state reset contract",
             )
         })
 }

@@ -11,13 +11,13 @@ Rust-hosted native dynamic library.
 - `ADR-0008-NATIVE-EXTENSION-PARITY.md`
 - `ADR-0009-NATIVE-DEPENDENCY-PREFIX.md`
 - `ADR-0010-NATIVE-BACKEND-SYMBOL-CONTRACT.md`
-- `ADR-0011-NATIVE-RUNTIME-LIFECYCLE.md`
 - `ADR-0012-NATIVE-DIAGNOSTIC-MANIFESTS.md`
 
 Done records:
 
 - `done/ADR-0001-RUST-FACADE-AND-DYNAMIC-PLUGIN.md`
 - `done/ADR-0003-POSTGRES-CLIENT-TRANSPORT.md`
+- `done/ADR-0011-NATIVE-RUNTIME-LIFECYCLE.md`
 
 ## Closing Rules
 
@@ -29,6 +29,11 @@ repo commands, not just described in text. The minimum evidence is:
 - native preflight runs that test or an equivalent package-level doctor check
 - packaged diagnostics carry enough data to debug stale or partial artifacts
 - production packaging fails when the ADR's release contract is not satisfied
+
+`scripts/audit-adr-closure.py` keeps the bookkeeping honest: root ADR files must
+be `Status: Open`, done ADR files must be `Status: Done`, and this README must
+list every open and done record. Native preflight runs that audit before package
+work starts.
 
 Current closure frontier:
 
@@ -49,7 +54,5 @@ Current closure frontier:
   local-provider libraries.
 - ADR-0010: still needs stale-symbol checks against the full extension parity
   set and Linux export/version-script coverage.
-- ADR-0011: still needs either deterministic restart support or a deliberate
-  decision that the production contract is single-start-per-process.
 - ADR-0012: still needs structured diagnostic coverage for the remaining
   extension/dependency/platform gates before it can close.

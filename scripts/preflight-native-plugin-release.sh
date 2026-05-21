@@ -11,6 +11,7 @@ usage: scripts/preflight-native-plugin-release.sh <version>
 Runs local release-boundary checks:
 
   - crate tests
+  - ADR closure audit
   - dynamic-loading check
   - pinned postgres-pglite native PIC archive build
   - native plugin build linked against those archives
@@ -20,7 +21,8 @@ Runs local release-boundary checks:
 
 ADR-0002 still owns the real native PGlite/Postgres runtime. This preflight
 checks the facade/plugin/release boundary and native link substrate without
-claiming the runtime lifecycle is complete.
+claiming the remaining extension, dependency, platform, and release gates are
+complete.
 USAGE
 }
 
@@ -147,6 +149,9 @@ fi
 
 echo "==> preflight ${release_version}: workspace tests"
 cargo test --all-features --workspace
+
+echo "==> preflight ${release_version}: ADR closure audit"
+python3 scripts/audit-adr-closure.py
 
 echo "==> preflight ${release_version}: facade dependency boundary"
 facade_tree="$(cargo tree -p libpglite --edges normal --no-default-features)"
