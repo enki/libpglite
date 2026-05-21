@@ -182,6 +182,10 @@ actual plugin and prefix contents.
   UTC `startedAt`/`endedAt` timestamps, and the package doctor rejects results
   whose end time predates the start time. This keeps release evidence
   self-diagnosing when a packaged-artifact check is copied, truncated, or stale.
+- The package doctor now checks the recorded command against the expected
+  release-gate fragments for `raw-protocol`, `tokio-postgres-client`,
+  `prefix-initialize`, and `prefix-resume`. A passing conformance JSON from an
+  unrelated or narrowed command cannot satisfy the final package evidence.
 - Packaging requires `LIBPGLITE_CONFORMANCE_DIR` so native artifacts are tied to
   explicit runtime evidence instead of only console output. The doctor validates
   that both required conformance results passed.

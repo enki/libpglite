@@ -130,5 +130,6 @@ Current closure frontier:
   patch-apply reproducibility is now a prepare-time gate rather than only a
   checksum claim, dependency manifests must use the platform-native scanner
   they claim, conformance diagnostics must carry command and timestamp evidence,
-  and the ADR audit now fails if any focused `scripts/test-*.py` regression is
-  not wired into native release preflight.
+  conformance commands must match the expected release-gate fragments, and the
+  ADR audit now fails if any focused `scripts/test-*.py` regression is not wired
+  into native release preflight.

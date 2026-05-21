@@ -33,6 +33,31 @@ RAW_PROTOCOL_CASES = {
     "deterministic-shutdown",
 }
 UTC_TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+CONFORMANCE_COMMAND_FRAGMENTS = {
+    "raw-protocol": [
+        "cargo test",
+        "--features dynamic-loading",
+        "--test dynamic_plugin",
+    ],
+    "tokio-postgres-client": [
+        "LIBPGLITE_RUN_TOKIO_POSTGRES_CHILD=1",
+        "--features dynamic-loading,client-tokio-postgres",
+        "--test dynamic_plugin",
+        "dynamic_plugin_tokio_postgres_client_child",
+    ],
+    "prefix-initialize": [
+        "LIBPGLITE_RUN_PREFIX_INITIALIZE_CHILD=1",
+        "--features dynamic-loading",
+        "--test dynamic_plugin",
+        "dynamic_plugin_prefix_initialize_child",
+    ],
+    "prefix-resume": [
+        "LIBPGLITE_RUN_PREFIX_RESUME_CHILD=1",
+        "--features dynamic-loading",
+        "--test dynamic_plugin",
+        "dynamic_plugin_prefix_resume_child",
+    ],
+}
 POSTGRES_PREFIX_LAYOUT = {
     "path": "postgres",
     "bin": "postgres/bin",
@@ -783,6 +808,17 @@ class Doctor:
             command = result.get("command")
             if not isinstance(command, str) or not command.strip():
                 self.errors.append(f"conformance result {name}.json is missing command")
+            else:
+                missing_fragments = [
+                    fragment
+                    for fragment in CONFORMANCE_COMMAND_FRAGMENTS[name]
+                    if fragment not in command
+                ]
+                if missing_fragments:
+                    self.errors.append(
+                        f"conformance result {name}.json command is missing fragments: "
+                        + ", ".join(missing_fragments)
+                    )
             if result.get("log") != f"{name}.log":
                 self.errors.append(f"conformance result {name}.json points at wrong log")
             expected_log_sha = result.get("logSha256")
