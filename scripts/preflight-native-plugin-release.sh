@@ -164,12 +164,15 @@ if grep -E 'libpglite-native|libpglite-plugin-native' <<<"$facade_tree" >/dev/nu
 fi
 
 echo "==> preflight ${release_version}: doctor regression tests"
+python3 scripts/test-build-native-dependency-prefix.py
 python3 scripts/test-describe-native-dependency-prefix.py
 python3 scripts/test-doctor-native-plugin-package.py
 python3 scripts/test-fetch-native-dependency-sources.py
 python3 scripts/test-generate-native-dependency-manifest.py
 python3 scripts/test-inventory-native-pglite-extensions.py
 python3 scripts/test-materialize-native-pglite-other-extensions.py
+python3 scripts/test-preflight-linux-smolvm.py
+python3 scripts/test-plugin-build-rs.py
 python3 scripts/test-prepare-native-pglite-link.py
 python3 scripts/test-check-native-other-extension-build.py
 python3 scripts/test-preflight-native-plugin-release.py
@@ -177,22 +180,46 @@ python3 scripts/test-preflight-native-plugin-release.py
 echo "==> preflight ${release_version}: dynamic-loading check"
 cargo check --features dynamic-loading,client-tokio-postgres
 
-dependency_prefix="${LIBPGLITE_NATIVE_DEPENDENCY_PREFIX:-"$repo_root/target/native-pglite/dependency-prefix"}"
+native_build_root="${LIBPGLITE_NATIVE_BUILD_ROOT:-"$repo_root/target/native-pglite"}"
+case "$native_build_root" in
+  /*) ;;
+  *) native_build_root="$repo_root/$native_build_root" ;;
+esac
+dependency_prefix="${LIBPGLITE_NATIVE_DEPENDENCY_PREFIX:-"$native_build_root/dependency-prefix"}"
 case "$dependency_prefix" in
   /*) ;;
   *) dependency_prefix="$repo_root/$dependency_prefix" ;;
 esac
+dependency_sources="${LIBPGLITE_NATIVE_DEPENDENCY_SOURCES:-"$native_build_root/dependency-sources"}"
+case "$dependency_sources" in
+  /*) ;;
+  *) dependency_sources="$repo_root/$dependency_sources" ;;
+esac
+dependency_work_dir="${LIBPGLITE_NATIVE_DEPENDENCY_BUILD_DIR:-"$native_build_root/dependency-build"}"
+case "$dependency_work_dir" in
+  /*) ;;
+  *) dependency_work_dir="$repo_root/$dependency_work_dir" ;;
+esac
+manifest="${LIBPGLITE_NATIVE_LINK_MANIFEST:-"$native_build_root/$(rustc -vV | awk -F': ' '$1 == "host" {print $2}')/libpglite_native_link_manifest.txt"}"
+case "$manifest" in
+  /*) ;;
+  *) manifest="$repo_root/$manifest" ;;
+esac
+export LIBPGLITE_NATIVE_LINK_MANIFEST="$manifest"
 
 echo "==> preflight ${release_version}: pinned native dependency prefix"
-scripts/build-native-dependency-prefix.sh --prefix "$dependency_prefix"
+scripts/build-native-dependency-prefix.sh \
+  --prefix "$dependency_prefix" \
+  --sources "$dependency_sources" \
+  --work-dir "$dependency_work_dir"
 
 echo "==> preflight ${release_version}: pinned postgres-pglite native archive build"
 scripts/prepare-native-pglite-link.sh \
   --build-postgres \
+  --out "$manifest" \
   --dependency-prefix "$dependency_prefix" \
   --fetch-other-extensions \
   --build-other-extensions
-manifest="$repo_root/target/native-pglite/$(rustc -vV | awk -F': ' '$1 == "host" {print $2}')/libpglite_native_link_manifest.txt"
 initdb_binary="$(awk -F= '$1 == "initdb_binary" {print substr($0, length($1) + 2)}' "$manifest")"
 postgres_lib_dir="$(awk -F= '$1 == "postgres_lib_dir" {print substr($0, length($1) + 2)}' "$manifest")"
 if [[ -z "$initdb_binary" || ! -x "$initdb_binary" ]]; then

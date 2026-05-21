@@ -95,6 +95,35 @@ require() {
   fi
 }
 
+require_libtoolize() {
+  if command -v glibtoolize >/dev/null 2>&1 || command -v libtoolize >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "missing required command: glibtoolize or libtoolize" >&2
+  exit 2
+}
+
+refresh_config_scripts() {
+  local dir="$1"
+  local script candidate
+  for script in config.guess config.sub; do
+    if [[ ! -f "$dir/$script" ]]; then
+      continue
+    fi
+    for candidate in \
+      "/usr/share/misc/$script" \
+      "/usr/share/automake/$script" \
+      "/opt/homebrew/share/automake/$script" \
+      /usr/share/automake-*/"$script" \
+      /opt/homebrew/share/automake-*/"$script"; do
+      if [[ -f "$candidate" ]]; then
+        cp "$candidate" "$dir/$script"
+        break
+      fi
+    done
+  done
+}
+
 require cc
 require cmake
 require git
@@ -214,7 +243,7 @@ build_zlib() {
 
 build_libxml2() {
   require automake
-  require glibtoolize
+  require_libtoolize
   local src
   src="$(extract_archive libxml2)"
   (
@@ -233,7 +262,7 @@ build_libxml2() {
 
 build_libxslt() {
   require automake
-  require glibtoolize
+  require_libtoolize
   local src
   src="$(extract_archive libxslt)"
   (
@@ -286,6 +315,7 @@ build_ossp_uuid() {
   src="$(extract_archive ossp-uuid)"
   (
     cd "$src"
+    refresh_config_scripts "$src"
     env "${common_env[@]}" ./configure \
       --enable-shared=no \
       --enable-static=yes \
@@ -353,7 +383,7 @@ build_libdeflate() {
 
 build_libtiff() {
   require automake
-  require glibtoolize
+  require_libtoolize
   local src
   src="$(extract_archive libtiff)"
   (

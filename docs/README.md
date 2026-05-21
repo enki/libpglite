@@ -46,7 +46,11 @@ Current closure frontier:
 - ADR-0005: still needs Linux `pglitec.c` PIC proof and an upstream/carry
   decision for the native portability patches.
 - ADR-0006: still needs Linux baseline automation through the Ubuntu
-  environment in `../smolvm/` or an equivalent release container.
+  environment in `../smolvm/` or an equivalent release container. A local
+  `scripts/preflight-linux-smolvm.sh` entrypoint now exists for the
+  `ubuntu:24.04` guest path and isolates Linux build outputs under `/tmp` in the
+  guest, but the full Linux preflight still has to pass and record baseline
+  diagnostics.
 - ADR-0007: macOS package doctor self-tests the packaged `postgres/` prefix,
   including the full extension/runtime data surface. It still needs the same
   prefix shape and strict relocatability on Linux.
@@ -59,8 +63,11 @@ Current closure frontier:
   prefix contract and continued strict dependency-regression coverage.
 - ADR-0010: macOS release preflight now generates backend exports from the full
   packaged parity set, including common data symbols, and proves the modules
-  load through the globally loaded plugin. It still needs Linux
-  export/version-script coverage and full-set stale-symbol regression coverage.
+  load through the globally loaded plugin. The Ubuntu smolvm lane reached the
+  final Linux plugin link and showed that Rust's generated cdylib version
+  script conflicts with a second GNU ld version script for generated backend
+  exports. Linux closure now needs one authoritative final-link/export boundary,
+  plus package/runtime proof and full-set stale-symbol regression coverage.
 - ADR-0012: still needs production package enforcement for every
   release-critical diagnostic and Linux schema parity before it can close. The
   normal macOS preflight package path now carries controlled-prefix diagnostics,

@@ -97,6 +97,14 @@ set changes.
 - On Linux, the equivalent release behavior should be implemented with an
   explicit exported dynamic symbol list or version script that includes both the
   `libpglite_plugin_*` ABI and the generated backend-symbol set.
+- Rust `cdylib` builds already pass a generated GNU ld version script for the
+  Rust-exported ABI. A second anonymous version script cannot be combined with
+  that generated script, and a focused Ubuntu linker probe showed that
+  `--dynamic-list` and `--export-dynamic-symbol` do not override the Rust
+  script's `local: *` rule. The Linux closure path therefore needs either a
+  single final linker-owned export script, a staticlib-plus-final-link packaging
+  step, or an equivalent mechanism that gives one linker boundary ownership of
+  both host ABI symbols and generated backend symbols.
 - Opening the plugin with local symbol visibility is insufficient for extension
   parity even if the plugin file itself exports the right symbols.
 - The macOS bring-up now proves this contract for PostgreSQL `contrib` modules
@@ -136,3 +144,15 @@ set changes.
   PostGIS, and that prepare is part of normal macOS preflight. This ADR remains
   open because Linux still needs the equivalent exported-symbol/version-script
   contract.
+- The Linux plugin build script now consumes the same generated
+  `backend_export_symbol=` manifest entries when native linking is enabled and
+  attempts to write them into the GNU ld version script beside the stable
+  `libpglite_plugin_*` ABI. The Ubuntu smolvm lane reached the final plugin
+  link and proved that this naive second-version-script approach conflicts with
+  Rust's own cdylib version script. A static preflight guard still prevents the
+  build from silently falling back to ABI-only exports, but this ADR cannot
+  close until Linux uses a single authoritative final-link/export boundary.
+- The Ubuntu smolvm lane also exposed that `src/timezone/zic.o` and
+  `src/timezone/zdump.o` are CLI entrypoint objects, not backend timezone
+  runtime objects. The native timezone archive now excludes them so Linux does
+  not collide with PostgreSQL backend `main.o` during whole-archive linking.

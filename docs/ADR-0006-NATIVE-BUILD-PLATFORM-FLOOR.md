@@ -74,3 +74,26 @@ still need an explicitly documented Linux baseline.
 - Linux baseline selection remains open, but local Linux testing should use the
   Ubuntu environment in `../smolvm/` until CI or release containers cover the
   same path.
+- `scripts/preflight-linux-smolvm.sh <version>` is now the local Ubuntu
+  baseline entrypoint. It runs `scripts/preflight-native-plugin-release.sh` in
+  an `ubuntu:24.04` guest through `../smolvm/target/release/smolvm`, installs
+  the native build prerequisites, mounts this checkout at `/mnt/libpglite`,
+  mounts the pinned `postgres-pglite` checkout at `/mnt/postgres-pglite` when
+  available from `LIBPGLITE_POSTGRES_SOURCE_DIR`, `vendor/postgres-pglite`, or
+  `../postgres-pglite`, and marks those mounts as Git-safe inside the guest.
+  Linux Cargo/native/package output is isolated under `/tmp` inside the guest.
+  On macOS it also points `DYLD_LIBRARY_PATH` at the local smolvm `lib/`
+  directory so the checked out smolvm binary can use its bundled VMM libraries
+  instead of depending on Homebrew install names. The first Ubuntu run reached
+  the native dependency-prefix stage and exposed mixed-ownership reuse of
+  host-side `target/native-pglite` git checkouts; native preflight now accepts a
+  `LIBPGLITE_NATIVE_BUILD_ROOT` so Linux can keep its dependency sources,
+  dependency build directory, dependency prefix, and native link manifest out of
+  the mounted macOS worktree. The next Ubuntu run built the full controlled
+  dependency prefix and then exposed the missing `postgres-pglite` source mount;
+  the wrapper now supplies that mount explicitly. The following run reached
+  native `initdb` and exposed a root-execution violation; the wrapper now keeps
+  package installation as root but runs the libpglite preflight as an
+  unprivileged `libpglite` user. This does not close the Linux floor yet because
+  the full Linux preflight still has to pass and write baseline diagnostics into
+  the package.

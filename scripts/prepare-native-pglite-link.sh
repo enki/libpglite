@@ -594,7 +594,7 @@ native_extension_be_dlllibs=$native_extension_be_dlllibs"
   timezone_objects=()
   while IFS= read -r object; do
     timezone_objects+=("$object")
-  done < <(find "$postgres_build_dir/src/timezone" -maxdepth 1 -type f -name '*.o' | LC_ALL=C sort)
+  done < <(find "$postgres_build_dir/src/timezone" -maxdepth 1 -type f -name '*.o' ! -name 'zic.o' ! -name 'zdump.o' | LC_ALL=C sort)
   if [[ "${#timezone_objects[@]}" -eq 0 ]]; then
     echo "native Postgres backend build produced no timezone object files" >&2
     exit 1

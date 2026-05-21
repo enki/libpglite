@@ -1,27 +1,37 @@
+use std::collections::BTreeSet;
 use std::env;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
 fn main() {
-    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
-        emit_linux_plugin_export_boundary();
-    }
-
     println!("cargo:rerun-if-env-changed=LIBPGLITE_NATIVE_LINK_PGLITE");
     println!("cargo:rerun-if-env-changed=LIBPGLITE_NATIVE_LINK_MANIFEST");
     println!("cargo:rerun-if-env-changed=LIBPGLITE_NATIVE_BUILD_DIR");
 
-    if env::var("LIBPGLITE_NATIVE_LINK_PGLITE").as_deref() == Ok("1") {
-        emit_native_pglite_link_inputs();
+    let native_manifest = if env::var("LIBPGLITE_NATIVE_LINK_PGLITE").as_deref() == Ok("1") {
+        Some(read_native_manifest())
+    } else {
+        None
+    };
+
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
+        let backend_exports = native_manifest
+            .as_ref()
+            .map(|(_, contents)| backend_export_symbols_from_manifest(contents))
+            .unwrap_or_default();
+        emit_linux_plugin_export_boundary(&backend_exports);
+    }
+
+    if let Some((manifest, contents)) = native_manifest {
+        emit_native_pglite_link_inputs(&manifest, &contents);
     }
 }
 
-fn emit_linux_plugin_export_boundary() {
+fn emit_linux_plugin_export_boundary(backend_exports: &BTreeSet<String>) {
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR is set by Cargo"));
     let version_script = out_dir.join("libpglite-plugin-native.exports");
-    fs::write(
-        &version_script,
+    let mut script = String::from(
         r#"{
     global:
         libpglite_plugin_abi_version;
@@ -30,12 +40,21 @@ fn emit_linux_plugin_export_boundary() {
         libpglite_plugin_runtime_destroy;
         libpglite_plugin_runtime_exec_protocol_raw;
         libpglite_plugin_runtime_shutdown;
-    local:
+"#,
+    );
+    for symbol in backend_exports {
+        script.push_str("        ");
+        script.push_str(symbol);
+        script.push_str(";\n");
+    }
+    script.push_str(
+        r#"    local:
         *;
 };
 "#,
-    )
-    .unwrap_or_else(|err| {
+    );
+
+    fs::write(&version_script, script).unwrap_or_else(|err| {
         panic!(
             "failed to write Linux plugin export version script at {}: {err}",
             version_script.display()
@@ -49,7 +68,7 @@ fn emit_linux_plugin_export_boundary() {
     println!("cargo:rustc-cdylib-link-arg=-Wl,--exclude-libs,ALL");
 }
 
-fn emit_native_pglite_link_inputs() {
+fn read_native_manifest() -> (PathBuf, String) {
     let manifest = env::var_os("LIBPGLITE_NATIVE_LINK_MANIFEST")
         .map(PathBuf::from)
         .unwrap_or_else(default_manifest_path);
@@ -60,7 +79,19 @@ fn emit_native_pglite_link_inputs() {
             manifest.display()
         )
     });
-    let link_inputs = native_link_inputs_from_manifest(&manifest, &contents);
+    (manifest, contents)
+}
+
+fn backend_export_symbols_from_manifest(contents: &str) -> BTreeSet<String> {
+    contents
+        .lines()
+        .filter_map(|line| line.strip_prefix("backend_export_symbol="))
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+fn emit_native_pglite_link_inputs(manifest: &Path, contents: &str) {
+    let link_inputs = native_link_inputs_from_manifest(manifest, contents);
 
     for input in link_inputs {
         match input {

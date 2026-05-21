@@ -38,6 +38,12 @@ class PrepareNativePgliteLinkTests(unittest.TestCase):
             text,
         )
 
+    def test_timezone_archive_excludes_cli_entrypoints(self):
+        text = SCRIPT.read_text()
+        self.assertIn("! -name 'zic.o'", text)
+        self.assertIn("! -name 'zdump.o'", text)
+        self.assertIn('ar -crs "$timezone_archive" "${timezone_objects[@]}"', text)
+
 
 if __name__ == "__main__":
     unittest.main()

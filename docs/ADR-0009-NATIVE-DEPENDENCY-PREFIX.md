@@ -156,6 +156,15 @@ libraries or runtime data.
   Homebrew for the PGlite-aligned libxml2/libxslt/libtiff `autogen.sh` path.
   That is an acceptable source-build prerequisite, not a release link provider.
   Release artifacts must still link against the controlled prefix outputs.
+- The dependency-prefix builder accepts both the Homebrew/macOS `glibtoolize`
+  command name and the GNU/Linux `libtoolize` command name. The Ubuntu baseline
+  exposed this as an actual portability requirement during the first Linux
+  prefix attempt, before any libpglite-specific C code was compiled.
+- OSSP uuid carries stale autotools platform scripts that do not recognize the
+  Ubuntu/aarch64 baseline used by `smolvm`. The dependency-prefix builder
+  refreshes `config.guess` and `config.sub` from the host autotools install
+  before configuring that source tree, and the builder regression test keeps
+  that portability repair in place.
 - The Darwin dependency compile flags include
   `-Werror=unguarded-availability-new`, and SQLite's generated
   `HAVE_STRCHRNUL` setting is forced off after configure because the macOS 15
