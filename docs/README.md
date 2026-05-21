@@ -51,13 +51,12 @@ Current closure frontier:
   ADRs remain open, and the doctor has focused conformance-diagnostic failure
   regressions. It still needs every root ADR closed before production packages
   can claim runtime-ready status.
-- ADR-0005: still needs the final upstream/carry decision for the native
-  portability patches. The backend archive now audits that PostgreSQL socket
-  I/O binds to PGlite callback shims instead of libc socket APIs, Linux prepare
-  forces the poll/self-pipe latch path for the dummy PGlite socket descriptor,
-  the forced-include header now declares the replacement shim ABI before macro
+- ADR-0005: the backend archive now audits that PostgreSQL socket I/O binds to
+  PGlite callback shims instead of libc socket APIs, Linux prepare forces the
+  poll/self-pipe latch path for the dummy PGlite socket descriptor, the
+  forced-include header now declares the replacement shim ABI before macro
   remapping, and the Ubuntu preflight passes the current release path. The ADR
-  now records per-patch downstream carry decisions, and preflight verifies that
+  records per-patch downstream carry decisions, and preflight verifies that
   every carried patch has a decision row. Remaining closure is keeping the
   patch-apply and shim-prototype regressions in the preflight path until final
   package evidence is current.
