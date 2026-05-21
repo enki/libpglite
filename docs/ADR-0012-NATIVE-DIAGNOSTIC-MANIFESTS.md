@@ -249,6 +249,11 @@ actual plugin and prefix contents.
   fingerprint, patch list, and per-patch SHA-256 values. A stale source
   provenance file can no longer satisfy the package diagnostic gate by carrying
   only plausible-looking checksums.
+- Doctor regression tests now corrupt each structured JSON diagnostic family
+  and assert explicit failures: dependency manifest, platform baseline, source
+  provenance, dependency prefix, runtime lifecycle, and conformance result
+  files. This keeps malformed release diagnostics from being treated as missing
+  optional data or plausible text.
 - Packaging now writes `diagnostics/platform-baseline.json` and the doctor
   validates it as a package claim. The diagnostic must match the bundle target.
   Linux packages must record the Ubuntu `24.04` baseline, matching

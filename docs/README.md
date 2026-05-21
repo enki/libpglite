@@ -108,6 +108,7 @@ Current closure frontier:
   extension package claims into the final-artifact doctor. Linux now uses the
   same dependency schema, the platform baseline diagnostic has joined the
   package doctor gate, production packages require a dependency-prefix
-  diagnostic, patch-apply reproducibility is now a prepare-time gate rather than
+  diagnostic, malformed structured JSON diagnostics have focused doctor
+  regressions, patch-apply reproducibility is now a prepare-time gate rather than
   only a checksum claim, and the ADR audit now fails if any focused
   `scripts/test-*.py` regression is not wired into native release preflight.

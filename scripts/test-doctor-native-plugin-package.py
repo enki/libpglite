@@ -473,6 +473,65 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "\n".join(doctor.errors),
         )
 
+    def test_malformed_structured_diagnostics_are_rejected(self):
+        cases = [
+            (
+                "diagnostics/dependencies.json",
+                lambda doctor: doctor.validate_dependencies(),
+                "dependency manifest is not readable",
+            ),
+            (
+                "diagnostics/platform-baseline.json",
+                lambda doctor: doctor.validate_platform_baseline(),
+                "platform baseline diagnostic is not readable",
+            ),
+            (
+                "diagnostics/source-provenance.json",
+                lambda doctor: doctor.validate_source_provenance(),
+                "source provenance diagnostic is not readable",
+            ),
+            (
+                "diagnostics/native-dependency-prefix.json",
+                lambda doctor: doctor.validate_dependencies(),
+                "dependency prefix manifest is not readable",
+            ),
+            (
+                "diagnostics/runtime-lifecycle.json",
+                lambda doctor: doctor.validate_lifecycle(),
+                "runtime lifecycle diagnostic is not readable",
+            ),
+            (
+                "diagnostics/conformance/raw-protocol.json",
+                lambda doctor: doctor.validate_conformance(),
+                "conformance result raw-protocol.json is not readable",
+            ),
+        ]
+        for rel_path, validate, expected in cases:
+            with self.subTest(rel_path=rel_path):
+                tempdir, doctor = self.make_doctor(
+                    plugin_symbols=ABI_SYMBOLS,
+                    plugin_manifest_symbols=ABI_SYMBOLS,
+                    native_manifest_backend_symbols=set(),
+                    backend_manifest_symbols=set(),
+                )
+                root = pathlib.Path(tempdir.name)
+                path = root / rel_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("{not json\n")
+                if "native-dependency-prefix" in rel_path:
+                    doctor.bundle["diagnostics"]["dependencyPrefix"] = rel_path
+                if "runtime-lifecycle" in rel_path:
+                    doctor.bundle["diagnostics"]["runtimeLifecycle"] = rel_path
+                if "conformance/" in rel_path:
+                    doctor.bundle["diagnostics"]["conformanceResults"] = (
+                        "diagnostics/conformance"
+                    )
+                    (path.parent / "raw-protocol.log").write_text("")
+                with tempdir:
+                    validate(doctor)
+
+                self.assertIn(expected, "\n".join(doctor.errors))
+
     def test_source_provenance_identity_must_match_native_manifest(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS,
