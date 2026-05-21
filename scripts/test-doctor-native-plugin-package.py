@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import hashlib
 import importlib.util
 import json
 import pathlib
@@ -198,6 +199,41 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             (extension_dir / name).write_text(text)
         for module in modules or []:
             (lib_dir / module).write_text("")
+
+    def test_conformance_diagnostics_reject_missing_failed_and_stale_results(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        doctor.bundle["releaseMode"] = "production"
+        doctor.bundle["runtimeStatus"] = "runtime-ready"
+        doctor.bundle["diagnostics"]["conformanceResults"] = "diagnostics/conformance"
+        conformance = pathlib.Path(tempdir.name) / "diagnostics" / "conformance"
+        conformance.mkdir()
+        (conformance / "raw-protocol.log").write_text("actual log\n")
+        (conformance / "raw-protocol.json").write_text(
+            json.dumps(
+                {
+                    "format": "libpglite-native-conformance-result-v1",
+                    "name": "raw-protocol",
+                    "status": "failed",
+                    "exitCode": 1,
+                    "log": "raw-protocol.log",
+                    "logSha256": hashlib.sha256(b"different log\n").hexdigest(),
+                }
+            )
+            + "\n"
+        )
+        with tempdir:
+            doctor.validate_conformance()
+
+        errors = "\n".join(doctor.errors)
+        self.assertIn("conformance result raw-protocol.json did not pass", errors)
+        self.assertIn("conformance result raw-protocol.json exitCode is not 0", errors)
+        self.assertIn("conformance result raw-protocol.json logSha256 mismatch", errors)
+        self.assertIn("conformance result is missing: tokio-postgres-client.json", errors)
 
     def test_plugin_symbol_diagnostic_must_match_actual_exports(self):
         tempdir, doctor = self.make_doctor(

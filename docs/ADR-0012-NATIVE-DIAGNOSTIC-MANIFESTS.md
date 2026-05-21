@@ -232,6 +232,9 @@ actual plugin and prefix contents.
   exports, `backend-export-symbols.txt` must match the native link manifest, and
   every recorded backend export must be present in the packaged plugin. Preflight
   runs regression tests for these stale-diagnostic failures.
+- The doctor now has focused conformance-diagnostic regression coverage for
+  missing result files, failed status/exit-code claims, and stale log checksums
+  in a production `runtime-ready` package shape.
 - The doctor now parses `build-provenance.txt` and compares it with the bundle
   manifest. Target, release version, release mode, runtime status, libpglite git
   commit, plugin filename/checksum, packaged diagnostic filenames, timestamp

@@ -60,6 +60,9 @@ moved to `docs/done/` and the remaining package diagnostics pass.
 `scripts/test-package-native-plugin-release.py` runs the production packaging
 command with a placeholder plugin and asserts that it fails before package
 assembly while naming the still-open root ADRs.
+The package doctor validates packaged conformance diagnostics directly, and
+`scripts/test-doctor-native-plugin-package.py` now pins missing results, failing
+status/exit codes, and stale log checksums as package errors.
 
 ## Required Work
 
@@ -87,5 +90,3 @@ assembly while naming the still-open root ADRs.
 - Once the other release-gating ADRs are done, production packaging sets
   `runtimeStatus=runtime-ready` only after native preflight has produced passing
   packaged-artifact conformance diagnostics.
-- The package doctor rejects missing, stale, or failing conformance diagnostics
-  for a production runtime-ready package.
