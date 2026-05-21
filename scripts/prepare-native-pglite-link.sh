@@ -49,6 +49,8 @@ require() {
 }
 
 require git
+require cc
+require patch
 
 pin_file="$repo_root/PGLITE_POSTGRES_SOURCE"
 if [[ ! -f "$pin_file" ]]; then
@@ -123,7 +125,21 @@ if [[ -z "$out" ]]; then
   out="$repo_root/target/native-pglite/$target/libpglite_native_link_manifest.txt"
 fi
 
-mkdir -p "$(dirname "$out")"
+build_dir="$(dirname "$out")"
+patched_source="$build_dir/patched-postgres-pglite"
+object_dir="$build_dir/objects"
+mkdir -p "$patched_source/pglite/src/pglitec" "$object_dir"
+
+cp "$source_dir/pglite/src/pglitec/pglitec.c" "$patched_source/pglite/src/pglitec/pglitec.c"
+for patch_file in "$repo_root"/patches/postgres-pglite/*.patch; do
+  [[ -e "$patch_file" ]] || continue
+  patch -d "$patched_source" -p1 <"$patch_file" >/dev/null
+done
+
+pglitec_object="$object_dir/pglitec.o"
+cc -fPIC -O2 -DNDEBUG \
+  -c "$patched_source/pglite/src/pglitec/pglitec.c" \
+  -o "$pglitec_object"
 
 {
   echo "format=libpglite-native-link-manifest-v1"
@@ -135,8 +151,9 @@ mkdir -p "$(dirname "$out")"
   for file in "${required_files[@]}"; do
     echo "required_file=$file"
   done
-  echo "note=ADR-0002 still owns native PIC object/archive generation"
+  echo "patch=patches/postgres-pglite/0001-pglitec-native-portability.patch"
+  echo "object=$pglitec_object"
+  echo "note=ADR-0002 still owns Postgres backend archive generation"
 } >"$out"
 
 echo "wrote $out"
-
