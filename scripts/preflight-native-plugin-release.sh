@@ -174,6 +174,7 @@ python3 scripts/test-generate-native-dependency-manifest.py
 python3 scripts/test-inventory-native-pglite-extensions.py
 python3 scripts/test-link-linux-native-plugin.py
 python3 scripts/test-materialize-native-pglite-other-extensions.py
+python3 scripts/test-native-patch-decisions.py
 python3 scripts/test-package-native-plugin-release.py
 python3 scripts/test-preflight-linux-smolvm.py
 python3 scripts/test-plugin-build-rs.py

@@ -53,8 +53,6 @@ clear preprocessor gates.
 - The release prepare path proves backend objects reference the PGlite callback
   transport shims (`pgl_recv`, `pgl_send`, `pgl_poll`, and related socket
   wrappers) instead of the corresponding libc socket APIs.
-- The ADR records the final carry/upstream decision for each portability patch
-  before moving to `docs/done/`.
 - A focused regression keeps the Linux forced-include ordering and jump-buffer
   address comparison in place, because those are the portability fixes most
   likely to be broken by future patch refreshes.
@@ -121,3 +119,19 @@ clear preprocessor gates.
   fortified jump symbols in addition to raw socket calls, and requires the
   backend to reference `pgl_siglongjmp`. This keeps Linux from silently bypassing
   the native error-recovery trap.
+- The final patch policy for this repository is to carry the native
+  portability patches downstream while the native library target is developed.
+  They stay small, fingerprinted, `git apply --check` verified, and isolated
+  behind explicit native preprocessor gates. Upstreaming remains desirable once
+  the native target contract is stable, but production readiness no longer
+  depends on an upstream merge.
+- Per-patch decisions:
+
+  | Patch | Decision | Rationale |
+  | --- | --- | --- |
+  | `0001-pglitec-native-portability.patch` | carry downstream | Native exit trapping, socket/poll/jump shim routing, host `poll()` signature compatibility, and portable jump-buffer identity are required for the native dynamic-library target while preserving the Emscripten lane behind explicit gates. |
+  | `0002-native-pglite-runtime-symbols.patch` | carry downstream | Native embedded mode needs runtime symbols and postmaster-aliveness behavior that the Emscripten build does not expose, including avoiding the nonexistent postmaster-death pipe in a single-process library runtime. |
+
+- `scripts/test-native-patch-decisions.py` keeps that decision table in sync
+  with the actual `patches/postgres-pglite/*.patch` files, and native preflight
+  runs the test before build work.
