@@ -73,13 +73,17 @@ set changes.
 
 ## Remaining Closure Criteria
 
-- Linux preflight implements the equivalent export/version-script contract and
-  proves bundled extension modules resolve against the globally loaded plugin.
+- Linux preflight implements the equivalent export/version-script contract with
+  one authoritative final link step, then proves bundled extension modules
+  resolve against the globally loaded plugin.
 - The package doctor keeps failing on stale backend-symbol diagnostics, missing
   exported backend symbols, and extension modules with unresolved backend
   references, with regression coverage for the full parity set.
 - Linux packaged-artifact conformance creates representative extension modules
   that require backend symbol resolution, including `pgcrypto` and PostGIS.
+- Linux symbol-boundary checks tolerate only the GNU version node plus the
+  stable host ABI and generated backend-symbol set; they must not accept
+  accidental exports from Rust, PostgreSQL, or dependency archives.
 
 ## Implementation Notes
 
@@ -123,6 +127,11 @@ set changes.
   The full parity sweep exposed `BufferBlocks` as a required common symbol for
   `pg_textsearch`; the scanner now accepts `T`, `D`, `B`, `S`, and `C` symbol
   classes so extension modules do not depend on accidental symbol omissions.
+- Linux packaged runtime conformance exposed `InvalidObjectAddress` as a
+  required read-only backend data symbol for `pg_ivm`. The scanner now includes
+  `R` symbols as well as `T`, `D`, `B`, `S`, and `C`, because extension parity
+  must be driven by actual undefined module references rather than an assumed
+  subset of backend symbol classes.
 - Bundled procedural language modules are part of the same dynamic-symbol
   contract. The generated `plpgsql` module is rebuilt during native prepare with
   the extension dynamic-lookup linker flags so extensions that require
@@ -144,15 +153,24 @@ set changes.
   PostGIS, and that prepare is part of normal macOS preflight. This ADR remains
   open because Linux still needs the equivalent exported-symbol/version-script
   contract.
-- The Linux plugin build script now consumes the same generated
-  `backend_export_symbol=` manifest entries when native linking is enabled and
-  attempts to write them into the GNU ld version script beside the stable
-  `libpglite_plugin_*` ABI. The Ubuntu smolvm lane reached the final plugin
-  link and proved that this naive second-version-script approach conflicts with
-  Rust's own cdylib version script. A static preflight guard still prevents the
-  build from silently falling back to ABI-only exports, but this ADR cannot
-  close until Linux uses a single authoritative final-link/export boundary.
+- The Linux plugin build now uses a Rust `staticlib` plus a final native link
+  script, giving GNU ld one version-script boundary that owns both the stable
+  `libpglite_plugin_*` ABI and the generated `backend_export_symbol=` manifest
+  entries. A focused Linux probe showed that `--exclude-libs,ALL` would hide
+  archive-sourced ABI symbols even when the version script listed them, so the
+  final link relies on the version script's `local: *` rule as the export
+  boundary.
+- Linux symbol scanners now filter the GNU version-node symbol
+  `LIBPGLITE_PLUGIN_NATIVE_1` before comparing exported symbols. The version
+  node is expected metadata from the single final version script, not an
+  additional public export.
 - The Ubuntu smolvm lane also exposed that `src/timezone/zic.o` and
   `src/timezone/zdump.o` are CLI entrypoint objects, not backend timezone
   runtime objects. The native timezone archive now excludes them so Linux does
   not collide with PostgreSQL backend `main.o` during whole-archive linking.
+- Linux runtime bring-up then reached `pgl_startPGlite` and exposed a separate
+  portability issue: PostgreSQL selected its epoll latch implementation for a
+  dummy PGlite socket descriptor. Native prepare now forces poll/self-pipe on
+  Linux. The remaining Linux runtime failure is no longer the export boundary;
+  it is proving that the callback socket transport reaches
+  `ProcessStartupPacket` exactly as it does in the WASM lane.

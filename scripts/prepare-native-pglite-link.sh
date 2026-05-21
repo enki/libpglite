@@ -226,6 +226,29 @@ native_trap_object="$object_dir/libpglite_native_trap.o"
 cc -fPIC -O2 -DNDEBUG -DLIBPGLITE_NATIVE_BACKEND_TRAMPOLINES \
   -c "$repo_root/native/c/libpglite_native_trap.c" \
   -o "$native_trap_object"
+socket_shim_header="$object_dir/libpglite_native_socket_shims.h"
+cat >"$socket_shim_header" <<'EOF'
+#ifndef LIBPGLITE_NATIVE_SOCKET_SHIMS_H
+#define LIBPGLITE_NATIVE_SOCKET_SHIMS_H
+
+#include <fcntl.h>
+#include <poll.h>
+#include <setjmp.h>
+#include <sys/socket.h>
+
+#define fcntl pgl_fcntl
+#define setsockopt pgl_setsockopt
+#define getsockopt pgl_getsockopt
+#define getsockname pgl_getsockname
+#define recv pgl_recv
+#define send pgl_send
+#define connect pgl_connect
+#define poll pgl_poll
+#define longjmp pgl_longjmp
+#define siglongjmp pgl_siglongjmp
+
+#endif
+EOF
 
 make_jobs="${LIBPGLITE_NATIVE_MAKE_JOBS:-}"
 if [[ -z "$make_jobs" ]]; then
@@ -239,18 +262,17 @@ if [[ -z "$make_jobs" ]]; then
 fi
 
 pglite_copt="-fPIC -O2 -DNDEBUG -D__PGLITE__ \
+-include $socket_shim_header \
 -Dsystem=pgl_system -Dpopen=pgl_popen -Dpclose=pgl_pclose \
 -Dgeteuid=pgl_geteuid -Dgetuid=pgl_getuid -Dgetpwuid=pgl_getpwuid \
 -Dexit=pgl_exit \
 -Dmunmap=pgl_munmap \
--Dfcntl=pgl_fcntl \
 -Datexit=pgl_atexit \
--Dsetsockopt=pgl_setsockopt -Dgetsockopt=pgl_getsockopt -Dgetsockname=pgl_getsockname \
--Drecv=pgl_recv -Dsend=pgl_send -Dconnect=pgl_connect \
--Dpoll=pgl_poll \
 -Dshmget=pgl_shmget -Dshmat=pgl_shmat -Dshmdt=pgl_shmdt -Dshmctl=pgl_shmctl \
--Dlongjmp=pgl_longjmp -Dsiglongjmp=pgl_siglongjmp \
 -Wno-macro-redefined -Wno-incompatible-pointer-types"
+if [[ "$(uname -s)" == "Linux" ]]; then
+  pglite_copt="$pglite_copt -DWAIT_USE_POLL -DWAIT_USE_SELF_PIPE"
+fi
 
 postgres_build_dir="$build_dir/postgres-build"
 postgres_install_prefix="$postgres_build_dir/install"
@@ -448,12 +470,63 @@ native_extension_required_symbols() {
 
   nm -g "$pglitec_object" "$native_trap_object" \
     "$backend_archive" "$timezone_archive" "$common_archive" "$port_archive" 2>/dev/null \
-    | awk '$2 ~ /^[TDBSC]$/ {print $3}' \
+    | awk '$2 ~ /^[TDBSCR]$/ {print $3}' \
     | sed 's/^_//' \
     | LC_ALL=C sort -u >"$defined_symbols"
 
   comm -12 "$undefined_symbols" "$defined_symbols"
   rm -f "$undefined_symbols" "$defined_symbols"
+}
+
+assert_backend_uses_pglite_socket_shims() {
+  local undefined_symbols
+  local unexpected_symbols
+  local undefined_with_objects
+  undefined_symbols="$(mktemp)"
+  unexpected_symbols="$(mktemp)"
+  undefined_with_objects="$(mktemp)"
+
+  nm -u -A "$backend_archive" 2>/dev/null \
+    | awk '
+      NF > 0 {
+        symbol = $NF
+        sub(/^_/, "", symbol)
+        location = $0
+        sub(/:[[:space:]]*(U[[:space:]]+)?_*[^[:space:]]+$/, "", location)
+        print location ": " symbol
+      }
+    ' \
+    | LC_ALL=C sort -u >"$undefined_with_objects"
+
+  awk -F': ' '{print $2}' "$undefined_with_objects" \
+    | LC_ALL=C sort -u >"$undefined_symbols"
+
+  grep -E '^(__longjmp_chk|__siglongjmp_chk|connect|fcntl|getsockname|getsockopt|longjmp|poll|recv|send|setsockopt|siglongjmp)$' \
+    "$undefined_symbols" >"$unexpected_symbols" || true
+  if [[ -s "$unexpected_symbols" ]]; then
+    echo "native Postgres backend archive still references libc socket APIs that PGlite must shim:" >&2
+    while IFS= read -r unexpected_symbol; do
+      grep -F ": $unexpected_symbol" "$undefined_with_objects" | sed 's/^/  /' >&2
+    done <"$unexpected_symbols"
+    rm -f "$undefined_symbols" "$unexpected_symbols" "$undefined_with_objects"
+    exit 1
+  fi
+
+  required_socket_shims=(pgl_recv pgl_send)
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    required_socket_shims+=(pgl_poll)
+  fi
+  required_socket_shims+=(pgl_siglongjmp)
+
+  for required_symbol in "${required_socket_shims[@]}"; do
+    if ! grep -Fx "$required_symbol" "$undefined_symbols" >/dev/null; then
+      echo "native Postgres backend archive is missing expected PGlite socket shim reference: $required_symbol" >&2
+      rm -f "$undefined_symbols" "$unexpected_symbols" "$undefined_with_objects"
+      exit 1
+    fi
+  done
+
+  rm -f "$undefined_symbols" "$unexpected_symbols" "$undefined_with_objects"
 }
 
 if [[ "$build_postgres" == "1" ]]; then
@@ -590,6 +663,7 @@ native_extension_be_dlllibs=$native_extension_be_dlllibs"
 
   rm -f "$backend_archive"
   ar -crs "$backend_archive" "${backend_objects[@]}"
+  assert_backend_uses_pglite_socket_shims
 
   timezone_objects=()
   while IFS= read -r object; do

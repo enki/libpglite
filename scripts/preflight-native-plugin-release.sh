@@ -131,6 +131,8 @@ run_conformance_check() {
   else
     write_conformance_result "$name" "failed" "$code" "$started_at" "$ended_at" "$*" "$log_file" "$log_sha256" "$result_file"
     echo "conformance check failed: $name" >&2
+    echo "last 200 log lines from $log_file:" >&2
+    tail -n 200 "$log_file" >&2 || true
     exit "$code"
   fi
 }
@@ -170,7 +172,9 @@ python3 scripts/test-doctor-native-plugin-package.py
 python3 scripts/test-fetch-native-dependency-sources.py
 python3 scripts/test-generate-native-dependency-manifest.py
 python3 scripts/test-inventory-native-pglite-extensions.py
+python3 scripts/test-link-linux-native-plugin.py
 python3 scripts/test-materialize-native-pglite-other-extensions.py
+python3 scripts/test-package-native-plugin-release.py
 python3 scripts/test-preflight-linux-smolvm.py
 python3 scripts/test-plugin-build-rs.py
 python3 scripts/test-prepare-native-pglite-link.py
@@ -241,9 +245,6 @@ LD_LIBRARY_PATH="$postgres_lib_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
     --auth=trust \
     --no-sync
 
-echo "==> preflight ${release_version}: build native plugin"
-LIBPGLITE_NATIVE_LINK_PGLITE=1 cargo build -p libpglite-plugin-native --release
-
 case "$(uname -s)" in
   Darwin) plugin_name="liblibpglite_plugin_native.dylib" ;;
   Linux) plugin_name="liblibpglite_plugin_native.so" ;;
@@ -259,6 +260,20 @@ case "$target_dir" in
   *) target_dir="$repo_root/$target_dir" ;;
 esac
 plugin_binary="$target_dir/release/$plugin_name"
+
+echo "==> preflight ${release_version}: build native plugin"
+case "$(uname -s)" in
+  Darwin)
+    LIBPGLITE_NATIVE_LINK_PGLITE=1 cargo build -p libpglite-plugin-native --release
+    ;;
+  Linux)
+    LIBPGLITE_NATIVE_LINK_PGLITE=1 cargo rustc -p libpglite-plugin-native --release --lib --crate-type staticlib
+    scripts/link-linux-native-plugin.sh \
+      "$manifest" \
+      "$target_dir/release/liblibpglite_plugin_native.a" \
+      "$plugin_binary"
+    ;;
+esac
 
 if [[ ! -f "$plugin_binary" ]]; then
   echo "expected plugin binary was not built: $plugin_binary" >&2
@@ -284,6 +299,7 @@ case "$(uname -s)" in
         awk '{print $3}' |
         sed 's/@@.*//' |
         sed 's/@.*//' |
+        grep -Ev '^LIBPGLITE_PLUGIN_NATIVE_[0-9]+$' |
         grep -Ev '^libpglite_plugin_' |
         grep -Fxv -f "$allowed_backend_exports" || true
     )"

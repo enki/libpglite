@@ -43,8 +43,11 @@ Current closure frontier:
   the native build lane is complete.
 - ADR-0004: still needs every root ADR closed before production packages can
   claim runtime-ready status.
-- ADR-0005: still needs Linux `pglitec.c` PIC proof and an upstream/carry
-  decision for the native portability patches.
+- ADR-0005: still needs the final upstream/carry decision for the native
+  portability patches and a passing Linux release preflight. The backend
+  archive now audits that PostgreSQL socket I/O binds to PGlite callback shims
+  instead of libc socket APIs, and Linux prepare forces the poll/self-pipe latch
+  path for the dummy PGlite socket descriptor.
 - ADR-0006: still needs Linux baseline automation through the Ubuntu
   environment in `../smolvm/` or an equivalent release container. A local
   `scripts/preflight-linux-smolvm.sh` entrypoint now exists for the
@@ -63,11 +66,10 @@ Current closure frontier:
   prefix contract and continued strict dependency-regression coverage.
 - ADR-0010: macOS release preflight now generates backend exports from the full
   packaged parity set, including common data symbols, and proves the modules
-  load through the globally loaded plugin. The Ubuntu smolvm lane reached the
-  final Linux plugin link and showed that Rust's generated cdylib version
-  script conflicts with a second GNU ld version script for generated backend
-  exports. Linux closure now needs one authoritative final-link/export boundary,
-  plus package/runtime proof and full-set stale-symbol regression coverage.
+  load through the globally loaded plugin. Linux now uses a Rust staticlib plus
+  one final GNU ld version-script boundary and filters the expected version node
+  from symbol diagnostics. It still needs a passing Ubuntu packaged-runtime
+  proof and full-set stale-symbol regression coverage before it can close.
 - ADR-0012: still needs production package enforcement for every
   release-critical diagnostic and Linux schema parity before it can close. The
   normal macOS preflight package path now carries controlled-prefix diagnostics,

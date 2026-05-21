@@ -33,6 +33,24 @@ class PreflightNativePluginReleaseTest(unittest.TestCase):
         self.assertIn(prepare, text)
         self.assertLess(text.index(build), text.index(prepare))
 
+    def test_linux_preflight_uses_staticlib_final_link_boundary(self):
+        text = SCRIPT.read_text()
+        self.assertIn("cargo rustc -p libpglite-plugin-native --release --lib --crate-type staticlib", text)
+        self.assertIn("scripts/link-linux-native-plugin.sh \\", text)
+        self.assertIn('"$target_dir/release/liblibpglite_plugin_native.a"', text)
+        self.assertIn('"$plugin_binary"', text)
+        self.assertLess(
+            text.index("cargo rustc -p libpglite-plugin-native --release --lib --crate-type staticlib"),
+            text.index("scripts/link-linux-native-plugin.sh \\"),
+        )
+        self.assertIn("grep -Ev '^LIBPGLITE_PLUGIN_NATIVE_[0-9]+$'", text)
+
+    def test_failed_conformance_prints_log_tail(self):
+        text = SCRIPT.read_text()
+        self.assertIn("conformance check failed: $name", text)
+        self.assertIn("last 200 log lines from $log_file", text)
+        self.assertIn('tail -n 200 "$log_file"', text)
+
 
 if __name__ == "__main__":
     unittest.main()

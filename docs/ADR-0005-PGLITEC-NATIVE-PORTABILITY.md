@@ -42,6 +42,8 @@ clear preprocessor gates.
 - Native and Emscripten behavior are both intentional and documented.
 - No native build script suppresses C portability errors with broad
   compatibility flags.
+- The release backend archive fails fast if PostgreSQL socket I/O binds to libc
+  calls that PGlite is expected to emulate through `pglitec.c`.
 - ADR-0002 can consume PGlite C support as a real native link input.
 
 ## Remaining Closure Criteria
@@ -52,6 +54,9 @@ clear preprocessor gates.
   and Linux.
 - The Linux compile proves the shared-memory portability gates in the same
   source path used by the release build.
+- The release prepare path proves backend objects reference the PGlite callback
+  transport shims (`pgl_recv`, `pgl_send`, `pgl_poll`, and related socket
+  wrappers) instead of the corresponding libc socket APIs.
 - The ADR records the final carry/upstream decision for each portability patch
   before moving to `docs/done/`.
 
@@ -69,3 +74,32 @@ clear preprocessor gates.
   Emscripten build, keeps native embedded mode from probing a nonexistent
   postmaster-death pipe, and preserves Emscripten behavior behind explicit
   preprocessor gates.
+- Linux native prepare now forces PostgreSQL's latch implementation onto the
+  poll/self-pipe path with `WAIT_USE_POLL` and `WAIT_USE_SELF_PIPE`. The
+  Emscripten lane already routes `poll()` through `pgl_poll`; native Linux must
+  avoid the epoll path because PGlite's callback transport uses a dummy socket
+  descriptor rather than a kernel socket fd.
+- The backend archive build now audits undefined symbols after archiving. It
+  rejects raw references to `recv`, `send`, `poll`, `connect`, `fcntl`,
+  `setsockopt`, `getsockopt`, or `getsockname`, and requires the corresponding
+  callback read/write shims to be present. The required-present set is
+  intentionally limited to shims exercised by the runtime transport path, while
+  raw libc socket references are rejected exactly when present. This turns the
+  callback transport binding into a build invariant without requiring optional
+  setup/authentication paths to stay linked.
+- Linux showed that command-line `-Drecv=pgl_recv` style overrides can be too
+  early for system socket prototypes. Native prepare now generates a forced
+  include header that includes `<sys/socket.h>`, `<poll.h>`, `<fcntl.h>`, and
+  `<setjmp.h>` before defining the PGlite socket and jump-call macros. That
+  keeps libc prototypes intact and redirects PostgreSQL call sites instead of
+  system declarations.
+- Linux runtime conformance then reached Postgres error recovery and exposed
+  another Emscripten-specific assumption: byte-comparing `jmp_buf` storage is
+  not a portable way to identify the top-level Postgres exception frame. The
+  native patch now compares the jump-buffer address instead, so the PGlite
+  top-level longjmp path is intercepted before glibc can attempt a real longjmp
+  into the returned single-user-main stack frame.
+- The backend archive audit now rejects raw `longjmp`, `siglongjmp`, and glibc
+  fortified jump symbols in addition to raw socket calls, and requires the
+  backend to reference `pgl_siglongjmp`. This keeps Linux from silently bypassing
+  the native error-recovery trap.

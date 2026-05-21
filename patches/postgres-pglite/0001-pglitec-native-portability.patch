@@ -17,6 +17,11 @@ index 9f3ec40..b3c9d23 100644
  // TODO: an include for libpglite
  #endif
  
+@@ -71,3 +74,3 @@
+ void EMSCRIPTEN_KEEPALIVE pgl_longjmp(jmp_buf env, int val) {
+-    if (is_pglite_active && memcmp(env, (void*)postgresmain_sigjmp_buf, sizeof(jmp_buf)) == 0) {
++    if (is_pglite_active && (void *) env == (void *) postgresmain_sigjmp_buf) {
+         // reset this as it is expected
 @@ -231,7 +234,11 @@
          pgl_stdout = NULL;
      }

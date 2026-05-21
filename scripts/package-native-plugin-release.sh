@@ -128,7 +128,13 @@ defined_symbols() {
   local binary="$1"
   case "$(uname -s)" in
     Darwin) nm -gU "$binary" | awk '{print $NF}' | sed 's/^_//' ;;
-    Linux) nm -D --defined-only "$binary" | awk '{print $NF}' | sed 's/@@.*//' | sed 's/@.*//' ;;
+    Linux)
+      nm -D --defined-only "$binary" |
+        awk '{print $NF}' |
+        sed 's/@@.*//' |
+        sed 's/@.*//' |
+        grep -Ev '^LIBPGLITE_PLUGIN_NATIVE_[0-9]+$'
+      ;;
     *) return 2 ;;
   esac
 }

@@ -4,6 +4,7 @@ import json
 import pathlib
 import tempfile
 import unittest
+from unittest import mock
 
 
 SCRIPT = pathlib.Path(__file__).with_name("doctor-native-plugin-package.py")
@@ -192,6 +193,17 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "pluginDefinedSymbols is stale; missing actual plugin symbols",
             "\n".join(doctor.errors),
         )
+
+    def test_defined_symbols_filters_linux_gnu_version_node(self):
+        class Uname:
+            sysname = "Linux"
+
+        completed = mock.Mock(stdout="00000000 A LIBPGLITE_PLUGIN_NATIVE_1\n00000000 T libpglite_plugin_abi_version@@LIBPGLITE_PLUGIN_NATIVE_1\n")
+        with mock.patch.object(doctor_module.os, "uname", return_value=Uname()):
+            with mock.patch.object(doctor_module.subprocess, "run", return_value=completed):
+                symbols = doctor_module.defined_symbols(pathlib.Path("plugin.so"))
+
+        self.assertEqual(symbols, {"libpglite_plugin_abi_version"})
 
     def test_backend_symbol_diagnostic_must_match_native_manifest(self):
         tempdir, doctor = self.make_doctor(

@@ -918,6 +918,8 @@ def defined_symbols(binary: pathlib.Path) -> set[str]:
             continue
         symbol = parts[-1].removeprefix("_")
         symbol = symbol.split("@", 1)[0]
+        if re.fullmatch(r"LIBPGLITE_PLUGIN_NATIVE_[0-9]+", symbol):
+            continue
         symbols.add(symbol)
     return symbols
 
