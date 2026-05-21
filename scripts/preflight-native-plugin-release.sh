@@ -13,6 +13,7 @@ Runs local release-boundary checks:
   - crate tests
   - ADR closure audit
   - dynamic-loading check
+  - pinned native dependency prefix build
   - pinned postgres-pglite native PIC archive build
   - native plugin build linked against those archives
   - native plugin symbol-boundary checks
@@ -53,6 +54,7 @@ require rustc
 require python3
 require zstd
 require nm
+require cmake
 
 cd "$repo_root"
 
@@ -168,12 +170,22 @@ python3 scripts/test-fetch-native-dependency-sources.py
 python3 scripts/test-generate-native-dependency-manifest.py
 python3 scripts/test-inventory-native-pglite-extensions.py
 python3 scripts/test-materialize-native-pglite-other-extensions.py
+python3 scripts/test-preflight-native-plugin-release.py
 
 echo "==> preflight ${release_version}: dynamic-loading check"
 cargo check --features dynamic-loading,client-tokio-postgres
 
+dependency_prefix="${LIBPGLITE_NATIVE_DEPENDENCY_PREFIX:-"$repo_root/target/native-pglite/dependency-prefix"}"
+case "$dependency_prefix" in
+  /*) ;;
+  *) dependency_prefix="$repo_root/$dependency_prefix" ;;
+esac
+
+echo "==> preflight ${release_version}: pinned native dependency prefix"
+scripts/build-native-dependency-prefix.sh --prefix "$dependency_prefix"
+
 echo "==> preflight ${release_version}: pinned postgres-pglite native archive build"
-scripts/prepare-native-pglite-link.sh --build-postgres
+scripts/prepare-native-pglite-link.sh --build-postgres --dependency-prefix "$dependency_prefix"
 manifest="$repo_root/target/native-pglite/$(rustc -vV | awk -F': ' '$1 == "host" {print $2}')/libpglite_native_link_manifest.txt"
 initdb_binary="$(awk -F= '$1 == "initdb_binary" {print substr($0, length($1) + 2)}' "$manifest")"
 postgres_lib_dir="$(awk -F= '$1 == "postgres_lib_dir" {print substr($0, length($1) + 2)}' "$manifest")"

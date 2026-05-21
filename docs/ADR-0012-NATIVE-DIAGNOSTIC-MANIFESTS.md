@@ -122,6 +122,16 @@ actual plugin and prefix contents.
   diagnostic SHA-256. That proves the prepare stage can make a falsifiable
   dependency claim, but this ADR stays open until production packages require
   and doctor-check the same claim from the final artifact.
+- Native preflight now enters packaging through that dependency-prefixed
+  manifest path by default, so the final package doctor sees the controlled
+  prefix diagnostic during the normal macOS release gate instead of only in a
+  manual smoke command.
+- The macOS `v0.1.0` preflight passed with that default path. The produced
+  package contains `diagnostics/native-dependency-prefix.json`, the bundle
+  manifest references it, and the strict package doctor/self-test accepted the
+  final `.tar.zst` artifact. The doctor still warns, but does not fail
+  development artifacts, for missing PGlite `other_extensions`; production mode
+  remains the hard gate for that parity gap.
 - Native dependency sources now have a structured
   `libpglite-native-dependency-sources-v1` fetch manifest with archive hashes
   and exact git commits. That manifest is build-stage evidence today; it should

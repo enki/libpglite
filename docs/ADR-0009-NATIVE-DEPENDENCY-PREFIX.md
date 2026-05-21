@@ -60,9 +60,6 @@ libraries or runtime data.
 
 ## Remaining Closure Criteria
 
-- Dependency-prefixed native prepare is promoted from an explicit smoke path to
-  the default production release path, and packaging copies its complete
-  `libpglite-native-dependency-prefix-v1` diagnostic into the package.
 - `pgcrypto` links against the controlled OpenSSL inputs and works from the
   packaged artifact without an external OpenSSL install.
 - PostGIS links against controlled GEOS, PROJ, json-c, SQLite, and related
@@ -88,6 +85,16 @@ libraries or runtime data.
   modules including `pgcrypto.dylib`, `uuid-ossp.dylib`, and `pgxml.dylib`
   without Homebrew dylib dependencies. `otool -L` reports only
   `/usr/lib/libSystem.B.dylib` for those modules.
+- Native preflight now builds the pinned controlled dependency prefix and passes
+  it to `scripts/prepare-native-pglite-link.sh --build-postgres` by default.
+  Packaging already copies the resulting complete prefix diagnostic into the
+  package and the doctor requires it to be complete when present.
+- `scripts/preflight-native-plugin-release.sh v0.1.0` passed on macOS through
+  that default path. The generated native link manifest records
+  `native_dependency_provider=libpglite-prefix`, a complete static-only
+  dependency-prefix diagnostic, and `macos_deployment_target=11.0`; the packaged
+  artifact includes `diagnostics/native-dependency-prefix.json` and passed the
+  strict package doctor/self-test.
 
 ## Implementation Notes
 
@@ -172,11 +179,11 @@ libraries or runtime data.
   just textually.
 - This is still not the final dependency-prefix implementation: the checked-in
   inventory, source fetcher, compile-stage entrypoint, and prefix descriptor
-  define the contract, and the clean macOS full-prefix smoke now passes. The
-  remaining closure work is making this prefix the default release link path,
-  proving `pgcrypto` and PostGIS from the packaged artifact, and then repeating
-  the prefix contract on Linux. OpenSSL is still copied from the local provider
-  for default macOS development packaging.
+  define the contract, and the clean macOS full-prefix smoke now passes. Native
+  preflight now uses this prefix by default for macOS. The remaining closure
+  work is proving `pgcrypto` and PostGIS from the packaged artifact across the
+  final extension surface, tightening strict diagnostics over that full surface,
+  and then repeating the prefix contract on Linux.
 - PGlite's WASM build extracts export-symbol lists from dependency archives for
   Emscripten. Native builds do not need the same files verbatim, but they do
   need equivalent link/export discipline for extension module loading.

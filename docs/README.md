@@ -52,14 +52,16 @@ Current closure frontier:
   packaged artifacts, and promotion of the opt-in extension build into release
   preflight. The dependency-prefixed macOS prepare now builds PostgreSQL
   `contrib` modules including `pgcrypto`, `uuid-ossp`, and `xml2`.
-- ADR-0009: still needs the controlled dependency prefix to become the default
-  production release link/package path, plus packaged `pgcrypto` and PostGIS
-  proof. The clean macOS dependency prefix and an explicit dependency-prefixed
-  Postgres/contrib prepare now complete with a complete, static-only prefix
-  diagnostic.
+- ADR-0009: still needs packaged `pgcrypto` and PostGIS proof, strict
+  dependency diagnostics across the final extension surface, and the Linux
+  prefix contract. The macOS preflight path now builds the clean controlled
+  dependency prefix by default, feeds it into Postgres/contrib prepare, packages
+  the complete static-only prefix diagnostic, and passes the strict package
+  doctor/self-test.
 - ADR-0010: still needs stale-symbol checks against the full extension parity
   set and Linux export/version-script coverage.
 - ADR-0012: still needs production package enforcement for every
   release-critical diagnostic and Linux schema parity before it can close. The
-  dependency-prefixed prepare now records the controlled prefix diagnostic and
-  checksum, but final-artifact doctor enforcement is still the closing line.
+  normal macOS preflight package path now carries the controlled prefix
+  diagnostic and checksum into the final-artifact doctor, and the `v0.1.0`
+  macOS preflight proved that path end to end.
