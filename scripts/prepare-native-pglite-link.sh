@@ -5,6 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source_dir="${LIBPGLITE_POSTGRES_SOURCE_DIR:-}"
 out="${LIBPGLITE_NATIVE_LINK_MANIFEST:-}"
 build_postgres="${LIBPGLITE_BUILD_POSTGRES:-0}"
+fetch_other_extensions="${LIBPGLITE_FETCH_OTHER_EXTENSIONS:-0}"
 
 if [[ "$(uname -s)" == "Darwin" && -z "${MACOSX_DEPLOYMENT_TARGET:-}" ]]; then
   export MACOSX_DEPLOYMENT_TARGET=11.0
@@ -12,7 +13,7 @@ fi
 
 usage() {
   cat >&2 <<'USAGE'
-usage: scripts/prepare-native-pglite-link.sh [--source-dir <path>] [--out <manifest>] [--build-postgres]
+usage: scripts/prepare-native-pglite-link.sh [--source-dir <path>] [--out <manifest>] [--build-postgres] [--fetch-other-extensions]
 
 Validates the pinned postgres-pglite source substrate and writes a native link
 manifest. By default it validates the source and compiles PGlite-specific C
@@ -23,6 +24,7 @@ Environment:
   LIBPGLITE_POSTGRES_SOURCE_DIR=<path>
   LIBPGLITE_NATIVE_LINK_MANIFEST=<path>
   LIBPGLITE_BUILD_POSTGRES=1
+  LIBPGLITE_FETCH_OTHER_EXTENSIONS=1
   LIBPGLITE_NATIVE_MAKE_JOBS=<jobs>
   MACOSX_DEPLOYMENT_TARGET=<version>  default: 11.0 on Darwin
 USAGE
@@ -40,6 +42,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --build-postgres)
       build_postgres=1
+      shift
+      ;;
+    --fetch-other-extensions)
+      fetch_other_extensions=1
       shift
       ;;
     -h|--help)
@@ -174,6 +180,12 @@ fi
 python3 "$repo_root/scripts/inventory-native-pglite-extensions.py" \
   --source-dir "$source_dir" \
   --out "$extension_inventory"
+
+if [[ "$fetch_other_extensions" == "1" ]]; then
+  python3 "$repo_root/scripts/materialize-native-pglite-other-extensions.py" \
+    --inventory "$extension_inventory" \
+    --out-root "$patched_source"
+fi
 
 pglitec_object="$object_dir/pglitec.o"
 cc -fPIC -O2 -DNDEBUG \

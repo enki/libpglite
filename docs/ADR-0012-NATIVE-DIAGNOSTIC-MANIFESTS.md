@@ -121,6 +121,10 @@ actual plugin and prefix contents.
   visible as development warnings. The inventory now records each
   `other_extensions` gitlink commit and submodule URL, and the doctor fails any
   package whose PGlite extension provenance is unknown.
+- The materialization step for PGlite `other_extensions` consumes the same
+  inventory that is packaged as diagnostics. This keeps fetch/build inputs and
+  package claims tied to one generated source of truth instead of separate
+  handwritten extension lists.
 - The package now includes a structured runtime lifecycle diagnostic. The doctor
   validates that it matches the current single-start-per-process contract and
   cites raw protocol conformance as evidence.

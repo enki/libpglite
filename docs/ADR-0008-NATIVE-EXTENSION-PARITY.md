@@ -129,6 +129,13 @@ PGlite-shipped extension.
   `postgis`, and `vector` each carry exact commits and URLs. Full parity
   requires fetching or vendoring those exact commits before native extension
   builds can be made release-gating.
+- `scripts/materialize-native-pglite-other-extensions.py` is the native build
+  substrate for that fetch step. It reads the generated inventory, refuses
+  unpinned entries, and populates `pglite/other_extensions/<name>` in the
+  patched source tree at the recorded commit. `prepare-native-pglite-link.sh`
+  exposes this behind `--fetch-other-extensions` /
+  `LIBPGLITE_FETCH_OTHER_EXTENSIONS=1`; it is opt-in until the native
+  `other_extensions` build itself is wired into preflight.
 - The package doctor now validates inventoried PostgreSQL `contrib` extensions
   beyond control-file presence: it checks each extension's `default_version`
   SQL and verifies native `$libdir`/`MODULE_PATHNAME` modules are present in the
