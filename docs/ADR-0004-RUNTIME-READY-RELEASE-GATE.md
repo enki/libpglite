@@ -34,6 +34,13 @@ Runtime-ready release status requires:
 - deterministic shutdown tested
 - high-level Rust PostgreSQL client transport tested
 
+The macOS native smoke now covers part of this list through raw protocol tests,
+including startup, simple query, a basic extended-query flow, transaction
+rollback, protocol error recovery, contrib extension loading, and deterministic
+shutdown. Runtime-ready status remains blocked on broader conformance, high-level
+client transport, full extension parity, Linux coverage, packaging relocatability,
+and the explicit lifecycle contract in ADR-0011.
+
 ## Required Work
 
 1. Keep package metadata explicit about `runtimeStatus`.
@@ -52,4 +59,3 @@ Runtime-ready release status requires:
   iteration.
 - ADR-0004 moves to `docs/done/` only after runtime-ready release gating is
   enforced by commands, not by convention.
-

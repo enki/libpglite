@@ -80,5 +80,6 @@ PostgreSQL with an actionable Rust initialization error.
   calling into PostgreSQL. This is an explicit temporary lifecycle contract, not
   the desired final restart behavior.
 - The dynamic plugin test now verifies that startup, simple query, `citext`,
-  `pgcrypto`, and shutdown all work in one runtime, then verifies that a second
-  open returns an actionable Rust error instead of aborting the process.
+  `pgcrypto`, transaction rollback, protocol error recovery, a basic
+  extended-query flow, and shutdown all work in one runtime, then verifies that
+  a second open returns an actionable Rust error instead of aborting the process.

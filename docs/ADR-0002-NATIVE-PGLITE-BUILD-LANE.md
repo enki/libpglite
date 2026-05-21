@@ -87,10 +87,12 @@ The native lane must preserve the PGlite runtime model:
   exporting the `libpglite_plugin_*` ABI symbols and the generated backend
   symbol set needed by bundled PostgreSQL extension modules. Other Postgres and
   `libpglite_native_*` symbols remain local implementation details.
-- The native runtime now has a macOS smoke path through the dynamic plugin:
-  initialize a clean data directory with the generated Postgres prefix, install
-  PGlite read/write callbacks, start the single-user backend, process a
-  PostgreSQL startup packet, execute a raw simple query protocol message, and
-  shut down.
-- Runtime recovery, extended query protocol, transaction, error recovery,
-  extension, packaging, and Linux conformance remain open.
+- The native runtime now has a macOS conformance path through the dynamic
+  plugin: initialize a clean data directory with the generated Postgres prefix,
+  install PGlite read/write callbacks, start the single-user backend, process a
+  PostgreSQL startup packet, execute raw simple query messages, exercise
+  transaction rollback, recover after a backend protocol error, execute a basic
+  extended-query flow, create contrib extensions, and shut down.
+- Broader extended-query coverage, richer transaction/error cases, full
+  extension parity, packaging hardening, restart lifecycle, and Linux
+  conformance remain open.

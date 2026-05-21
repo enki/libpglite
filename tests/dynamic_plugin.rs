@@ -45,6 +45,40 @@ fn dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_
     assert_message_type(&query_response, b'C');
     assert_message_type(&query_response, b'Z');
 
+    let transaction_response = runtime
+        .exec_protocol_raw(&query_message(
+            "begin; create table tx_smoke(value int); insert into tx_smoke values (7); rollback; select to_regclass('tx_smoke') is null",
+        ))
+        .expect("transaction query succeeds");
+    assert_no_error_message(&transaction_response);
+    assert_message_type(&transaction_response, b'D');
+    assert_message_type(&transaction_response, b'C');
+    assert_message_type(&transaction_response, b'Z');
+
+    let error_response = runtime
+        .exec_protocol_raw(&query_message("select missing_column from missing_table"))
+        .expect("protocol error is returned as backend response");
+    assert_message_type(&error_response, b'E');
+    assert_message_type(&error_response, b'Z');
+
+    let recovery_response = runtime
+        .exec_protocol_raw(&query_message("select 42"))
+        .expect("query after protocol error succeeds");
+    assert_no_error_message(&recovery_response);
+    assert_message_type(&recovery_response, b'D');
+    assert_message_type(&recovery_response, b'Z');
+
+    let extended_response = runtime
+        .exec_protocol_raw(&extended_query_message("select 5::int4"))
+        .expect("extended query succeeds");
+    assert_no_error_message(&extended_response);
+    assert_message_type(&extended_response, b'1');
+    assert_message_type(&extended_response, b'2');
+    assert_message_type(&extended_response, b'T');
+    assert_message_type(&extended_response, b'D');
+    assert_message_type(&extended_response, b'C');
+    assert_message_type(&extended_response, b'Z');
+
     let citext_response = runtime
         .exec_protocol_raw(&query_message(
             "create extension citext; select 'pglite'::citext = 'PGLITE'::citext",
@@ -133,6 +167,43 @@ fn query_message(sql: &str) -> Vec<u8> {
     message.extend_from_slice(sql.as_bytes());
     message.push(0);
     message
+}
+
+fn extended_query_message(sql: &str) -> Vec<u8> {
+    let mut message = Vec::new();
+
+    let mut parse = Vec::new();
+    push_cstr(&mut parse, "");
+    push_cstr(&mut parse, sql);
+    parse.extend_from_slice(&0u16.to_be_bytes());
+    push_tagged_message(&mut message, b'P', &parse);
+
+    let mut bind = Vec::new();
+    push_cstr(&mut bind, "");
+    push_cstr(&mut bind, "");
+    bind.extend_from_slice(&0u16.to_be_bytes());
+    bind.extend_from_slice(&0u16.to_be_bytes());
+    bind.extend_from_slice(&0u16.to_be_bytes());
+    push_tagged_message(&mut message, b'B', &bind);
+
+    let mut describe = Vec::new();
+    describe.push(b'P');
+    push_cstr(&mut describe, "");
+    push_tagged_message(&mut message, b'D', &describe);
+
+    let mut execute = Vec::new();
+    push_cstr(&mut execute, "");
+    execute.extend_from_slice(&0u32.to_be_bytes());
+    push_tagged_message(&mut message, b'E', &execute);
+
+    push_tagged_message(&mut message, b'S', &[]);
+    message
+}
+
+fn push_tagged_message(buffer: &mut Vec<u8>, tag: u8, body: &[u8]) {
+    buffer.push(tag);
+    buffer.extend_from_slice(&((body.len() + 4) as u32).to_be_bytes());
+    buffer.extend_from_slice(body);
 }
 
 fn push_cstr(buffer: &mut Vec<u8>, value: &str) {
