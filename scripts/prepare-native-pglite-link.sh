@@ -67,6 +67,7 @@ require patch
 require make
 require ar
 require tar
+require python3
 
 pin_file="$repo_root/PGLITE_POSTGRES_SOURCE"
 if [[ ! -f "$pin_file" ]]; then
@@ -144,6 +145,7 @@ fi
 build_dir="$(dirname "$out")"
 patched_source="$build_dir/patched-postgres-pglite"
 object_dir="$build_dir/objects"
+extension_inventory="$build_dir/libpglite_native_extension_inventory.txt"
 mkdir -p "$build_dir" "$object_dir"
 
 patch_fingerprint="$(cd "$repo_root" && git hash-object patches/postgres-pglite/*.patch | git hash-object --stdin)"
@@ -160,6 +162,10 @@ if [[ ! -f "$patched_source_fingerprint_file" || "$(cat "$patched_source_fingerp
   done
   printf '%s\n' "$patched_source_fingerprint" >"$patched_source_fingerprint_file"
 fi
+
+python3 "$repo_root/scripts/inventory-native-pglite-extensions.py" \
+  --source-dir "$source_dir" \
+  --out "$extension_inventory"
 
 pglitec_object="$object_dir/pglitec.o"
 cc -fPIC -O2 -DNDEBUG \
@@ -307,6 +313,13 @@ fi
   echo "source_commit=$source_commit"
   echo "source_dir=$source_dir"
   echo "patched_source_dir=$patched_source"
+  echo "extension_inventory=$extension_inventory"
+  while IFS= read -r inventory_line; do
+    case "$inventory_line" in
+      format=*) ;;
+      *) echo "extension_$inventory_line" ;;
+    esac
+  done <"$extension_inventory"
   if [[ "$build_postgres" == "1" ]]; then
     echo "status=native-postgres-archive-built"
   else

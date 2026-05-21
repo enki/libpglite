@@ -100,3 +100,10 @@ PGlite-shipped extension.
   used by PGlite and is part of the required parity set.
 - PostGIS should be handled as a first-class parity requirement even though it
   requires third-party library and data packaging.
+- `scripts/inventory-native-pglite-extensions.py` derives a native extension
+  inventory from the pinned PGlite source and records it in the native link
+  manifest. It currently shows the PGlite `other_extensions` as required
+  submodules with explicit present/missing status.
+- The current local pinned source has unpopulated `pglite/other_extensions`
+  submodules. Full parity requires fetching or vendoring those exact submodule
+  commits before native extension builds can be made release-gating.
