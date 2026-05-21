@@ -73,6 +73,22 @@ actual plugin and prefix contents.
 - This ADR moves to `docs/done/` only after the package doctor owns all
   release-critical manifest checks that preflight depends on.
 
+## Remaining Closure Criteria
+
+- Every release-critical gate emits structured diagnostics copied into the
+  package, including source provenance, patches, platform floor, dependency
+  prefix, extension inventory, backend exports, public ABI, lifecycle, and
+  conformance results.
+- The package doctor validates those diagnostics against the actual packaged
+  plugin and prefix without source checkout access.
+- The doctor has regression tests for stale, missing, malformed, and
+  contradicted diagnostics across source provenance, symbols, dependencies,
+  extension inventory, lifecycle, and conformance.
+- Linux dependency diagnostics use the same JSON schema as macOS with
+  platform-specific tool details captured as data.
+- Production packaging and strict preflight fail when any release-critical
+  diagnostic is absent or contradicted by the artifact.
+
 ## Implementation Notes
 
 - Development packaging now includes a top-level `diagnostics/` directory inside

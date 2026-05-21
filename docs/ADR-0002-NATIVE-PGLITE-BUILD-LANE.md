@@ -59,6 +59,21 @@ The native lane must preserve the PGlite runtime model:
 - No JavaScript, Emscripten module object, or wasm runtime is required by the
   production native plugin.
 
+## Remaining Closure Criteria
+
+- `scripts/preflight-native-plugin-release.sh <version>` passes on macOS with
+  native Postgres/PGlite linked and with the final package doctor self-test
+  exercising the packaged artifact.
+- The same native link and conformance path passes on Linux in the documented
+  baseline environment.
+- Raw protocol conformance covers startup, simple query, extended query,
+  transaction success, transaction rollback, recoverable protocol error, and
+  deterministic shutdown from the dynamic plugin.
+- The high-level Rust client transport runs against the same dynamic plugin and
+  packaged prefix used by the raw protocol checks.
+- Production packaging contains no JavaScript, Emscripten module object, wasm
+  runtime, or wasm2c fallback input.
+
 ## Implementation Notes
 
 - The source snapshot is pinned in `PGLITE_POSTGRES_SOURCE`.

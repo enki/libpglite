@@ -43,6 +43,18 @@ still need an explicitly documented Linux baseline.
 - Changing the deployment target forces a native Postgres rebuild.
 - Linux release preflight runs in a documented baseline environment.
 
+## Remaining Closure Criteria
+
+- macOS preflight records one deployment target in the native link manifest and
+  package provenance, and no linked native C input reports a mismatched floor.
+- Changing `MACOSX_DEPLOYMENT_TARGET` forces a native Postgres/PGlite rebuild
+  instead of reusing stale objects.
+- The Linux baseline is documented as a concrete distro/toolchain/libc contract
+  and validated through the Ubuntu environment in `../smolvm/` or an equivalent
+  release container.
+- Linux preflight records the selected baseline in diagnostics and rejects
+  artifacts built outside that baseline.
+
 ## Implementation Notes
 
 - `scripts/prepare-native-pglite-link.sh` now defaults

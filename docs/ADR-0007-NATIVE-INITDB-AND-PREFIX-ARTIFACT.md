@@ -45,6 +45,18 @@ the plugin or provide an equivalent generated artifact.
 - Runtime open can initialize a missing data directory and resume an existing
   one.
 
+## Remaining Closure Criteria
+
+- The packaged `postgres/` prefix contains every runtime file needed by the
+  final extension parity set, not only the current contrib subset.
+- Package doctor self-test initializes a missing data directory from the
+  packaged prefix and resumes it from a later process without build-tree
+  environment variables.
+- Strict package diagnostics reject build-machine absolute paths in prefix
+  metadata, extension SQL/control files, loadable module paths, and runtime data
+  references.
+- The prefix layout remains stable across macOS and Linux packages.
+
 ## Implementation Notes
 
 - `scripts/prepare-native-pglite-link.sh --build-postgres` now installs a

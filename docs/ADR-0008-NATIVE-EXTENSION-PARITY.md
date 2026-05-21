@@ -106,6 +106,21 @@ PGlite-shipped extension.
 - This ADR moves to `docs/done/` only after the full inventoried parity set is
   built, packaged, and exercised from the packaged artifact.
 
+## Remaining Closure Criteria
+
+- The native inventory is generated from the pinned `postgres-pglite` source and
+  fails preflight on unpinned, missing-URL, added, or removed PGlite extension
+  entries.
+- Release preflight fetches/materializes and builds every inventoried
+  `pglite/other_extensions` entry, including `vector` and PostGIS.
+- PostGIS is built with the controlled native dependency prefix and packaged
+  with its required GEOS, PROJ, json-c, SQLite, and projection-data payload.
+- Packaged-artifact conformance runs `CREATE EXTENSION` for the full parity set,
+  including `vector` and `postgis`.
+- The package doctor rejects any extension whose control file, default-version
+  SQL, loadable module, dependency library, or required data payload is absent or
+  non-relocatable.
+
 ## Implementation Notes
 
 - ADR-0002 still owns the core native backend link model. This ADR expands the

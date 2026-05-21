@@ -74,3 +74,16 @@ moved to `docs/done/` and the remaining package diagnostics pass.
   iteration.
 - ADR-0004 moves to `docs/done/` only after runtime-ready release gating is
   enforced by commands, not by convention.
+
+## Remaining Closure Criteria
+
+- All root `docs/ADR-*.md` records have moved to `docs/done/` with their own
+  acceptance evidence intact.
+- Production packaging fails while any release-gating ADR remains open, for
+  example:
+  `LIBPGLITE_RELEASE_MODE=production scripts/package-native-plugin-release.sh <version> <target>`.
+- Once the other release-gating ADRs are done, production packaging sets
+  `runtimeStatus=runtime-ready` only after native preflight has produced passing
+  packaged-artifact conformance diagnostics.
+- The package doctor rejects missing, stale, or failing conformance diagnostics
+  for a production runtime-ready package.

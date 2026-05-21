@@ -71,6 +71,19 @@ set changes.
 - Release preflight fails if the generated backend-symbol set is stale relative
   to the packaged extension modules.
 
+## Remaining Closure Criteria
+
+- The backend export set is generated from every packaged extension module in
+  the final parity set, not only the current contrib subset.
+- macOS preflight proves the plugin exports the generated backend symbols while
+  keeping unrelated implementation symbols hidden from the public host ABI.
+- Linux preflight implements the equivalent export/version-script contract and
+  proves bundled extension modules resolve against the globally loaded plugin.
+- The package doctor fails on stale backend-symbol diagnostics, missing exported
+  backend symbols, and extension modules with unresolved backend references.
+- Packaged-artifact conformance creates representative extension modules that
+  require backend symbol resolution, including `pgcrypto` and PostGIS.
+
 ## Implementation Notes
 
 - This ADR refines ADR-0002's native build lane and ADR-0008's extension parity

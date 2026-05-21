@@ -58,6 +58,23 @@ libraries or runtime data.
 - Release preflight rejects absolute build-machine dependency paths in plugin,
   extension, and metadata artifacts.
 
+## Remaining Closure Criteria
+
+- A macOS command builds the full pinned dependency prefix from
+  `deps/native-pglite-dependencies.json` without Homebrew libraries in the
+  release link path.
+- `scripts/prepare-native-pglite-link.sh --dependency-prefix <prefix>
+  --build-postgres` is the release path, and the resulting manifest records a
+  complete `libpglite-native-dependency-prefix-v1` diagnostic.
+- `pgcrypto` links against the controlled OpenSSL inputs and works from the
+  packaged artifact without an external OpenSSL install.
+- PostGIS links against controlled GEOS, PROJ, json-c, SQLite, and related
+  dependency/data inputs and works from the packaged artifact.
+- Strict package diagnostics reject host-provider, build-machine, external, or
+  unresolved dependency paths in plugin and extension modules.
+- The same prefix contract is implemented for the Linux baseline after macOS is
+  closed.
+
 ## Implementation Notes
 
 - This ADR owns the dependency prefix. ADR-0007 owns the Postgres runtime prefix.

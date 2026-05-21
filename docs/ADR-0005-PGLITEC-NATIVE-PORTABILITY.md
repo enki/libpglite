@@ -44,6 +44,17 @@ clear preprocessor gates.
   compatibility flags.
 - ADR-0002 can consume PGlite C support as a real native link input.
 
+## Remaining Closure Criteria
+
+- The carried PGlite native patch set is reduced to documented, fingerprinted
+  source patches applied by `scripts/prepare-native-pglite-link.sh`.
+- `pglitec.c` compiles as PIC without broad permissive compiler flags on macOS
+  and Linux.
+- The Linux compile proves the shared-memory portability gates in the same
+  source path used by the release build.
+- The ADR records the final carry/upstream decision for each portability patch
+  before moving to `docs/done/`.
+
 ## Implementation Notes
 
 - The carried patch keeps Emscripten behavior unchanged while routing native
