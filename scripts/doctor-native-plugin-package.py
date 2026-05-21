@@ -84,6 +84,7 @@ class Doctor:
         self.validate_plugin()
         self.validate_postgres_prefix()
         self.validate_diagnostics()
+        self.validate_source_provenance()
         self.validate_lifecycle()
         self.validate_conformance()
         self.validate_extensions()
@@ -224,6 +225,72 @@ class Doctor:
                 self.errors.append(
                     f"pluginDefinedSymbols is missing ABI symbols: {', '.join(missing)}"
                 )
+
+    def validate_source_provenance(self) -> None:
+        path = self.diagnostic_path("sourceProvenance")
+        if path is None:
+            return
+        try:
+            with path.open() as handle:
+                provenance = json.load(handle)
+        except Exception as err:
+            self.errors.append(f"source provenance diagnostic is not readable: {err}")
+            return
+        if not isinstance(provenance, dict):
+            self.errors.append("source provenance diagnostic root must be an object")
+            return
+        if provenance.get("format") != "libpglite-native-source-provenance-v1":
+            self.errors.append("source provenance diagnostic has wrong format")
+        postgres_pglite = provenance.get("postgresPglite")
+        if not isinstance(postgres_pglite, dict):
+            self.errors.append("source provenance postgresPglite must be an object")
+        else:
+            for key in ["repository", "ref", "commit"]:
+                value = postgres_pglite.get(key)
+                if not isinstance(value, str) or not value:
+                    self.errors.append(f"source provenance postgresPglite.{key} is missing")
+            commit = postgres_pglite.get("commit")
+            if isinstance(commit, str) and not re.fullmatch(r"[0-9a-f]{40}", commit):
+                self.errors.append("source provenance postgresPglite.commit is not a full SHA-1")
+
+        patches = provenance.get("patches")
+        if not isinstance(patches, list) or not patches:
+            self.errors.append("source provenance patches must be a nonempty list")
+            return
+
+        native_manifest = self.diagnostic_path("nativeLinkManifest")
+        manifest_patch_paths: set[str] = set()
+        if native_manifest is not None:
+            for line in nonempty_lines(native_manifest, self.errors):
+                if line.startswith("patch="):
+                    manifest_patch_paths.add(line.split("=", 1)[1])
+
+        seen_paths: set[str] = set()
+        for patch in patches:
+            if not isinstance(patch, dict):
+                self.errors.append("source provenance patch entry must be an object")
+                continue
+            rel = patch.get("path")
+            digest = patch.get("sha256")
+            if not isinstance(rel, str) or not rel:
+                self.errors.append("source provenance patch.path is missing")
+            elif rel in seen_paths:
+                self.errors.append(f"source provenance repeats patch path: {rel}")
+            else:
+                seen_paths.add(rel)
+            if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+                self.errors.append(f"source provenance patch has invalid sha256: {rel}")
+
+        missing = sorted(manifest_patch_paths - seen_paths)
+        extra = sorted(seen_paths - manifest_patch_paths)
+        if missing:
+            self.errors.append(
+                f"source provenance is missing native manifest patches: {', '.join(missing)}"
+            )
+        if extra:
+            self.errors.append(
+                f"source provenance lists patches absent from native manifest: {', '.join(extra)}"
+            )
 
     def validate_lifecycle(self) -> None:
         path = self.diagnostic_path("runtimeLifecycle")

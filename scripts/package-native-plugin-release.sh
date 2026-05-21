@@ -352,6 +352,41 @@ defined_symbols "$binary_stage/$expected_plugin" | LC_ALL=C sort -u >"$diagnosti
 awk -F= '$1 == "backend_export_symbol" {print substr($0, length($1) + 2)}' "$native_manifest" \
   | LC_ALL=C sort -u >"$diagnostics_stage/backend-export-symbols.txt"
 dependency_report "$diagnostics_stage/dependencies.txt" "$binary_stage" "$binary_stage/$expected_plugin" "$binary_stage/postgres/lib"
+python3 - "$repo_root" "$native_manifest" "$diagnostics_stage/source-provenance.json" <<'PY'
+import hashlib
+import json
+import pathlib
+import sys
+
+repo_root = pathlib.Path(sys.argv[1])
+native_manifest = pathlib.Path(sys.argv[2])
+out = pathlib.Path(sys.argv[3])
+
+values: dict[str, list[str]] = {}
+for line in native_manifest.read_text().splitlines():
+    if "=" not in line:
+        continue
+    key, value = line.split("=", 1)
+    values.setdefault(key, []).append(value)
+
+patches = []
+for rel in values.get("patch", []):
+    path = repo_root / rel
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    patches.append({"path": rel, "sha256": digest})
+
+provenance = {
+    "format": "libpglite-native-source-provenance-v1",
+    "postgresPglite": {
+        "repository": values.get("source_repository", [""])[0],
+        "ref": values.get("source_ref", [""])[0],
+        "commit": values.get("source_commit", [""])[0],
+    },
+    "patchFingerprint": values.get("patch_fingerprint", [""])[0],
+    "patches": patches,
+}
+out.write_text(json.dumps(provenance, indent=2, sort_keys=True) + "\n")
+PY
 python3 - "$diagnostics_stage/runtime-lifecycle.json" <<'PY'
 import json
 import pathlib
@@ -430,6 +465,7 @@ bundle = {
         "pluginDefinedSymbols": "diagnostics/plugin-defined-symbols.txt",
         "backendExportSymbols": "diagnostics/backend-export-symbols.txt",
         "dependencies": "diagnostics/dependencies.txt",
+        "sourceProvenance": "diagnostics/source-provenance.json",
         "runtimeLifecycle": "diagnostics/runtime-lifecycle.json",
         "conformanceResults": "diagnostics/conformance",
     },

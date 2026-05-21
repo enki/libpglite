@@ -77,6 +77,7 @@ actual plugin and prefix contents.
   - `diagnostics/plugin-defined-symbols.txt`
   - `diagnostics/backend-export-symbols.txt`
   - `diagnostics/dependencies.txt`
+  - `diagnostics/source-provenance.json`
   - `diagnostics/runtime-lifecycle.json`
 - `dependencies.txt` is generated with `otool -L` on macOS and `ldd` on Linux.
   This currently exposes remaining relocatability weaknesses, including absolute
@@ -112,6 +113,10 @@ actual plugin and prefix contents.
 - The package now includes a structured runtime lifecycle diagnostic. The doctor
   validates that it matches the current single-start-per-process contract and
   cites raw protocol conformance as evidence.
+- The native link manifest and packaged diagnostics now include structured
+  source provenance for the pinned `postgres-pglite` repository/ref/commit and
+  SHA-256 checksums for every downstream patch. The doctor validates that the
+  packaged source provenance and native link manifest agree on the patch set.
 - This ADR remains open until diagnostics are generated as structured release
   data across all required gates and production packaging rejects stale
   diagnostics.

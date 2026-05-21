@@ -69,6 +69,14 @@ require ar
 require tar
 require python3
 
+sha256() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  else
+    sha256sum "$1" | awk '{print $1}'
+  fi
+}
+
 pin_file="$repo_root/PGLITE_POSTGRES_SOURCE"
 if [[ ! -f "$pin_file" ]]; then
   echo "missing PGlite Postgres source pin: $pin_file" >&2
@@ -442,6 +450,7 @@ fi
   for patch_file in "$repo_root"/patches/postgres-pglite/*.patch; do
     [[ -e "$patch_file" ]] || continue
     echo "patch=${patch_file#$repo_root/}"
+    echo "patch_sha256=${patch_file#$repo_root/};sha256=$(sha256 "$patch_file")"
   done
   echo "patch_fingerprint=$patch_fingerprint"
   echo "object=$pglitec_object"
