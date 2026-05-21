@@ -1,0 +1,8 @@
+/target/
+/.DS_Store
+/vendor/postgres-pglite/
+*.dylib
+*.so
+*.dll
+*.tar.zst
+

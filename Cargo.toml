@@ -1,0 +1,42 @@
+[package]
+name = "libpglite"
+version = "0.1.0"
+edition = "2024"
+description = "Rust facade for hosting PGlite through a replaceable native plugin"
+license = "Apache-2.0"
+repository = "https://github.com/enki/libpglite"
+homepage = "https://github.com/enki/libpglite"
+readme = "README.md"
+keywords = ["postgres", "pglite", "embedding", "ffi", "plugin"]
+categories = ["api-bindings", "database"]
+include = [
+    "/Cargo.lock",
+    "/Cargo.toml",
+    "/LICENSE",
+    "/README.md",
+    "/build.rs",
+    "/src/**",
+    "/tests/**",
+]
+
+[workspace]
+members = ["native", "plugin"]
+resolver = "2"
+
+[lib]
+path = "src/lib.rs"
+doctest = false
+
+[dependencies]
+libloading = { version = "0.8", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[features]
+default = []
+dynamic-loading = ["dep:libloading"]
