@@ -192,7 +192,8 @@ PGlite-shipped extension.
 - The same package doctor checks now apply when PGlite `other_extensions` are
   materialized as `status=present`. Regression tests cover missing control
   files, missing default-version install SQL, missing referenced native modules,
-  and missing PostGIS projection data.
+  missing PostGIS projection data, and corrupt packaged PostGIS projection
+  databases.
 - The missing-control-file regression now covers the full pinned
   `other_extensions` parity set (`age`, `pg_hashids`, `pg_ivm`,
   `pg_textsearch`, `pg_uuidv7`, `pgtap`, `postgis`, and `vector`) rather than a

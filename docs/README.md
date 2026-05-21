@@ -81,10 +81,10 @@ Current closure frontier:
   `other_extensions`, builds the full set including `postgis`, packages them,
   and runs packaged-artifact `CREATE EXTENSION` conformance for the parity set.
   The Ubuntu lane now passes the same parity path on Linux, and the package
-  doctor now has a full-set missing-control regression for the pinned
-  `other_extensions` inventory. Remaining closure is production enforcement and
-  deeper file/dependency regressions that keep missing extension sources or
-  files from degrading to warnings.
+  doctor now has full-set missing-control coverage plus focused regressions for
+  missing or unreadable PostGIS projection data. Remaining closure is production
+  enforcement and deeper dependency regressions that keep missing extension
+  sources or files from degrading to warnings.
 - ADR-0009: macOS packaged `pgcrypto` and PostGIS now work from the controlled
   dependency prefix under strict package diagnostics. The Ubuntu lane now
   applies package-local RUNPATH repair with `patchelf` and passes strict package

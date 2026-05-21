@@ -200,9 +200,9 @@ actual plugin and prefix contents.
   package whose PGlite extension provenance is unknown.
 - Doctor regression tests now cover present PGlite `other_extensions` with
   missing control files, missing default-version install SQL, missing referenced
-  native modules, and missing PostGIS projection data. That gives the
-  final-artifact diagnostics concrete failure modes instead of relying only on a
-  green package smoke.
+  native modules, missing PostGIS projection data, and unreadable packaged
+  PostGIS projection databases. That gives the final-artifact diagnostics
+  concrete failure modes instead of relying only on a green package smoke.
 - The materialization step for PGlite `other_extensions` consumes the same
   inventory that is packaged as diagnostics. This keeps fetch/build inputs and
   package claims tied to one generated source of truth instead of separate

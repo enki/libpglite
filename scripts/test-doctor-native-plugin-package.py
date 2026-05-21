@@ -937,6 +937,40 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "\n".join(doctor.errors),
         )
 
+    def test_present_postgis_requires_readable_projection_database(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+            extension_inventory_text=(
+                "format=libpglite-native-extension-inventory-v1\n"
+                "other_extension=postgis;"
+                "source=pglite/other_extensions/postgis;"
+                "submodule_state=?;"
+                "submodule_commit=35ab919bf5da677709b2ebb8be07480bb25e97cf;"
+                "status=present;"
+                "submodule_url=https://github.com/postgis/postgis.git\n"
+            ),
+        )
+        self.write_packaged_extension(
+            doctor,
+            "postgis",
+            "default_version = '3.5.2'\nmodule_pathname = '$libdir/postgis-3'\n",
+            {"postgis--3.5.2.sql": "select '$libdir/postgis-3';\n"},
+            modules=["postgis-3.dylib"],
+        )
+        proj_dir = pathlib.Path(tempdir.name) / "postgres" / "share" / "proj"
+        proj_dir.mkdir(parents=True)
+        (proj_dir / "proj.db").write_text("not sqlite\n")
+        with tempdir:
+            doctor.validate_extensions()
+
+        self.assertIn(
+            "PostGIS projection data is not a readable SQLite database",
+            "\n".join(doctor.errors),
+        )
+
     def test_dependency_manifest_blocks_local_provider_in_strict_mode(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS,

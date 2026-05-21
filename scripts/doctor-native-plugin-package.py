@@ -6,6 +6,7 @@ import os
 import pathlib
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -838,6 +839,15 @@ class Doctor:
         if not proj_db.is_file():
             self.errors.append(
                 "PostGIS projection data is missing: postgres/share/proj/proj.db"
+            )
+            return
+        try:
+            with sqlite3.connect(f"file:{proj_db}?mode=ro", uri=True) as connection:
+                connection.execute("select name from sqlite_master limit 1").fetchall()
+        except sqlite3.DatabaseError as err:
+            self.errors.append(
+                "PostGIS projection data is not a readable SQLite database: "
+                f"postgres/share/proj/proj.db ({err})"
             )
 
     def validate_contrib_extension(self, extension: str) -> None:
