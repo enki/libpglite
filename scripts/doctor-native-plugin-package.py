@@ -609,6 +609,11 @@ class Doctor:
         if not isinstance(patches, list) or not patches:
             self.errors.append("source provenance patches must be a nonempty list")
             return
+        provenance_fingerprint = provenance.get("patchFingerprint")
+        if not isinstance(provenance_fingerprint, str) or not re.fullmatch(
+            r"[0-9a-f]{40}", provenance_fingerprint
+        ):
+            self.errors.append("source provenance patchFingerprint is not a full SHA-1")
 
         native_manifest = self.diagnostic_path("nativeLinkManifest")
         manifest_patch_paths: set[str] = set()
@@ -631,7 +636,6 @@ class Doctor:
             manifest_fingerprint = first_manifest_value(
                 native_manifest, "patch_fingerprint", self.errors
             )
-            provenance_fingerprint = provenance.get("patchFingerprint")
             if manifest_fingerprint and provenance_fingerprint != manifest_fingerprint:
                 self.errors.append(
                     "source provenance patchFingerprint mismatch: "

@@ -593,6 +593,27 @@ class DoctorDiagnosticsTests(unittest.TestCase):
             "\n".join(doctor.errors),
         )
 
+    def test_source_provenance_patch_fingerprint_must_be_full_sha1(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+        )
+        source_provenance = (
+            pathlib.Path(tempdir.name) / "diagnostics" / "source-provenance.json"
+        )
+        provenance = json.loads(source_provenance.read_text())
+        provenance["patchFingerprint"] = "not-a-sha"
+        source_provenance.write_text(json.dumps(provenance) + "\n")
+        with tempdir:
+            doctor.validate_source_provenance()
+
+        self.assertIn(
+            "source provenance patchFingerprint is not a full SHA-1",
+            "\n".join(doctor.errors),
+        )
+
     def test_malformed_structured_diagnostics_are_rejected(self):
         cases = [
             (

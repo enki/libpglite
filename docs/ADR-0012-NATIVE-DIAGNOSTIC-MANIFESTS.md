@@ -270,9 +270,10 @@ actual plugin and prefix contents.
   cannot carry the pending runtime status.
 - The doctor now cross-checks `source-provenance.json` against the native link
   manifest for pinned `postgres-pglite` repository/ref/commit, patch
-  fingerprint, patch list, and per-patch SHA-256 values. A stale source
-  provenance file can no longer satisfy the package diagnostic gate by carrying
-  only plausible-looking checksums.
+  fingerprint, patch list, and per-patch SHA-256 values. The patch fingerprint
+  must also be a full SHA-1-shaped value. A stale source provenance file can no
+  longer satisfy the package diagnostic gate by carrying only plausible-looking
+  checksums.
 - Doctor regression tests now corrupt each structured JSON diagnostic family
   and assert explicit failures: dependency manifest, platform baseline, source
   provenance, dependency prefix, runtime lifecycle, and conformance result
