@@ -165,6 +165,11 @@ actual plugin and prefix contents.
   native raw protocol/contrib smoke against the packaged plugin and packaged
   Postgres prefix. This keeps final-artifact runtime validation in the artifact
   doctor instead of duplicating one-off extraction logic in preflight.
+- Linux native preflight now reaches that strict doctor gate. The current
+  failure is diagnostic, not opaque: dependency manifests classify
+  build-prefix `libpq.so.5` references from modules such as `dblink` and
+  `postgres_fdw`, plus unresolved/static-unknown module dependencies, and the
+  strict doctor rejects the package before it can be treated as releasable.
 - The doctor now cross-checks inventoried `contrib` extensions against packaged
   control files, default-version SQL, and referenced native modules. It also
   makes missing PGlite `other_extensions` production-fatal while keeping them

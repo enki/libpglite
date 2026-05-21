@@ -199,6 +199,12 @@ libraries or runtime data.
   protocol/contrib smoke against the packaged plugin and packaged Postgres
   prefix. This verifies that the repaired install names work behaviorally, not
   just textually.
+- The Ubuntu lane now reaches strict package dependency diagnostics. The current
+  Linux blocker is not native backend startup: modules such as `dblink` and
+  `postgres_fdw` still resolve `libpq.so.5` through the build-machine
+  PostgreSQL install prefix, and strict relocatability correctly rejects that.
+  Linux closure requires the same package-local dependency repair that macOS
+  already applies with loader-relative install names/rpaths.
 - This is still not the final dependency-prefix implementation for all
   supported targets: the checked-in inventory, source fetcher, compile-stage
   entrypoint, and prefix descriptor define the contract, and the normal macOS
