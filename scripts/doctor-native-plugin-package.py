@@ -858,6 +858,8 @@ class Doctor:
                     self.errors.append("extension inventory contrib_extension is missing name")
                     continue
                 self.validate_contrib_extension(extension)
+            elif key == "contrib_module":
+                self.validate_contrib_module_inventory(fields)
             elif key == "other_extension":
                 if not fields.get("name"):
                     self.errors.append("extension inventory other_extension is missing name")
@@ -865,6 +867,15 @@ class Doctor:
                 self.validate_other_extension_inventory(fields)
             else:
                 self.errors.append(f"extension inventory has unknown entry: {key}")
+
+    def validate_contrib_module_inventory(self, fields: dict[str, str]) -> None:
+        module = fields.get("name")
+        if not module:
+            self.errors.append("extension inventory contrib_module is missing name")
+            return
+        source = fields.get("source")
+        if source != f"contrib/{module}":
+            self.errors.append(f"contrib module has wrong source path: {module}")
 
     def validate_other_extension_inventory(self, fields: dict[str, str]) -> None:
         extension = fields["name"]

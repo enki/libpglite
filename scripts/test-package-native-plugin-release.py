@@ -101,6 +101,14 @@ class PackageNativePluginReleaseTests(unittest.TestCase):
             text.index('tar -C "$binary_stage" --zstd -cf "$binary_asset" .'),
         )
 
+    def test_runtime_package_prunes_postgres_server_headers(self):
+        text = SCRIPT.read_text()
+        self.assertIn('rm -rf "$binary_stage/postgres/include"', text)
+        self.assertLess(
+            text.index('rm -rf "$binary_stage/postgres/include"'),
+            text.index('repair_macos_package_install_names "$binary_stage" "$expected_plugin"'),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -293,7 +293,8 @@ actual plugin and prefix contents.
 - The package doctor now also treats malformed extension-inventory lines,
   unnamed inventoried extensions, and unknown inventory entry types as
   diagnostic errors instead of allowing malformed text to crash or be silently
-  ignored.
+  ignored. Standalone `contrib_module` entries are now an explicit validated
+  inventory class rather than an unknown-entry failure.
 - Packaging now writes `diagnostics/platform-baseline.json` and the doctor
   validates it as a package claim. The diagnostic must match the bundle target.
   It must also carry nonempty observed `system` and `machine` fields. Linux

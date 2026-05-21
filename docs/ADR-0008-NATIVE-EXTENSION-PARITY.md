@@ -209,7 +209,10 @@ PGlite-shipped extension.
 - The native prepare step now builds extension-bearing PostgreSQL `contrib`
   source directories individually and validates installed control files.
   Standalone contrib modules and utility programs remain inventoried, but are
-  not part of the first `CREATE EXTENSION` parity gate.
+  not part of the first `CREATE EXTENSION` parity gate. The package doctor now
+  recognizes those `contrib_module` records as explicit non-extension inventory
+  entries and validates their `contrib/<name>` source path instead of treating
+  them as unknown malformed records.
 - A dependency-prefixed macOS prepare builds and installs contrib modules that
   exercise the controlled prefix handoff, including `pgcrypto`, `uuid-ossp`,
   and `xml2`. The normal macOS preflight now carries that prefix through the

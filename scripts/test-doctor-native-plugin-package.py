@@ -965,6 +965,30 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         self.assertIn("extension inventory other_extension is missing name", errors)
         self.assertIn("extension inventory has unknown entry: unexpected_extension", errors)
 
+    def test_contrib_modules_are_inventory_records_not_extension_gates(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS,
+            plugin_manifest_symbols=ABI_SYMBOLS,
+            native_manifest_backend_symbols=set(),
+            backend_manifest_symbols=set(),
+            extension_inventory_text=(
+                "format=libpglite-native-extension-inventory-v1\n"
+                "contrib_module=pg_waldump;source=contrib/pg_waldump\n"
+                "contrib_module=broken;source=other/broken\n"
+            ),
+        )
+        with tempdir:
+            doctor.validate_extensions()
+
+        self.assertIn(
+            "contrib module has wrong source path: broken",
+            "\n".join(doctor.errors),
+        )
+        self.assertNotIn(
+            "extension inventory has unknown entry: contrib_module",
+            "\n".join(doctor.errors),
+        )
+
     def test_missing_other_extension_is_warning_only_for_development(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS,

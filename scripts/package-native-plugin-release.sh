@@ -332,6 +332,7 @@ mkdir -p "$binary_stage" "$source_stage"
 
 cp "$plugin_binary" "$binary_stage/"
 cp -R "$postgres_install_prefix" "$binary_stage/postgres"
+rm -rf "$binary_stage/postgres/include"
 repair_macos_package_install_names "$binary_stage" "$expected_plugin"
 repair_linux_package_rpaths "$binary_stage" "$expected_plugin"
 validate_plugin_exports "$binary_stage/$expected_plugin"

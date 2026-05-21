@@ -82,16 +82,20 @@ Current closure frontier:
   the same package doctor self-test with Linux RUNPATH repair. The doctor now
   rejects build-machine absolute paths in packaged prefix text metadata under
   strict diagnostics and enforces the exact `postgresPrefix` bundle layout.
-  Remaining closure is keeping the final self-test and strict diagnostics
-  release-gating current across supported packages.
+  Runtime packaging now prunes server headers from the binary prefix so native
+  packages do not carry build-only port headers. Remaining closure is keeping
+  the final self-test and strict diagnostics release-gating current across
+  supported packages.
 - ADR-0008: macOS release preflight now materializes all pinned PGlite
   `other_extensions`, builds the full set including `postgis`, packages them,
   and runs packaged-artifact `CREATE EXTENSION` conformance for the parity set.
   The Ubuntu lane now passes the same parity path on Linux, and the package
   doctor now has full-set missing-control coverage plus focused regressions for
-  missing or unreadable PostGIS projection data. Remaining closure is production
-  enforcement and deeper dependency regressions that keep missing extension
-  sources or files from degrading to warnings.
+  missing or unreadable PostGIS projection data. Standalone PostgreSQL
+  `contrib_module` inventory records are now explicitly validated as non-
+  extension entries. Remaining closure is production enforcement and deeper
+  dependency regressions that keep missing extension sources or files from
+  degrading to warnings.
 - ADR-0009: macOS packaged `pgcrypto` and PostGIS now work from the controlled
   dependency prefix under strict package diagnostics. The Ubuntu lane now
   applies package-local RUNPATH repair with `patchelf` and passes strict package
@@ -125,7 +129,8 @@ Current closure frontier:
   package doctor gate, production packaging and doctor validation both require
   a dependency-prefix diagnostic, malformed structured JSON diagnostics have
   focused doctor regressions, malformed extension-inventory lines now produce
-  package errors, build provenance now names every release-critical packaged
+  package errors while `contrib_module` entries are validated as an explicit
+  inventory class, build provenance now names every release-critical packaged
   diagnostic, raw-protocol diagnostics must name their covered protocol cases,
   patch-apply reproducibility is now a prepare-time gate rather than only a
   checksum claim, dependency manifests must use the platform-native scanner

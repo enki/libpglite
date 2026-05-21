@@ -103,3 +103,8 @@ the plugin or provide an equivalent generated artifact.
 - The package doctor now enforces the canonical `postgresPrefix` bundle layout
   exactly instead of accepting any existing relative path map. That makes the
   package contract self-diagnosing when macOS and Linux packaging drift apart.
+- Runtime packages now prune `postgres/include` after staging the generated
+  PostgreSQL prefix. Server headers are build inputs for extension compilation,
+  not runtime prefix artifacts, and pruning them keeps Emscripten-port headers
+  out of native binary packages without weakening the native-only payload
+  doctor check.
