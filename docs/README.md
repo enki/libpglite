@@ -36,7 +36,8 @@ repo commands, not just described in text. The minimum evidence is:
 
 `scripts/audit-adr-closure.py` keeps the bookkeeping honest: root ADR files must
 be `Status: Open`, done ADR files must be `Status: Done` with a `Closing
-Evidence` section, and this README must list every open and done record. Native
+Evidence` section, open ADRs must carry non-empty acceptance and remaining
+closure bullets, and this README must list every open and done record. Native
 preflight runs that audit before package work starts.
 
 Current closure frontier:

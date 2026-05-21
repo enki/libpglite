@@ -23,6 +23,19 @@ def has_section(text: str, heading: str) -> bool:
     return re.search(rf"^## {re.escape(heading)}\s*$", text, re.MULTILINE) is not None
 
 
+def section_body(text: str, heading: str) -> str:
+    match = re.search(
+        rf"^## {re.escape(heading)}\s*$(.*?)(?=^## |\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    return match.group(1) if match else ""
+
+
+def has_bullet(text: str, heading: str) -> bool:
+    return re.search(r"^\s*-\s+\S", section_body(text, heading), re.MULTILINE) is not None
+
+
 def main() -> int:
     errors: list[str] = []
     readme = README.read_text()
@@ -40,8 +53,12 @@ def main() -> int:
             errors.append(f"{rel} is not listed in docs/README.md open records")
         if not has_section(text, "Acceptance Criteria"):
             errors.append(f"{rel} is missing Acceptance Criteria")
+        elif not has_bullet(text, "Acceptance Criteria"):
+            errors.append(f"{rel} Acceptance Criteria has no concrete bullets")
         if not has_section(text, "Remaining Closure Criteria"):
             errors.append(f"{rel} is missing Remaining Closure Criteria")
+        elif not has_bullet(text, "Remaining Closure Criteria"):
+            errors.append(f"{rel} Remaining Closure Criteria has no concrete bullets")
         parts = path.stem.split("-", 2)
         if len(parts) >= 2:
             label = "-".join(parts[:2])
@@ -57,6 +74,8 @@ def main() -> int:
             errors.append(f"{rel} is not listed in docs/README.md done records")
         if not has_section(text, "Closing Evidence"):
             errors.append(f"{rel} is missing Closing Evidence")
+        elif not has_bullet(text, "Closing Evidence"):
+            errors.append(f"{rel} Closing Evidence has no concrete bullets")
 
     for path in sorted((REPO_ROOT / "scripts").glob("test-*.py")):
         rel = path.relative_to(REPO_ROOT).as_posix()
