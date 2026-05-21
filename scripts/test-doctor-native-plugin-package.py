@@ -200,6 +200,39 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         doctor.actual_plugin_symbols = plugin_symbols
         return tempdir, doctor
 
+    def test_bundle_runtime_status_must_match_release_mode(self):
+        cases = [
+            (
+                "production",
+                "native-runtime-pending-adr-0002",
+                "production package runtimeStatus must be 'runtime-ready'",
+            ),
+            (
+                "development",
+                "runtime-ready",
+                "development package must not claim runtimeStatus 'runtime-ready'",
+            ),
+            (
+                "development",
+                "unknown-status",
+                "unsupported runtimeStatus: 'unknown-status'",
+            ),
+        ]
+        for release_mode, runtime_status, expected in cases:
+            with self.subTest(release_mode=release_mode, runtime_status=runtime_status):
+                tempdir, doctor = self.make_doctor(
+                    plugin_symbols=ABI_SYMBOLS,
+                    plugin_manifest_symbols=ABI_SYMBOLS,
+                    native_manifest_backend_symbols=set(),
+                    backend_manifest_symbols=set(),
+                )
+                doctor.bundle["releaseMode"] = release_mode
+                doctor.bundle["runtimeStatus"] = runtime_status
+                with tempdir:
+                    doctor.validate_bundle()
+
+                self.assertIn(expected, "\n".join(doctor.errors))
+
     def write_packaged_extension(
         self,
         doctor,

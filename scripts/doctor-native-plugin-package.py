@@ -158,6 +158,17 @@ class Doctor:
         release_mode = self.bundle.get("releaseMode")
         if release_mode not in {"development", "production"}:
             self.errors.append(f"unsupported releaseMode: {release_mode!r}")
+        runtime_status = self.bundle.get("runtimeStatus")
+        if runtime_status not in {"native-runtime-pending-adr-0002", "runtime-ready"}:
+            self.errors.append(f"unsupported runtimeStatus: {runtime_status!r}")
+        elif release_mode == "production" and runtime_status != "runtime-ready":
+            self.errors.append(
+                "production package runtimeStatus must be 'runtime-ready'"
+            )
+        elif release_mode == "development" and runtime_status == "runtime-ready":
+            self.errors.append(
+                "development package must not claim runtimeStatus 'runtime-ready'"
+            )
         if self.bundle.get("pluginAbiVersion") != 1:
             self.errors.append("pluginAbiVersion must be 1")
 

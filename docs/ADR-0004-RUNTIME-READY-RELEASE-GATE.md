@@ -66,6 +66,9 @@ status/exit codes, and stale log checksums as package errors.
 The release packaging regression suite also pins the final boundary ordering:
 `scripts/package-native-plugin-release.sh` must run the package doctor against
 the staged binary package before writing the distributable `.tar.zst` archive.
+The package doctor now rejects contradictory bundle metadata: production
+packages must claim `runtimeStatus=runtime-ready`, and development packages must
+not claim that status.
 
 ## Required Work
 

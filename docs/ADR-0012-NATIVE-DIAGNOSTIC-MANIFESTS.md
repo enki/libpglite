@@ -262,6 +262,9 @@ actual plugin and prefix contents.
   dependency text/json, source provenance, lifecycle, and conformance results.
   The doctor rejects provenance that points at stale or partial diagnostic
   filenames rather than the bundle's current package claims.
+- The package doctor validates the `releaseMode`/`runtimeStatus` pair directly:
+  development artifacts cannot claim `runtime-ready`, and production artifacts
+  cannot carry the pending runtime status.
 - The doctor now cross-checks `source-provenance.json` against the native link
   manifest for pinned `postgres-pglite` repository/ref/commit, patch
   fingerprint, patch list, and per-patch SHA-256 values. A stale source
