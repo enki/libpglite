@@ -297,6 +297,24 @@ build_ossp_uuid() {
     make -j"$jobs"
     make install || true
     ln -sf libuuid.a "$prefix/lib/libossp-uuid.a"
+    mkdir -p "$prefix/include/ossp"
+    # PostgreSQL checks <ossp/uuid.h> after Darwin system headers. OSSP's
+    # installed uuid.h also names uuid_t, so expose a prefix-local wrapper that
+    # preserves OSSP function names while keeping the abstract type distinct.
+    python3 - "$prefix/include/uuid.h" "$prefix/include/ossp/uuid.h" <<'PY'
+import pathlib
+import sys
+
+source = pathlib.Path(sys.argv[1])
+out = pathlib.Path(sys.argv[2])
+text = source.read_text()
+start = text.index("/* workaround conflicts with system headers */")
+end = text.index("/* required system headers */")
+text = text[:start] + "/* required system headers */\n#include <stddef.h>\n" + text[end + len("/* required system headers */\n"):]
+text = text.replace("__UUID_H__", "__OSSP_UUID_H__")
+text = text.replace("#define __OSSP_UUID_H__", "#define __OSSP_UUID_H__\n#define uuid_t ossp_uuid_t", 1)
+out.write_text(text)
+PY
   )
 }
 

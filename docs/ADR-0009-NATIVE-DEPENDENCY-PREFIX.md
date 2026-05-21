@@ -60,9 +60,9 @@ libraries or runtime data.
 
 ## Remaining Closure Criteria
 
-- `scripts/prepare-native-pglite-link.sh --dependency-prefix <prefix>
-  --build-postgres` is the release path, and the resulting manifest records a
-  complete `libpglite-native-dependency-prefix-v1` diagnostic.
+- Dependency-prefixed native prepare is promoted from an explicit smoke path to
+  the default production release path, and packaging copies its complete
+  `libpglite-native-dependency-prefix-v1` diagnostic into the package.
 - `pgcrypto` links against the controlled OpenSSL inputs and works from the
   packaged artifact without an external OpenSSL install.
 - PostGIS links against controlled GEOS, PROJ, json-c, SQLite, and related
@@ -80,6 +80,14 @@ libraries or runtime data.
   autotools projects.
 - The macOS full-prefix descriptor is complete and static-only:
   `complete=true`, `staticOnly=true`, `missing=[]`, and `dynamicObjects=[]`.
+- On macOS, `scripts/prepare-native-pglite-link.sh --build-postgres
+  --dependency-prefix <prefix>` completes against that prefix and writes a
+  native link manifest naming `native_dependency_provider=libpglite-prefix`,
+  the prefix path, the prefix diagnostic, and its SHA-256.
+- That dependency-prefixed prepare builds and installs PostgreSQL `contrib`
+  modules including `pgcrypto.dylib`, `uuid-ossp.dylib`, and `pgxml.dylib`
+  without Homebrew dylib dependencies. `otool -L` reports only
+  `/usr/lib/libSystem.B.dylib` for those modules.
 
 ## Implementation Notes
 
@@ -110,6 +118,10 @@ libraries or runtime data.
   libtiff, SQLite, PROJ, and GEOS. The OpenSSL native path uses `no-module` in
   addition to `no-shared` so the prefix does not silently acquire a loadable
   `legacy.dylib`.
+- OSSP uuid is installed with both `include/uuid.h` and a prefix-local
+  `include/ossp/uuid.h` wrapper. The wrapper keeps PostgreSQL's expected
+  `<ossp/uuid.h>` include shape while avoiding Darwin's system `uuid_t`
+  typedef collision by renaming the OSSP abstract type to `ossp_uuid_t`.
 - A clean macOS full-prefix smoke run now builds the entire pinned inventory
   from `deps/native-pglite-dependencies.json` into an isolated prefix and emits
   a complete `libpglite-native-dependency-prefix-v1` descriptor. The descriptor

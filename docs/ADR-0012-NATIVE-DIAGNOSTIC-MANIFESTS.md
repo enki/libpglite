@@ -117,6 +117,11 @@ actual plugin and prefix contents.
   development lane. When present, build provenance must name the prefix
   diagnostic and the package doctor requires it to be a complete
   `libpglite-native-dependency-prefix-v1` manifest.
+- The dependency-prefixed macOS prepare path now writes a native link manifest
+  that names the controlled prefix, the copied prefix diagnostic, and the
+  diagnostic SHA-256. That proves the prepare stage can make a falsifiable
+  dependency claim, but this ADR stays open until production packages require
+  and doctor-check the same claim from the final artifact.
 - Native dependency sources now have a structured
   `libpglite-native-dependency-sources-v1` fetch manifest with archive hashes
   and exact git commits. That manifest is build-stage evidence today; it should

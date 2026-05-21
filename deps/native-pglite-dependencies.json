@@ -52,7 +52,7 @@
     {
       "archive": "uuid-1.6.2.tar.gz",
       "buildSystem": "autotools",
-      "headers": ["include/uuid.h"],
+      "headers": ["include/uuid.h", "include/ossp/uuid.h"],
       "libraries": ["lib/libuuid.a", "lib/libossp-uuid.a"],
       "mirrors": ["http://www.mirrorservice.org/sites/ftp.ossp.org/pkg/lib/uuid/uuid-1.6.2.tar.gz"],
       "name": "ossp-uuid",

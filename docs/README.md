@@ -47,16 +47,19 @@ Current closure frontier:
   environment in `../smolvm/` or an equivalent release container.
 - ADR-0007: still needs final relocatable prefix closure after extension parity
   expands the prefix beyond current contrib coverage.
-- ADR-0008: still needs PostGIS native dependency/data packaging, full
-  `CREATE EXTENSION` conformance from packaged artifacts, and promotion of the
-  opt-in non-PostGIS `other_extensions` build into release preflight.
-- ADR-0009: still needs a pinned native dependency prefix instead of repaired
-  local-provider libraries; the pinned dependency inventory, verified source
-  fetcher, compile-stage entrypoint, and prefix diagnostic contract exist, but
-  the clean macOS dependency builder still needs to complete that prefix.
+- ADR-0008: still needs materialized PGlite `other_extensions`, PostGIS
+  native dependency/data packaging, full `CREATE EXTENSION` conformance from
+  packaged artifacts, and promotion of the opt-in extension build into release
+  preflight. The dependency-prefixed macOS prepare now builds PostgreSQL
+  `contrib` modules including `pgcrypto`, `uuid-ossp`, and `xml2`.
+- ADR-0009: still needs the controlled dependency prefix to become the default
+  production release link/package path, plus packaged `pgcrypto` and PostGIS
+  proof. The clean macOS dependency prefix and an explicit dependency-prefixed
+  Postgres/contrib prepare now complete with a complete, static-only prefix
+  diagnostic.
 - ADR-0010: still needs stale-symbol checks against the full extension parity
   set and Linux export/version-script coverage.
-- ADR-0012: still needs structured diagnostic coverage for the remaining
-  extension/platform gates before it can close; dependency diagnostics now have
-  raw reports, structured scan manifests, and optional controlled-prefix
-  manifests.
+- ADR-0012: still needs production package enforcement for every
+  release-critical diagnostic and Linux schema parity before it can close. The
+  dependency-prefixed prepare now records the controlled prefix diagnostic and
+  checksum, but final-artifact doctor enforcement is still the closing line.

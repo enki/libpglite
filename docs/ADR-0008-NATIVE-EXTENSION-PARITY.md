@@ -181,6 +181,12 @@ PGlite-shipped extension.
   source directories individually and validates installed control files.
   Standalone contrib modules and utility programs remain inventoried, but are
   not part of the first `CREATE EXTENSION` parity gate.
+- A dependency-prefixed macOS prepare now builds and installs contrib modules
+  that exercise the controlled prefix handoff, including `pgcrypto`,
+  `uuid-ossp`, and `xml2`. This is useful parity evidence for PostgreSQL
+  `contrib`, but it does not close this ADR because the PGlite
+  `other_extensions` sources are still missing in that smoke manifest and no
+  packaged-artifact `CREATE EXTENSION` sweep has run.
 - PGlite's WASM build keeps global OpenSSL disabled for the Postgres configure
   step and special-cases `pgcrypto` with explicit OpenSSL side-module link
   flags. The native build should copy that shape: do not enable `sslinfo`
