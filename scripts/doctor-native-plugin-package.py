@@ -314,6 +314,7 @@ class Doctor:
                         "backendExportSymbols lists symbols absent from native link manifest: "
                         f"{format_symbol_delta(stale_diagnostic_symbols)}"
                     )
+            self.validate_linux_plugin_symbol_boundary(backend_symbols)
 
     def validate_extension_backend_symbol_claims(self, backend_symbols: set[str]) -> None:
         if self.actual_plugin_symbols is None:
@@ -334,6 +335,27 @@ class Doctor:
                 "extension modules reference plugin-exported backend symbols missing "
                 "from backendExportSymbols: "
                 + "; ".join(missing_claims[:10])
+            )
+
+    def validate_linux_plugin_symbol_boundary(self, backend_symbols: set[str]) -> None:
+        target = self.bundle.get("target")
+        if not isinstance(target, str) or not target.endswith("linux-gnu"):
+            return
+        symbols_path = self.diagnostic_path("pluginDefinedSymbols")
+        if symbols_path is None:
+            return
+        plugin_symbols = {
+            symbol
+            for symbol in nonempty_lines(symbols_path, self.errors)
+            if not re.fullmatch(r"LIBPGLITE_PLUGIN_NATIVE_[0-9]+", symbol)
+        }
+        allowed = ABI_SYMBOLS | backend_symbols
+        unexpected = sorted(plugin_symbols - allowed)
+        if unexpected:
+            self.errors.append(
+                "Linux pluginDefinedSymbols contains symbols outside the host ABI "
+                "and generated backend export set: "
+                f"{format_symbol_delta(unexpected)}"
             )
 
     def validate_build_provenance(self) -> None:

@@ -96,8 +96,9 @@ Current closure frontier:
   now includes `R` symbols. The doctor now rejects stale backend-symbol
   diagnostics by scanning packaged extension modules for plugin-exported backend
   references missing from `backend-export-symbols.txt`, with full pinned
-  `other_extensions` regression coverage. Remaining closure is keeping that
-  strictness under the final packaged parity set.
+  `other_extensions` regression coverage. It also rejects accidental Linux
+  plugin exports outside the host ABI and generated backend set. Remaining
+  closure is keeping that strictness under the final packaged parity set.
 - ADR-0012: still needs production package enforcement for every
   release-critical diagnostic and Linux schema parity before it can close. The
   normal macOS preflight package path now carries controlled-prefix diagnostics,

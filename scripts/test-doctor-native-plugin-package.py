@@ -271,6 +271,23 @@ class DoctorDiagnosticsTests(unittest.TestCase):
 
         self.assertEqual(symbols, {"libpglite_plugin_abi_version"})
 
+    def test_linux_plugin_symbol_boundary_rejects_accidental_exports(self):
+        tempdir, doctor = self.make_doctor(
+            plugin_symbols=ABI_SYMBOLS | {"BackendA", "AccidentalRustExport"},
+            plugin_manifest_symbols=ABI_SYMBOLS | {"BackendA", "AccidentalRustExport"},
+            native_manifest_backend_symbols={"BackendA"},
+            backend_manifest_symbols={"BackendA"},
+        )
+        doctor.bundle["target"] = "x86_64-unknown-linux-gnu"
+        with tempdir:
+            doctor.validate_diagnostics()
+
+        self.assertIn(
+            "Linux pluginDefinedSymbols contains symbols outside the host ABI "
+            "and generated backend export set: AccidentalRustExport",
+            "\n".join(doctor.errors),
+        )
+
     def test_backend_symbol_diagnostic_must_match_native_manifest(self):
         tempdir, doctor = self.make_doctor(
             plugin_symbols=ABI_SYMBOLS | {"BackendA", "BackendB"},

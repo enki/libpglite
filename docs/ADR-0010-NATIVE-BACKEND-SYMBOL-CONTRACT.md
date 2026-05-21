@@ -76,9 +76,7 @@ set changes.
 - The package doctor keeps failing on stale backend-symbol diagnostics, missing
   exported backend symbols, and extension modules with unresolved backend
   references under the full packaged parity set.
-- Linux symbol-boundary checks tolerate only the GNU version node plus the
-  stable host ABI and generated backend-symbol set; they must not accept
-  accidental exports from Rust, PostgreSQL, or dependency archives.
+- Linux symbol-boundary checks remain release-gating for every final package.
 
 ## Implementation Notes
 
@@ -174,6 +172,11 @@ set changes.
   `LIBPGLITE_PLUGIN_NATIVE_1` before comparing exported symbols. The version
   node is expected metadata from the single final version script, not an
   additional public export.
+- The package doctor now also enforces the Linux exported-symbol boundary from
+  packaged diagnostics: `plugin-defined-symbols.txt` may contain only the stable
+  host ABI plus generated `backend-export-symbols.txt` entries, ignoring the
+  expected GNU version node. A focused regression rejects an accidental exported
+  Rust/PostgreSQL/dependency symbol in a Linux package shape.
 - The Ubuntu smolvm lane also exposed that `src/timezone/zic.o` and
   `src/timezone/zdump.o` are CLI entrypoint objects, not backend timezone
   runtime objects. The native timezone archive now excludes them so Linux does
