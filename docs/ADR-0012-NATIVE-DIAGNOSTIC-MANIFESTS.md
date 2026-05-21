@@ -185,7 +185,9 @@ actual plugin and prefix contents.
   all eight pinned `other_extensions` were materialized and the non-PostGIS set
   was installed into the generated prefix, so the inventory can move from
   `status=missing` to `status=present` with concrete files behind the claim.
-  This remains a build-stage diagnostic proof until the normal preflight package
+  `scripts/check-native-other-extension-build.sh` keeps PostGIS as a default
+  failure and requires `--allow-postgis-gap` for the current partial proof. This
+  remains a build-stage diagnostic proof until the normal preflight package
   carries those present-source claims and the doctor validates them from the
   final artifact.
 - The package now includes a structured runtime lifecycle diagnostic. The doctor

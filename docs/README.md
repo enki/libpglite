@@ -52,8 +52,9 @@ Current closure frontier:
   from packaged artifacts, and promotion of the opt-in extension build into
   release preflight. The dependency-prefixed macOS prepare now builds PostgreSQL
   `contrib` modules including `pgcrypto`, `uuid-ossp`, and `xml2`; the
-  controlled-prefix opt-in prepare also materializes all pinned PGlite
-  `other_extensions` and builds the non-PostGIS set, including `vector`.
+  controlled-prefix opt-in probe also materializes all pinned PGlite
+  `other_extensions` and builds the non-PostGIS set, including `vector`, while
+  keeping PostGIS as an explicit default failure.
 - ADR-0009: still needs packaged `pgcrypto` and PostGIS proof, strict
   dependency diagnostics across the final extension surface, and the Linux
   prefix contract. The macOS preflight path now builds the clean controlled

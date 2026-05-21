@@ -170,6 +170,7 @@ python3 scripts/test-fetch-native-dependency-sources.py
 python3 scripts/test-generate-native-dependency-manifest.py
 python3 scripts/test-inventory-native-pglite-extensions.py
 python3 scripts/test-materialize-native-pglite-other-extensions.py
+python3 scripts/test-check-native-other-extension-build.py
 python3 scripts/test-preflight-native-plugin-release.py
 
 echo "==> preflight ${release_version}: dynamic-loading check"
