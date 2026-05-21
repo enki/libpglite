@@ -50,9 +50,6 @@ still need an explicitly documented Linux baseline.
   native link manifest, `platform-baseline.json`, and build provenance agree on
   the deployment target. On Linux that means the package records and validates
   the selected distro/libc baseline.
-- The Linux baseline is treated as release policy, not only a local preflight
-  habit: production packages must reject artifacts that were not built on the
-  documented Ubuntu baseline or an explicitly documented successor baseline.
 - After platform-floor diagnostics change, the full macOS preflight and the
   Ubuntu `../smolvm/` preflight both pass from the final package artifact.
 
@@ -115,3 +112,9 @@ still need an explicitly documented Linux baseline.
   diagnostic, and build provenance.
 - After adding the package baseline diagnostic, `scripts/preflight-linux-smolvm.sh`
   with version `0.1.0` passed again in the `ubuntu:24.04` guest on 2026-05-21.
+- `docs/LINUX-RELEASE-POLICY.md` now records Ubuntu `24.04` as the Linux
+  release baseline unless an ADR documents a successor. Packaging rejects Linux
+  artifacts whose `/etc/os-release` identity does not match the selected
+  baseline before writing the package, build provenance records the selected
+  Linux baseline, and the package doctor rejects stale or contradictory Linux
+  platform-baseline diagnostics.
