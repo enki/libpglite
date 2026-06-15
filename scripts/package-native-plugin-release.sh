@@ -320,7 +320,7 @@ if [[ -z "$conformance_dir" || ! -d "$conformance_dir" ]]; then
   echo "LIBPGLITE_CONFORMANCE_DIR must point at structured native conformance results" >&2
   exit 1
 fi
-for result in raw-protocol tokio-postgres-client prefix-initialize prefix-resume; do
+for result in raw-protocol tokio-postgres-client stdin-sealed-startup prefix-initialize prefix-resume; do
   if [[ ! -f "$conformance_dir/$result.json" || ! -f "$conformance_dir/$result.log" ]]; then
     echo "native conformance directory is missing required result pair: $result" >&2
     exit 1

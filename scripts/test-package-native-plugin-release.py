@@ -57,6 +57,17 @@ class PackageNativePluginReleaseTests(unittest.TestCase):
         ]:
             self.assertIn(line, text)
 
+    def test_packaging_requires_stdin_sealed_startup_conformance_pair(self):
+        text = SCRIPT.read_text()
+        self.assertIn(
+            "for result in raw-protocol tokio-postgres-client stdin-sealed-startup prefix-initialize prefix-resume",
+            text,
+        )
+        self.assertIn(
+            "native conformance directory is missing required result pair: $result",
+            text,
+        )
+
     def test_production_packaging_is_blocked_while_root_adrs_are_open(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root = pathlib.Path(tempdir) / "repo"

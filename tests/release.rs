@@ -188,6 +188,77 @@ fn bundled_resolver_accepts_plugin_in_parent_of_cargo_deps_test_binary() {
 }
 
 #[test]
+fn bundled_resolver_missing_plugin_error_names_product_paths_not_cache() {
+    let asset = current_native_plugin_asset().expect("current target is supported");
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let host_binary = tempdir.path().join("product-host");
+    std::fs::write(&host_binary, b"host").expect("write host placeholder");
+
+    let error = BundledNativePluginResolver::new()
+        .with_host_binary_path(&host_binary)
+        .resolve()
+        .expect_err("missing bundled plugin should fail");
+    let message = error.to_string();
+
+    assert!(message.contains("bundled libpglite plugin"), "{message}");
+    assert!(message.contains(&asset.plugin_filename), "{message}");
+    assert!(
+        message.contains(&host_binary.display().to_string()),
+        "{message}"
+    );
+    assert!(message.contains("expected one of"), "{message}");
+    assert!(
+        message.contains(
+            &tempdir
+                .path()
+                .join(asset.plugin_filename)
+                .display()
+                .to_string()
+        ),
+        "{message}"
+    );
+    assert!(!message.contains(LIBPGLITE_HOME_ENV), "{message}");
+    assert!(!message.contains("cache"), "{message}");
+}
+
+#[test]
+fn bundled_resolver_missing_plugin_error_lists_canonical_symlink_expected_path() {
+    let asset = current_native_plugin_asset().expect("current target is supported");
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let real_dir = tempdir.path().join("real");
+    let shim_dir = tempdir.path().join("shim");
+    std::fs::create_dir_all(&real_dir).expect("create real dir");
+    std::fs::create_dir_all(&shim_dir).expect("create shim dir");
+    let real_host_binary = real_dir.join("product-host");
+    let shim_host_binary = shim_dir.join("product-host");
+    std::fs::write(&real_host_binary, b"host").expect("write host placeholder");
+
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&real_host_binary, &shim_host_binary)
+        .expect("create host binary symlink");
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_file(&real_host_binary, &shim_host_binary)
+        .expect("create host binary symlink");
+
+    let error = BundledNativePluginResolver::new()
+        .with_host_binary_path(&shim_host_binary)
+        .resolve()
+        .expect_err("missing bundled plugin should fail");
+    let message = error.to_string();
+
+    let raw_expected = shim_dir.join(asset.plugin_filename);
+    let canonical_expected = real_dir.join(asset.plugin_filename);
+    assert!(
+        message.contains(&raw_expected.display().to_string()),
+        "{message}"
+    );
+    assert!(
+        message.contains(&canonical_expected.display().to_string()),
+        "{message}"
+    );
+}
+
+#[test]
 fn resolver_missing_plugin_error_is_actionable() {
     let asset = current_native_plugin_asset().expect("current target is supported");
     let tempdir = tempfile::tempdir().expect("tempdir");

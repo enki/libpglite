@@ -46,6 +46,11 @@ CONFORMANCE_COMMAND_FRAGMENTS = {
         "--test dynamic_plugin",
         "dynamic_plugin_tokio_postgres_client_child",
     ],
+    "stdin-sealed-startup": [
+        "--features dynamic-loading",
+        "--test dynamic_plugin",
+        "dynamic_plugin_native_startup_seals_inherited_stdin",
+    ],
     "prefix-initialize": [
         "LIBPGLITE_RUN_PREFIX_INITIALIZE_CHILD=1",
         "--features dynamic-loading",
@@ -778,6 +783,7 @@ class Doctor:
         for name in [
             "raw-protocol",
             "tokio-postgres-client",
+            "stdin-sealed-startup",
             "prefix-initialize",
             "prefix-resume",
         ]:
@@ -1249,6 +1255,8 @@ class Doctor:
         bundled_env["LIBPGLITE_RUN_BUNDLED_PREFIX_CHILD"] = "1"
         bundled_env.pop("LIBPGLITE_TEST_PLUGIN_PATH", None)
         bundled_env.pop("LIBPGLITE_TEST_POSTGRES_PREFIX", None)
+        bundled_env.pop("LIBPGLITE_PLUGIN_PATH", None)
+        bundled_env.pop("LIBPGLITE_HOME", None)
         bundled_prefix_command = [
             "cargo",
             "test",
@@ -1267,6 +1275,62 @@ class Doctor:
         if result.returncode != 0:
             self.errors.append(
                 f"package bundled-prefix self-test failed with exit code {result.returncode}"
+            )
+
+        current_exe_env = os.environ.copy()
+        current_exe_env["RUST_TEST_THREADS"] = "1"
+        current_exe_env["LIBPGLITE_TEST_PLUGIN_DIR"] = str(self.root)
+        current_exe_env["LIBPGLITE_RUN_CURRENT_EXE_BUNDLED_PLUGIN_CHILD"] = "1"
+        current_exe_env.pop("LIBPGLITE_TEST_PLUGIN_PATH", None)
+        current_exe_env.pop("LIBPGLITE_TEST_POSTGRES_PREFIX", None)
+        current_exe_env.pop("LIBPGLITE_PLUGIN_PATH", None)
+        current_exe_env.pop("LIBPGLITE_HOME", None)
+        current_exe_command = [
+            "cargo",
+            "test",
+            "--features",
+            "dynamic-loading",
+            "--test",
+            "dynamic_plugin",
+            "dynamic_plugin_open_uses_current_exe_bundled_plugin_default",
+            "--",
+            "--nocapture",
+        ]
+        print("running package self-test:", " ".join(current_exe_command))
+        result = subprocess.run(
+            current_exe_command, cwd=repo_root, env=current_exe_env, check=False
+        )
+        if result.returncode != 0:
+            self.errors.append(
+                f"package current-exe bundled-plugin self-test failed with exit code {result.returncode}"
+            )
+
+        symlinked_env = os.environ.copy()
+        symlinked_env["RUST_TEST_THREADS"] = "1"
+        symlinked_env["LIBPGLITE_TEST_PLUGIN_DIR"] = str(self.root)
+        symlinked_env["LIBPGLITE_RUN_SYMLINKED_HOST_BUNDLED_PLUGIN_CHILD"] = "1"
+        symlinked_env.pop("LIBPGLITE_TEST_PLUGIN_PATH", None)
+        symlinked_env.pop("LIBPGLITE_TEST_POSTGRES_PREFIX", None)
+        symlinked_env.pop("LIBPGLITE_PLUGIN_PATH", None)
+        symlinked_env.pop("LIBPGLITE_HOME", None)
+        symlinked_host_command = [
+            "cargo",
+            "test",
+            "--features",
+            "dynamic-loading",
+            "--test",
+            "dynamic_plugin",
+            "dynamic_plugin_resolves_bundled_plugin_for_symlinked_host_binary_from_package",
+            "--",
+            "--nocapture",
+        ]
+        print("running package self-test:", " ".join(symlinked_host_command))
+        result = subprocess.run(
+            symlinked_host_command, cwd=repo_root, env=symlinked_env, check=False
+        )
+        if result.returncode != 0:
+            self.errors.append(
+                f"package symlinked-host bundled-plugin self-test failed with exit code {result.returncode}"
             )
 
     def diagnostic_path(self, key: str) -> pathlib.Path | None:

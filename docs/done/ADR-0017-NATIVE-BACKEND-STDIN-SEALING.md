@@ -1,6 +1,6 @@
 # ADR-0017: Native Backend Stdin Sealing
 
-Status: Open
+Status: Done
 
 ## Context
 
@@ -65,11 +65,31 @@ pipe.
 - Verified the focused stdin-sealing test against the locally rebuilt native
   release plugin.
 
-## Remaining Closure Criteria
+2026-06-15: downstream Swarm has since verified the real product-host failure
+mode under an interactive PTY and a public symlinked command: the durable
+native-libpglite provider path completes without requiring shell suspend/resume.
+The remaining libpglite closure work is enforcement polish: preflight already
+creates a `stdin-sealed-startup` conformance result, but package creation and
+package doctor do not yet require that structured result the same way they
+require `raw-protocol`, `tokio-postgres-client`, `prefix-initialize`, and
+`prefix-resume`.
 
-- Run full libpglite formatting/tests after downstream integration.
-- Rebuild the packaged native plugin consumed by a product host and prove
-  interactive execution no longer stalls or changes behavior after
-  suspend/resume.
-- Run package doctor or the native preflight path that exercises this test from
-  the packaged archive.
+## Closing Evidence
+
+- `NativeBackendStdioLease` redirects native backend stdin to `/dev/null` while
+  stdout/stderr are captured into the backend-output ledger, then restores all
+  three descriptors when the call boundary ends.
+- `dynamic_plugin_native_startup_seals_inherited_stdin` spawns a child with a
+  live inherited stdin pipe and proves native startup completes without reading
+  or blocking on fd 0.
+- `scripts/package-native-plugin-release.sh` now requires
+  `stdin-sealed-startup.{json,log}` beside the other structured conformance
+  results before a native package can be created.
+- `scripts/doctor-native-plugin-package.py` validates the
+  `stdin-sealed-startup` conformance result and checks command fragments for
+  `dynamic_plugin_native_startup_seals_inherited_stdin`.
+- `scripts/test-doctor-native-plugin-package.py` proves stale packages missing
+  `stdin-sealed-startup.{json,log}` fail package doctor validation.
+- `scripts/doctor-native-plugin-package.py --self-test
+  dist/preflight-native-plugin/libpglite-plugin-native-v0.1.0-aarch64-apple-darwin.tar.zst`
+  passed with the stdin-sealed-startup self-test included.

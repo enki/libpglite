@@ -42,6 +42,22 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         self.assertIn("dynamic_plugin_tokio_postgres_client_child", text)
         self.assertIn("package tokio-postgres self-test failed", text)
 
+    def test_package_self_test_runs_product_bundled_resolution_from_extracted_package(self):
+        text = SCRIPT.read_text()
+        self.assertIn("LIBPGLITE_RUN_CURRENT_EXE_BUNDLED_PLUGIN_CHILD", text)
+        self.assertIn("dynamic_plugin_open_uses_current_exe_bundled_plugin_default", text)
+        self.assertIn("package current-exe bundled-plugin self-test failed", text)
+        self.assertIn("LIBPGLITE_RUN_SYMLINKED_HOST_BUNDLED_PLUGIN_CHILD", text)
+        self.assertIn(
+            "dynamic_plugin_resolves_bundled_plugin_for_symlinked_host_binary_from_package",
+            text,
+        )
+        self.assertIn("package symlinked-host bundled-plugin self-test failed", text)
+        self.assertIn('current_exe_env.pop("LIBPGLITE_PLUGIN_PATH", None)', text)
+        self.assertIn('current_exe_env.pop("LIBPGLITE_HOME", None)', text)
+        self.assertIn('symlinked_env.pop("LIBPGLITE_PLUGIN_PATH", None)', text)
+        self.assertIn('symlinked_env.pop("LIBPGLITE_HOME", None)', text)
+
     def make_doctor(
         self,
         plugin_symbols: set[str],
@@ -294,6 +310,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         self.assertIn("conformance result raw-protocol.json exitCode is not 0", errors)
         self.assertIn("conformance result raw-protocol.json logSha256 mismatch", errors)
         self.assertIn("conformance result is missing: tokio-postgres-client.json", errors)
+        self.assertIn("conformance result is missing: stdin-sealed-startup.json", errors)
 
     def test_raw_protocol_conformance_must_name_required_cases(self):
         tempdir, doctor = self.make_doctor(
@@ -344,6 +361,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         for name in [
             "raw-protocol",
             "tokio-postgres-client",
+            "stdin-sealed-startup",
             "prefix-initialize",
             "prefix-resume",
         ]:
@@ -387,6 +405,7 @@ class DoctorDiagnosticsTests(unittest.TestCase):
                 "cargo test --features dynamic-loading --test dynamic_plugin"
             ),
             "tokio-postgres-client": "cargo test --test unrelated",
+            "stdin-sealed-startup": "cargo test --test unrelated",
             "prefix-initialize": (
                 "env LIBPGLITE_RUN_PREFIX_INITIALIZE_CHILD=1 "
                 "cargo test --features dynamic-loading --test dynamic_plugin "
@@ -425,6 +444,11 @@ class DoctorDiagnosticsTests(unittest.TestCase):
         )
         self.assertIn("LIBPGLITE_RUN_TOKIO_POSTGRES_CHILD=1", errors)
         self.assertIn("dynamic_plugin_tokio_postgres_client_child", errors)
+        self.assertIn(
+            "conformance result stdin-sealed-startup.json command is missing fragments",
+            errors,
+        )
+        self.assertIn("dynamic_plugin_native_startup_seals_inherited_stdin", errors)
 
     def test_plugin_symbol_diagnostic_must_match_actual_exports(self):
         tempdir, doctor = self.make_doctor(

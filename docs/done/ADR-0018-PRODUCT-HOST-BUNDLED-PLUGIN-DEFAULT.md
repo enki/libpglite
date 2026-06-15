@@ -1,6 +1,6 @@
 # ADR-0018: Product Host Bundled Plugin Default
 
-Status: Open
+Status: Done
 
 ## Context
 
@@ -63,9 +63,34 @@ defaults to no cache root, and `from_env()` admits only explicit
 `LIBPGLITE_HOME`. Focused release tests prove explicit cache resolution still
 works while an ambient cache is not used without an admitted root.
 
-## Remaining Closure Criteria
+2026-06-15: downstream Swarm ADR-2088 confirms this is the right owner-boundary
+law for real product hosts. Swarm's `ss` runtime path must rely on
+`DynamicPgliteRuntime::open(...)` reaching libpglite's bundled current-exe
+resolver; Swarm must not compensate with a local cache resolver or
+`LIBPGLITE_HOME` fallback. Libpglite still needs package-level proof that the
+product-facing default works from a current executable, not only through
+explicit plugin-directory test helpers.
 
-- Package preflight or package doctor should exercise the product-facing default
-  from an extracted product-host binary.
-- Missing-plugin diagnostics from the dynamic runtime should be captured in a
-  focused failure test or package-doctor check.
+## Closing Evidence
+
+- `DynamicPgliteRuntime::open(...)` reaches
+  `release::resolve_native_plugin()`, which resolves through the bundled
+  current-executable product path.
+- `NativePluginResolver::new()` has no ambient cache root, and
+  `NativePluginResolver::from_env()` admits a cache only through explicit
+  `LIBPGLITE_HOME`; exact `LIBPGLITE_PLUGIN_PATH` override remains higher
+  priority.
+- `native_plugin_resolver_does_not_use_ambient_cache_without_explicit_root`
+  proves product runtime resolution does not silently fall back to a user-local
+  release cache.
+- `bundled_resolver_missing_plugin_error_names_product_paths_not_cache` proves
+  product-path missing-plugin diagnostics name bundled executable-derived
+  resolution and the exact plugin override, without directing hosts to a cache.
+- `dynamic_plugin_open_uses_current_exe_bundled_plugin_default` runs from an
+  extracted native package with `LIBPGLITE_PLUGIN_PATH`, `LIBPGLITE_HOME`,
+  `LIBPGLITE_TEST_PLUGIN_PATH`, and `LIBPGLITE_TEST_POSTGRES_PREFIX` removed,
+  then proves `DynamicPgliteRuntime::open(...)` finds the plugin and Postgres
+  prefix through current-executable bundled resolution.
+- `scripts/doctor-native-plugin-package.py --self-test
+  dist/preflight-native-plugin/libpglite-plugin-native-v0.1.0-aarch64-apple-darwin.tar.zst`
+  passed with the product current-exe bundled default self-test included.

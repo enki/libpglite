@@ -1,6 +1,6 @@
 # ADR-0016: Symlinked Host Binary Bundled Plugin Resolution
 
-Status: Open
+Status: Done
 
 ## Context
 
@@ -63,10 +63,29 @@ Verification so far:
 The ADR remains open until the native package preflight/package doctor includes
 or directly exercises this resolver behavior.
 
-## Remaining Closure Criteria
+2026-06-15: downstream Swarm confirms this topology matters for real product
+hosts: development and installed commands can launch through stable symlinks
+while the actual `ss` binary and bundled native-libpglite package live in a
+build or release directory. The libpglite resolver behavior is correct, but the
+release/package gate still needs to prove the behavior from an extracted package
+instead of relying only on path-level unit tests.
 
-- Add native package preflight or package-doctor coverage that exercises
-  symlinked host-binary bundled-plugin resolution from an extracted package.
-- Add native package preflight or package-doctor coverage that exercises Cargo
-  `deps`-parent bundled-plugin resolution, or document the equivalent release
-  command that runs the focused release test before packaging.
+## Closing Evidence
+
+- `BundledNativePluginResolver` uses a bounded executable-derived frontier:
+  raw executable directory, raw Cargo `deps` parent, canonical executable
+  directory, and canonical Cargo `deps` parent.
+- `bundled_resolver_follows_symlinked_host_binary_to_real_bundle` proves a
+  symlinked host resolves the bundled plugin beside the canonical executable.
+- `bundled_resolver_finds_plugin_from_cargo_deps_parent` keeps Cargo
+  `target/<profile>/deps` parent resolution covered in the release test suite.
+- `bundled_resolver_missing_plugin_error_lists_canonical_symlink_expected_path`
+  proves missing-plugin diagnostics list both raw and canonical
+  executable-derived expected paths for a symlinked product host.
+- `dynamic_plugin_resolves_bundled_plugin_for_symlinked_host_binary_from_package`
+  stages an extracted native package beside a real host executable, launches
+  through an external symlink, and proves the plugin and bundled Postgres prefix
+  are found from the canonical executable location.
+- `scripts/doctor-native-plugin-package.py --self-test
+  dist/preflight-native-plugin/libpglite-plugin-native-v0.1.0-aarch64-apple-darwin.tar.zst`
+  passed with the symlinked-host package self-test included.

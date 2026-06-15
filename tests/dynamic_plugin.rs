@@ -462,6 +462,80 @@ fn dynamic_plugin_uses_bundled_postgres_prefix_from_plugin_dir() {
 }
 
 #[test]
+fn dynamic_plugin_open_uses_current_exe_bundled_plugin_default() {
+    if std::env::var_os("LIBPGLITE_RUN_CURRENT_EXE_BUNDLED_PLUGIN_CHILD").is_none() {
+        return;
+    }
+
+    let _guard = test_guard();
+    let Some(package_dir) = std::env::var_os("LIBPGLITE_TEST_PLUGIN_DIR") else {
+        panic!("LIBPGLITE_TEST_PLUGIN_DIR is required");
+    };
+    let package_dir = std::path::PathBuf::from(package_dir);
+    assert_product_default_env_is_clean();
+    let current_exe = std::env::current_exe().expect("current test exe");
+    let current_exe_dir = current_exe.parent().expect("current test exe parent");
+    stage_bundled_package_assets(&package_dir, current_exe_dir);
+
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let config = PgliteConfig::new(
+        "dynamic-plugin-current-exe-bundled-default-test",
+        tempdir.path().join("pgdata"),
+    );
+    let mut runtime = DynamicPgliteRuntime::open(config)
+        .expect("runtime opens through current-exe bundled plugin resolver");
+
+    startup(&mut runtime);
+    let response = runtime
+        .exec_protocol_raw(&query_message("select 1"))
+        .expect("simple query succeeds through current-exe bundled prefix");
+    assert_no_error_message(&response);
+    assert_message_type(&response, b'D');
+    assert_message_type(&response, b'Z');
+    runtime.shutdown().expect("runtime shuts down");
+}
+
+#[test]
+fn dynamic_plugin_resolves_bundled_plugin_for_symlinked_host_binary_from_package() {
+    if std::env::var_os("LIBPGLITE_RUN_SYMLINKED_HOST_BUNDLED_PLUGIN_CHILD").is_none() {
+        return;
+    }
+
+    let _guard = test_guard();
+    let Some(package_dir) = std::env::var_os("LIBPGLITE_TEST_PLUGIN_DIR") else {
+        panic!("LIBPGLITE_TEST_PLUGIN_DIR is required");
+    };
+    let package_dir = std::path::PathBuf::from(package_dir);
+    assert_product_default_env_is_clean();
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let real_host_dir = tempdir.path().join("real-host");
+    let shim_dir = tempdir.path().join("shim");
+    std::fs::create_dir_all(&real_host_dir).expect("create real host dir");
+    std::fs::create_dir_all(&shim_dir).expect("create shim dir");
+    stage_bundled_package_assets(&package_dir, &real_host_dir);
+    let real_host = real_host_dir.join("product-host-test");
+    std::fs::write(&real_host, b"host").expect("write real host placeholder");
+    let shim_host = shim_dir.join("product-host-test");
+    create_symlinked_host(&real_host, &shim_host);
+
+    let config = PgliteConfig::new(
+        "dynamic-plugin-symlinked-host-bundled-test",
+        tempdir.path().join("pgdata"),
+    );
+    let mut runtime = DynamicPgliteRuntime::initialize_with_bundled_plugin(config, &shim_host)
+        .expect("runtime opens through symlinked host canonical bundled plugin resolver");
+
+    startup(&mut runtime);
+    let response = runtime
+        .exec_protocol_raw(&query_message("select 1"))
+        .expect("simple query succeeds through symlinked host bundled prefix");
+    assert_no_error_message(&response);
+    assert_message_type(&response, b'D');
+    assert_message_type(&response, b'Z');
+    runtime.shutdown().expect("runtime shuts down");
+}
+
+#[test]
 fn dynamic_plugin_prefix_initialize_child() {
     if std::env::var_os("LIBPGLITE_RUN_PREFIX_INITIALIZE_CHILD").is_none() {
         return;
@@ -496,6 +570,83 @@ fn dynamic_plugin_prefix_initialize_child() {
         data_dir.join("PG_VERSION").is_file(),
         "runtime should initialize missing data directory"
     );
+}
+
+fn assert_product_default_env_is_clean() {
+    assert!(
+        std::env::var_os("LIBPGLITE_PLUGIN_PATH").is_none(),
+        "product-default package test must not receive LIBPGLITE_PLUGIN_PATH"
+    );
+    assert!(
+        std::env::var_os("LIBPGLITE_HOME").is_none(),
+        "product-default package test must not receive LIBPGLITE_HOME"
+    );
+    assert!(
+        std::env::var_os("LIBPGLITE_TEST_PLUGIN_PATH").is_none(),
+        "product-default package test must not receive LIBPGLITE_TEST_PLUGIN_PATH"
+    );
+    assert!(
+        std::env::var_os("LIBPGLITE_TEST_POSTGRES_PREFIX").is_none(),
+        "product-default package test must not receive LIBPGLITE_TEST_POSTGRES_PREFIX"
+    );
+}
+
+fn stage_bundled_package_assets(package_dir: &std::path::Path, host_dir: &std::path::Path) {
+    let asset = libpglite::release::current_native_plugin_asset()
+        .expect("current target has native plugin asset");
+    let source_plugin = package_dir.join(asset.plugin_filename);
+    let source_postgres = package_dir.join(libpglite::release::POSTGRES_PREFIX_DIR);
+    assert!(
+        source_plugin.is_file(),
+        "package plugin is missing: {}",
+        source_plugin.display()
+    );
+    assert!(
+        source_postgres.is_dir(),
+        "package postgres prefix is missing: {}",
+        source_postgres.display()
+    );
+    let dest_plugin = host_dir.join(asset.plugin_filename);
+    let dest_postgres = host_dir.join(libpglite::release::POSTGRES_PREFIX_DIR);
+    std::fs::copy(&source_plugin, &dest_plugin).expect("stage bundled plugin beside host");
+    if dest_postgres.exists() {
+        std::fs::remove_dir_all(&dest_postgres).expect("remove stale bundled postgres prefix");
+    }
+    copy_dir_all(&source_postgres, &dest_postgres)
+        .expect("stage bundled postgres prefix beside host");
+}
+
+fn copy_dir_all(source: &std::path::Path, dest: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dest)?;
+    for entry in std::fs::read_dir(source)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let source_path = entry.path();
+        let dest_path = dest.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_all(&source_path, &dest_path)?;
+        } else if file_type.is_symlink() {
+            let target = std::fs::read_link(&source_path)?;
+            create_symlink(&target, &dest_path)?;
+        } else {
+            std::fs::copy(&source_path, &dest_path)?;
+        }
+    }
+    Ok(())
+}
+
+fn create_symlinked_host(real_host: &std::path::Path, shim_host: &std::path::Path) {
+    create_symlink(real_host, shim_host).expect("create symlinked host binary");
+}
+
+#[cfg(unix)]
+fn create_symlink(source: &std::path::Path, dest: &std::path::Path) -> std::io::Result<()> {
+    std::os::unix::fs::symlink(source, dest)
+}
+
+#[cfg(windows)]
+fn create_symlink(source: &std::path::Path, dest: &std::path::Path) -> std::io::Result<()> {
+    std::os::windows::fs::symlink_file(source, dest)
 }
 
 #[test]
