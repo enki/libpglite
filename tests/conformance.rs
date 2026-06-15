@@ -31,7 +31,7 @@ fn config_rejects_empty_authority_fields() {
 
 #[test]
 fn plugin_abi_status_layout_is_stable() {
-    assert_eq!(LIBPGLITE_PLUGIN_ABI_VERSION, 1);
+    assert_eq!(LIBPGLITE_PLUGIN_ABI_VERSION, 2);
     assert_eq!(LIBPGLITE_PLUGIN_STATUS_OK, 0);
     assert_eq!(LIBPGLITE_PLUGIN_STATUS_ERROR, 1);
     assert_eq!(

@@ -58,7 +58,7 @@ impl Default for NativePluginResolver {
     fn default() -> Self {
         Self {
             plugin_path: None,
-            cache_root: default_cache_root(),
+            cache_root: None,
         }
     }
 }
@@ -152,9 +152,7 @@ impl NativePluginResolver {
     pub fn from_env() -> Self {
         Self {
             plugin_path: std::env::var_os(LIBPGLITE_PLUGIN_PATH_ENV).map(PathBuf::from),
-            cache_root: std::env::var_os(LIBPGLITE_HOME_ENV)
-                .map(PathBuf::from)
-                .or_else(default_cache_root),
+            cache_root: std::env::var_os(LIBPGLITE_HOME_ENV).map(PathBuf::from),
         }
     }
 
@@ -254,13 +252,7 @@ impl BundledNativePluginResolver {
         }
 
         if let Some(host_binary_path) = &self.host_binary_path {
-            let plugin_dir = host_binary_path.parent().ok_or_else(|| {
-                PgliteError::initialize(format!(
-                    "host binary path `{}` has no parent directory for bundled libpglite plugin resolution",
-                    host_binary_path.display()
-                ))
-            })?;
-            return resolve_bundled_plugin_in_dir(asset, plugin_dir);
+            return resolve_bundled_plugin_for_host_binary(asset, host_binary_path);
         }
 
         Err(PgliteError::initialize(format!(
@@ -274,7 +266,18 @@ pub fn current_native_plugin_asset() -> PgliteResult<NativePluginAsset> {
 }
 
 pub fn resolve_native_plugin() -> PgliteResult<ResolvedNativePlugin> {
-    NativePluginResolver::from_env().resolve()
+    resolve_bundled_native_plugin_for_current_exe()
+}
+
+pub fn resolve_bundled_native_plugin_for_current_exe() -> PgliteResult<ResolvedNativePlugin> {
+    let current_exe = std::env::current_exe().map_err(|err| {
+        PgliteError::initialize(format!(
+            "failed to read current executable path for bundled libpglite plugin resolution: {err}"
+        ))
+    })?;
+    BundledNativePluginResolver::from_env()
+        .with_host_binary_path(current_exe)
+        .resolve()
 }
 
 pub fn expected_checksum(checksums: &str, asset_name: &str) -> PgliteResult<String> {
@@ -309,6 +312,67 @@ pub fn verify_file_checksum(checksums: &str, asset_name: &str, path: &Path) -> P
     Ok(())
 }
 
+fn resolve_bundled_plugin_for_host_binary(
+    asset: NativePluginAsset,
+    host_binary_path: &Path,
+) -> PgliteResult<ResolvedNativePlugin> {
+    let mut candidate_dirs = Vec::new();
+    push_host_binary_plugin_candidate_dirs(&mut candidate_dirs, host_binary_path)?;
+    if let Ok(canonical_host_binary_path) = std::fs::canonicalize(host_binary_path) {
+        push_host_binary_plugin_candidate_dirs(&mut candidate_dirs, &canonical_host_binary_path)?;
+    }
+
+    let mut expected_paths = Vec::new();
+    for candidate_dir in candidate_dirs {
+        let plugin_path = asset.plugin_path_in_dir(&candidate_dir);
+        if plugin_path.is_file() {
+            return Ok(ResolvedNativePlugin {
+                path: plugin_path,
+                postgres_prefix: packaged_postgres_prefix(Some(&candidate_dir)),
+                source: NativePluginSource::Bundled,
+                asset,
+            });
+        }
+        expected_paths.push(plugin_path);
+    }
+
+    Err(PgliteError::initialize(format!(
+        "bundled libpglite plugin `{}` was not found next to host binary `{}`; expected one of {}",
+        asset.plugin_filename,
+        host_binary_path.display(),
+        expected_paths
+            .iter()
+            .map(|path| format!("`{}`", path.display()))
+            .collect::<Vec<_>>()
+            .join(", ")
+    )))
+}
+
+fn push_host_binary_plugin_candidate_dirs(
+    candidate_dirs: &mut Vec<PathBuf>,
+    host_binary_path: &Path,
+) -> PgliteResult<()> {
+    let binary_dir = host_binary_path.parent().ok_or_else(|| {
+        PgliteError::initialize(format!(
+            "host binary path `{}` has no parent directory for bundled libpglite plugin resolution",
+            host_binary_path.display()
+        ))
+    })?;
+    push_unique_path(candidate_dirs, binary_dir);
+    if binary_dir.file_name().is_some_and(|name| name == "deps")
+        && let Some(parent_dir) = binary_dir.parent()
+    {
+        push_unique_path(candidate_dirs, parent_dir);
+    }
+    Ok(())
+}
+
+fn push_unique_path(paths: &mut Vec<PathBuf>, path: &Path) {
+    if !paths.iter().any(|candidate| candidate == path) {
+        paths.push(path.to_path_buf());
+    }
+}
+
 fn resolve_bundled_plugin_in_dir(
     asset: NativePluginAsset,
     plugin_dir: &Path,
@@ -338,13 +402,18 @@ fn missing_plugin_message(asset: &NativePluginAsset, cache_root: Option<&Path>) 
     let cache_hint = cache_root
         .map(|root| {
             format!(
-                ", or install the plugin at `{}`",
+                " The explicit {LIBPGLITE_HOME_ENV} cache root was `{}` and the expected cached plugin path was `{}`.",
+                root.display(),
                 asset.cached_plugin_path(root).display()
             )
         })
-        .unwrap_or_default();
+        .unwrap_or_else(|| {
+            format!(
+                " No cache root was admitted; product hosts should use bundled plugin resolution instead of a user-local cache."
+            )
+        });
     format!(
-        "native libpglite plugin for target `{}` was not found. Set {LIBPGLITE_PLUGIN_PATH_ENV} to an exact plugin path{cache_hint}. Expected release asset: {}",
+        "native libpglite plugin for target `{}` was not found. Set {LIBPGLITE_PLUGIN_PATH_ENV} to an exact plugin path or provide an explicit {LIBPGLITE_HOME_ENV} cache root for release tooling.{cache_hint} Expected release asset: {}",
         asset.target,
         asset.archive_url()
     )
@@ -377,12 +446,6 @@ fn plugin_filename_for_target(target: &str) -> &'static str {
     } else {
         "liblibpglite_plugin_native.so"
     }
-}
-
-fn default_cache_root() -> Option<PathBuf> {
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join(".cache").join("libpglite"))
 }
 
 fn release_asset_name(suffix: &str) -> String {

@@ -15,7 +15,7 @@ use crate::plugin_abi::{
 };
 use crate::release;
 use crate::release::ResolvedNativePlugin;
-use crate::{PgliteConfig, PgliteError, PgliteResult, PgliteRuntime};
+use crate::{PgliteBackendOutputLedger, PgliteConfig, PgliteError, PgliteResult, PgliteRuntime};
 
 type PluginAbiVersionFn = unsafe extern "C" fn() -> u32;
 type PluginBufferFreeFn = unsafe extern "C" fn(LibpglitePluginBuffer);
@@ -25,6 +25,7 @@ type RuntimeDestroyFn = unsafe extern "C" fn(*mut c_void);
 type RuntimeExecProtocolRawFn =
     unsafe extern "C" fn(*mut c_void, *const u8, usize) -> LibpglitePluginStatus;
 type RuntimeShutdownFn = unsafe extern "C" fn(*mut c_void) -> LibpglitePluginStatus;
+type RuntimeTakeBackendOutputFn = unsafe extern "C" fn(*mut c_void) -> LibpglitePluginStatus;
 
 #[derive(Debug)]
 pub struct DynamicPgliteRuntime {
@@ -42,6 +43,7 @@ struct DynamicPlugin {
     runtime_destroy: RuntimeDestroyFn,
     runtime_exec_protocol_raw: RuntimeExecProtocolRawFn,
     runtime_shutdown: RuntimeShutdownFn,
+    runtime_take_backend_output: RuntimeTakeBackendOutputFn,
 }
 
 impl DynamicPgliteRuntime {
@@ -130,6 +132,22 @@ impl PgliteRuntime for DynamicPgliteRuntime {
         self.shutdown = true;
         Ok(())
     }
+
+    fn take_backend_output(&mut self) -> PgliteBackendOutputLedger {
+        if self.runtime.is_null() {
+            return PgliteBackendOutputLedger::empty();
+        }
+        let status = unsafe { (self.plugin.runtime_take_backend_output)(self.runtime) };
+        self.plugin
+            .status_json(status, PgliteError::protocol)
+            .unwrap_or_else(|err| PgliteBackendOutputLedger {
+                records: vec![crate::PgliteBackendOutputRecord::new(
+                    crate::PgliteBackendOutputStream::Stderr,
+                    "dynamic_plugin_take_backend_output",
+                    err.to_string(),
+                )],
+            })
+    }
 }
 
 fn config_with_resolved_plugin_environment(
@@ -200,6 +218,9 @@ impl DynamicPlugin {
                 symbol(&library, b"libpglite_plugin_runtime_exec_protocol_raw")?
             },
             runtime_shutdown: unsafe { symbol(&library, b"libpglite_plugin_runtime_shutdown")? },
+            runtime_take_backend_output: unsafe {
+                symbol(&library, b"libpglite_plugin_runtime_take_backend_output")?
+            },
             _library: ManuallyDrop::new(library),
         })
     }

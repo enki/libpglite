@@ -14,15 +14,27 @@ use std::ffi::CString;
 #[cfg(libpglite_native_link_pglite)]
 use std::ffi::c_void;
 #[cfg(libpglite_native_link_pglite)]
+use std::fs::{self, File, OpenOptions};
+#[cfg(libpglite_native_link_pglite)]
+use std::io::{Read, Seek, SeekFrom};
+#[cfg(libpglite_native_link_pglite)]
+use std::os::fd::{AsRawFd, RawFd};
+#[cfg(libpglite_native_link_pglite)]
 use std::path::{Path, PathBuf};
 #[cfg(libpglite_native_link_pglite)]
 use std::process::Command;
 #[cfg(libpglite_native_link_pglite)]
 use std::ptr;
 #[cfg(libpglite_native_link_pglite)]
-use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, Ordering};
+#[cfg(libpglite_native_link_pglite)]
+use std::sync::{Mutex, OnceLock};
 
-use libpglite::{PgliteConfig, PgliteError, PgliteResult, PgliteRuntime};
+use libpglite::{
+    PgliteBackendOutputLedger, PgliteConfig, PgliteError, PgliteResult, PgliteRuntime,
+};
+#[cfg(libpglite_native_link_pglite)]
+use libpglite::{PgliteBackendOutputRecord, PgliteBackendOutputStream};
 
 #[cfg(libpglite_native_link_pglite)]
 const POSTGRES_PREFIX_ENV: &str = "LIBPGLITE_POSTGRES_PREFIX";
@@ -89,6 +101,8 @@ pub struct NativePgliteRuntime {
     config: PgliteConfig,
     #[cfg(libpglite_native_link_pglite)]
     transport: Box<NativeTransport>,
+    #[cfg(libpglite_native_link_pglite)]
+    backend_output: PgliteBackendOutputLedger,
     shutdown: bool,
 }
 
@@ -118,6 +132,8 @@ impl NativeTransport {
 static ACTIVE_TRANSPORT: AtomicPtr<NativeTransport> = AtomicPtr::new(ptr::null_mut());
 #[cfg(libpglite_native_link_pglite)]
 static NATIVE_BACKEND_START_ATTEMPTED: AtomicBool = AtomicBool::new(false);
+#[cfg(libpglite_native_link_pglite)]
+static NATIVE_STDIO_CAPTURE_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 impl PgliteRuntime for NativePgliteRuntime {
     fn open(config: PgliteConfig) -> PgliteResult<Self> {
@@ -133,13 +149,17 @@ impl PgliteRuntime for NativePgliteRuntime {
             let mut runtime = Self {
                 config,
                 transport: Box::default(),
+                backend_output: PgliteBackendOutputLedger::empty(),
                 shutdown: false,
             };
             ACTIVE_TRANSPORT.store(&mut *runtime.transport, Ordering::SeqCst);
             unsafe {
                 ffi::pgl_set_rw_cbs(Some(native_read), Some(native_write));
             }
-            if let Err(err) = runtime.start_postgres() {
+            if let Err(err) = runtime.with_backend_stdio_capture(
+                NativeBackendStdioPhase::Startup,
+                NativePgliteRuntime::start_postgres,
+            ) {
                 ACTIVE_TRANSPORT.store(ptr::null_mut(), Ordering::SeqCst);
                 unsafe {
                     ffi::pgl_set_rw_cbs(None, None);
@@ -184,26 +204,29 @@ impl PgliteRuntime for NativePgliteRuntime {
                 return Ok(self.transport.finish());
             }
 
-            while self.transport.read_offset < self.transport.input.len()
-                || unsafe { ffi::libpglite_native_pq_buffer_remaining_data() } > 0
-            {
-                let status = unsafe { ffi::libpglite_native_postgres_main_loop_once() };
-                match status {
-                    0 => {}
-                    POSTGRES_MAIN_LONGJMP => {
-                        check_status(
-                            unsafe { ffi::libpglite_native_postgres_main_longjmp() },
-                            "PostgresMainLongJmp",
-                        )?;
-                    }
-                    PGLITE_EXIT_ALIVE => break,
-                    other => {
-                        return Err(PgliteError::protocol(format!(
-                            "PostgresMainLoopOnce exited with status {other}"
-                        )));
+            self.with_backend_stdio_capture(NativeBackendStdioPhase::Protocol, |runtime| {
+                while runtime.transport.read_offset < runtime.transport.input.len()
+                    || unsafe { ffi::libpglite_native_pq_buffer_remaining_data() } > 0
+                {
+                    let status = unsafe { ffi::libpglite_native_postgres_main_loop_once() };
+                    match status {
+                        0 => {}
+                        POSTGRES_MAIN_LONGJMP => {
+                            check_status(
+                                unsafe { ffi::libpglite_native_postgres_main_longjmp() },
+                                "PostgresMainLongJmp",
+                            )?;
+                        }
+                        PGLITE_EXIT_ALIVE => break,
+                        other => {
+                            return Err(PgliteError::protocol(format!(
+                                "PostgresMainLoopOnce exited with status {other}"
+                            )));
+                        }
                     }
                 }
-            }
+                Ok(())
+            })?;
 
             check_status(
                 unsafe { ffi::libpglite_native_postgres_send_ready_for_query_if_necessary() },
@@ -229,20 +252,47 @@ impl PgliteRuntime for NativePgliteRuntime {
             return Ok(());
         }
         #[cfg(libpglite_native_link_pglite)]
-        unsafe {
+        self.with_backend_stdio_capture(NativeBackendStdioPhase::Shutdown, |runtime| unsafe {
             let _ = ffi::libpglite_native_pgl_set_active(0);
             let status = ffi::libpglite_native_pgl_run_atexit_funcs();
             ACTIVE_TRANSPORT.store(ptr::null_mut(), Ordering::SeqCst);
             ffi::pgl_set_rw_cbs(None, None);
             check_status(status, "pgl_run_atexit_funcs")?;
-            remove_current_single_user_postmaster_pid(&self.config.data_dir)?;
-        }
+            remove_current_single_user_postmaster_pid(&runtime.config.data_dir)
+        })?;
         self.shutdown = true;
         Ok(())
+    }
+
+    fn take_backend_output(&mut self) -> PgliteBackendOutputLedger {
+        #[cfg(libpglite_native_link_pglite)]
+        {
+            return std::mem::take(&mut self.backend_output);
+        }
+        #[cfg(not(libpglite_native_link_pglite))]
+        {
+            PgliteBackendOutputLedger::empty()
+        }
     }
 }
 
 impl NativePgliteRuntime {
+    #[cfg(libpglite_native_link_pglite)]
+    fn with_backend_stdio_capture<T>(
+        &mut self,
+        phase: NativeBackendStdioPhase,
+        operation: impl FnOnce(&mut Self) -> PgliteResult<T>,
+    ) -> PgliteResult<T> {
+        let _guard = native_stdio_capture_guard().lock().map_err(|_| {
+            PgliteError::initialize("native backend stdio capture guard is poisoned")
+        })?;
+        let lease = NativeBackendStdioLease::begin(phase)?;
+        let result = operation(self);
+        let records = lease.finish()?;
+        self.backend_output.extend(records);
+        result
+    }
+
     #[cfg(libpglite_native_link_pglite)]
     fn start_postgres(&mut self) -> PgliteResult<()> {
         let user = CString::new(self.config.user.as_str())
@@ -322,6 +372,283 @@ fn claim_native_backend_start() -> PgliteResult<()> {
                  deterministic same-process restart requires a future PostgreSQL global-state reset contract",
             )
         })
+}
+
+#[cfg(libpglite_native_link_pglite)]
+#[derive(Debug, Clone, Copy)]
+enum NativeBackendStdioPhase {
+    Startup,
+    Protocol,
+    Shutdown,
+}
+
+#[cfg(libpglite_native_link_pglite)]
+impl NativeBackendStdioPhase {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Startup => "native_backend_startup",
+            Self::Protocol => "native_backend_protocol",
+            Self::Shutdown => "native_backend_shutdown",
+        }
+    }
+}
+
+#[cfg(libpglite_native_link_pglite)]
+struct NativeBackendStdioLease {
+    phase: NativeBackendStdioPhase,
+    stdin: RedirectedFd,
+    stdout: CapturedFd,
+    stderr: CapturedFd,
+    restored: bool,
+}
+
+#[cfg(libpglite_native_link_pglite)]
+impl NativeBackendStdioLease {
+    fn begin(phase: NativeBackendStdioPhase) -> PgliteResult<Self> {
+        unsafe {
+            libc::fflush(ptr::null_mut());
+        }
+        Ok(Self {
+            phase,
+            stdin: RedirectedFd::redirect_to_dev_null(libc::STDIN_FILENO, "stdin")?,
+            stdout: CapturedFd::redirect(libc::STDOUT_FILENO, "stdout")?,
+            stderr: CapturedFd::redirect(libc::STDERR_FILENO, "stderr")?,
+            restored: false,
+        })
+    }
+
+    fn finish(mut self) -> PgliteResult<Vec<PgliteBackendOutputRecord>> {
+        self.restore()?;
+        let mut records = Vec::new();
+        if let Some(text) = self.stdout.read_text()? {
+            records.push(PgliteBackendOutputRecord::new(
+                PgliteBackendOutputStream::Stdout,
+                self.phase.as_str(),
+                text,
+            ));
+        }
+        if let Some(text) = self.stderr.read_text()? {
+            records.push(PgliteBackendOutputRecord::new(
+                PgliteBackendOutputStream::Stderr,
+                self.phase.as_str(),
+                text,
+            ));
+        }
+        Ok(records)
+    }
+
+    fn restore(&mut self) -> PgliteResult<()> {
+        if self.restored {
+            return Ok(());
+        }
+        unsafe {
+            libc::fflush(ptr::null_mut());
+        }
+        self.stderr.restore()?;
+        self.stdout.restore()?;
+        self.stdin.restore()?;
+        self.restored = true;
+        Ok(())
+    }
+}
+
+#[cfg(libpglite_native_link_pglite)]
+impl Drop for NativeBackendStdioLease {
+    fn drop(&mut self) {
+        let _ = self.restore();
+    }
+}
+
+#[cfg(libpglite_native_link_pglite)]
+struct CapturedFd {
+    label: &'static str,
+    fd: RawFd,
+    saved_fd: RawFd,
+    file: File,
+    path: PathBuf,
+    restored: bool,
+}
+
+#[cfg(libpglite_native_link_pglite)]
+struct RedirectedFd {
+    label: &'static str,
+    fd: RawFd,
+    saved_fd: RawFd,
+    restored: bool,
+}
+
+#[cfg(libpglite_native_link_pglite)]
+impl RedirectedFd {
+    fn redirect_to_dev_null(fd: RawFd, label: &'static str) -> PgliteResult<Self> {
+        let file = OpenOptions::new()
+            .read(true)
+            .open("/dev/null")
+            .map_err(|error| {
+                PgliteError::initialize(format!(
+                    "native backend stdio capture failed to open /dev/null for {label}: {error}"
+                ))
+            })?;
+        let saved_fd = unsafe { libc::dup(fd) };
+        if saved_fd < 0 {
+            return Err(PgliteError::initialize(format!(
+                "native backend stdio capture failed to duplicate {label}: {}",
+                std::io::Error::last_os_error()
+            )));
+        }
+        if unsafe { libc::dup2(file.as_raw_fd(), fd) } < 0 {
+            let error = std::io::Error::last_os_error();
+            unsafe {
+                libc::close(saved_fd);
+            }
+            return Err(PgliteError::initialize(format!(
+                "native backend stdio capture failed to redirect {label}: {error}"
+            )));
+        }
+        Ok(Self {
+            label,
+            fd,
+            saved_fd,
+            restored: false,
+        })
+    }
+
+    fn restore(&mut self) -> PgliteResult<()> {
+        if self.restored {
+            return Ok(());
+        }
+        if unsafe { libc::dup2(self.saved_fd, self.fd) } < 0 {
+            return Err(PgliteError::initialize(format!(
+                "native backend stdio capture failed to restore {}: {}",
+                self.label,
+                std::io::Error::last_os_error()
+            )));
+        }
+        unsafe {
+            libc::close(self.saved_fd);
+        }
+        self.restored = true;
+        Ok(())
+    }
+}
+
+#[cfg(libpglite_native_link_pglite)]
+impl Drop for RedirectedFd {
+    fn drop(&mut self) {
+        let _ = self.restore();
+    }
+}
+
+#[cfg(libpglite_native_link_pglite)]
+impl CapturedFd {
+    fn redirect(fd: RawFd, label: &'static str) -> PgliteResult<Self> {
+        let (path, file) = create_capture_file(label)?;
+        let saved_fd = unsafe { libc::dup(fd) };
+        if saved_fd < 0 {
+            return Err(PgliteError::initialize(format!(
+                "native backend stdio capture failed to duplicate {label}: {}",
+                std::io::Error::last_os_error()
+            )));
+        }
+        if unsafe { libc::dup2(file.as_raw_fd(), fd) } < 0 {
+            let error = std::io::Error::last_os_error();
+            unsafe {
+                libc::close(saved_fd);
+            }
+            return Err(PgliteError::initialize(format!(
+                "native backend stdio capture failed to redirect {label}: {error}"
+            )));
+        }
+        Ok(Self {
+            label,
+            fd,
+            saved_fd,
+            file,
+            path,
+            restored: false,
+        })
+    }
+
+    fn restore(&mut self) -> PgliteResult<()> {
+        if self.restored {
+            return Ok(());
+        }
+        if unsafe { libc::dup2(self.saved_fd, self.fd) } < 0 {
+            return Err(PgliteError::initialize(format!(
+                "native backend stdio capture failed to restore {}: {}",
+                self.label,
+                std::io::Error::last_os_error()
+            )));
+        }
+        unsafe {
+            libc::close(self.saved_fd);
+        }
+        self.restored = true;
+        Ok(())
+    }
+
+    fn read_text(&mut self) -> PgliteResult<Option<String>> {
+        self.file.seek(SeekFrom::Start(0)).map_err(|error| {
+            PgliteError::initialize(format!(
+                "native backend stdio capture failed to seek {} output: {error}",
+                self.label
+            ))
+        })?;
+        let mut bytes = Vec::new();
+        self.file.read_to_end(&mut bytes).map_err(|error| {
+            PgliteError::initialize(format!(
+                "native backend stdio capture failed to read {} output: {error}",
+                self.label
+            ))
+        })?;
+        if bytes.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(String::from_utf8_lossy(&bytes).into_owned()))
+        }
+    }
+}
+
+#[cfg(libpglite_native_link_pglite)]
+impl Drop for CapturedFd {
+    fn drop(&mut self) {
+        let _ = self.restore();
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+#[cfg(libpglite_native_link_pglite)]
+fn create_capture_file(label: &'static str) -> PgliteResult<(PathBuf, File)> {
+    for _ in 0..100 {
+        let sequence = NATIVE_STDIO_CAPTURE_SEQUENCE.fetch_add(1, Ordering::SeqCst);
+        let path = std::env::temp_dir().join(format!(
+            "libpglite-native-stdio-{}-{label}-{sequence}.log",
+            std::process::id()
+        ));
+        match OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(file) => return Ok((path, file)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => {
+                return Err(PgliteError::initialize(format!(
+                    "native backend stdio capture failed to create {}: {error}",
+                    path.display()
+                )));
+            }
+        }
+    }
+    Err(PgliteError::initialize(
+        "native backend stdio capture could not allocate a unique capture file",
+    ))
+}
+
+#[cfg(libpglite_native_link_pglite)]
+fn native_stdio_capture_guard() -> &'static Mutex<()> {
+    static GUARD: OnceLock<Mutex<()>> = OnceLock::new();
+    GUARD.get_or_init(|| Mutex::new(()))
 }
 
 #[cfg(libpglite_native_link_pglite)]

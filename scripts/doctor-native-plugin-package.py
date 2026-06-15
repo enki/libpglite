@@ -1219,6 +1219,30 @@ class Doctor:
                 f"package tokio-postgres self-test failed with exit code {result.returncode}"
             )
 
+        stdin_env = os.environ.copy()
+        stdin_env["RUST_TEST_THREADS"] = "1"
+        stdin_env["LIBPGLITE_TEST_PLUGIN_PATH"] = str(plugin_path)
+        stdin_env["LIBPGLITE_TEST_POSTGRES_PREFIX"] = str(postgres_root)
+        stdin_seal_command = [
+            "cargo",
+            "test",
+            "--features",
+            "dynamic-loading",
+            "--test",
+            "dynamic_plugin",
+            "dynamic_plugin_native_startup_seals_inherited_stdin",
+            "--",
+            "--nocapture",
+        ]
+        print("running package self-test:", " ".join(stdin_seal_command))
+        result = subprocess.run(
+            stdin_seal_command, cwd=repo_root, env=stdin_env, check=False
+        )
+        if result.returncode != 0:
+            self.errors.append(
+                f"package stdin-seal self-test failed with exit code {result.returncode}"
+            )
+
         bundled_env = os.environ.copy()
         bundled_env["RUST_TEST_THREADS"] = "1"
         bundled_env["LIBPGLITE_TEST_PLUGIN_DIR"] = str(self.root)

@@ -345,6 +345,13 @@ run_conformance_check tokio-postgres-client \
     cargo test --features dynamic-loading,client-tokio-postgres --test dynamic_plugin \
       dynamic_plugin_tokio_postgres_client_child -- --nocapture
 
+run_conformance_check stdin-sealed-startup \
+  env \
+    LIBPGLITE_TEST_PLUGIN_PATH="$plugin_binary" \
+    LIBPGLITE_TEST_POSTGRES_PREFIX="$postgres_prefix" \
+    cargo test --features dynamic-loading --test dynamic_plugin \
+      dynamic_plugin_native_startup_seals_inherited_stdin -- --nocapture
+
 run_conformance_check prefix-initialize \
   env \
     LIBPGLITE_RUN_PREFIX_INITIALIZE_CHILD=1 \

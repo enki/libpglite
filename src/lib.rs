@@ -18,7 +18,7 @@ pub mod release;
 pub type PgliteResult<T> = Result<T, PgliteError>;
 
 pub mod plugin_abi {
-    pub const LIBPGLITE_PLUGIN_ABI_VERSION: u32 = 1;
+    pub const LIBPGLITE_PLUGIN_ABI_VERSION: u32 = 2;
 
     pub const LIBPGLITE_PLUGIN_STATUS_OK: u32 = 0;
     pub const LIBPGLITE_PLUGIN_STATUS_ERROR: u32 = 1;
@@ -71,6 +71,61 @@ pub struct PgliteConfig {
     pub user: String,
     pub database: String,
     pub environment: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PgliteBackendOutputStream {
+    Stdout,
+    Stderr,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PgliteBackendOutputRecord {
+    pub stream: PgliteBackendOutputStream,
+    pub phase: String,
+    pub text: String,
+}
+
+impl PgliteBackendOutputRecord {
+    pub fn new(
+        stream: PgliteBackendOutputStream,
+        phase: impl Into<String>,
+        text: impl Into<String>,
+    ) -> Self {
+        Self {
+            stream,
+            phase: phase.into(),
+            text: text.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PgliteBackendOutputLedger {
+    pub records: Vec<PgliteBackendOutputRecord>,
+}
+
+impl PgliteBackendOutputLedger {
+    pub fn empty() -> Self {
+        Self {
+            records: Vec::new(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    pub fn push(&mut self, record: PgliteBackendOutputRecord) {
+        self.records.push(record);
+    }
+
+    pub fn extend(&mut self, records: impl IntoIterator<Item = PgliteBackendOutputRecord>) {
+        self.records.extend(records);
+    }
 }
 
 impl PgliteConfig {
@@ -130,6 +185,10 @@ pub trait PgliteRuntime {
     fn exec_protocol_raw(&mut self, message: &[u8]) -> PgliteResult<Vec<u8>>;
 
     fn shutdown(&mut self) -> PgliteResult<()>;
+
+    fn take_backend_output(&mut self) -> PgliteBackendOutputLedger {
+        PgliteBackendOutputLedger::empty()
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

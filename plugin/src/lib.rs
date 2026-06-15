@@ -83,6 +83,13 @@ pub unsafe extern "C" fn libpglite_plugin_runtime_shutdown(
     })
 }
 
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn libpglite_plugin_runtime_take_backend_output(
+    runtime: *mut c_void,
+) -> LibpglitePluginStatus {
+    ffi_status(|| Ok(runtime_mut(runtime)?.runtime.take_backend_output()))
+}
+
 fn ffi_status<T>(operation: impl FnOnce() -> libpglite::PgliteResult<T>) -> LibpglitePluginStatus
 where
     T: serde::Serialize,

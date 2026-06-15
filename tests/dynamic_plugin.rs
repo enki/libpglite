@@ -1,11 +1,13 @@
 #![cfg(feature = "dynamic-loading")]
 
+use libpglite::PgliteBackendOutputLedger;
 use libpglite::PgliteConfig;
 use libpglite::PgliteRuntime;
 use libpglite::dynamic::DynamicPgliteRuntime;
 use std::process::Stdio;
 use std::sync::Mutex;
 use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 
 #[test]
 fn dynamic_plugin_rejects_abi_mismatch_before_runtime_create() {
@@ -80,6 +82,12 @@ fn dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_
     let Some(mut runtime) = load_native_runtime("dynamic-plugin-runtime-test") else {
         return;
     };
+    let startup_output = runtime.take_backend_output();
+    assert_backend_output_contains_phase(&startup_output, "native_backend_startup");
+    assert!(
+        runtime.take_backend_output().is_empty(),
+        "backend output drain must be affine for already-drained startup records"
+    );
 
     startup(&mut runtime);
 
@@ -182,6 +190,8 @@ fn dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_
     assert_pglite_other_extensions(&mut runtime);
 
     runtime.shutdown().expect("runtime shuts down");
+    let shutdown_output = runtime.take_backend_output();
+    assert_backend_output_contains_phase(&shutdown_output, "native_backend_shutdown");
     drop(runtime);
 
     let Some(restart_error) = load_native_runtime_result("dynamic-plugin-restart-test")
@@ -193,6 +203,77 @@ fn dynamic_plugin_executes_queries_and_contrib_extensions_when_native_prefix_is_
     assert!(
         restart_message.contains("only one backend startup per process"),
         "{restart_message}"
+    );
+}
+
+#[test]
+fn dynamic_plugin_native_startup_seals_inherited_stdin() {
+    let Some(plugin_path) = std::env::var_os("LIBPGLITE_TEST_PLUGIN_PATH") else {
+        return;
+    };
+    let Some(postgres_prefix) = std::env::var_os("LIBPGLITE_TEST_POSTGRES_PREFIX") else {
+        return;
+    };
+
+    let mut child = std::process::Command::new(std::env::current_exe().expect("current test exe"))
+        .arg("--exact")
+        .arg("dynamic_plugin_native_startup_seals_inherited_stdin_child")
+        .arg("--nocapture")
+        .env("LIBPGLITE_RUN_STDIN_SEAL_CHILD", "1")
+        .env("LIBPGLITE_TEST_PLUGIN_PATH", plugin_path)
+        .env("LIBPGLITE_TEST_POSTGRES_PREFIX", postgres_prefix)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn stdin-seal child");
+    let held_stdin = child.stdin.take().expect("child stdin is piped");
+    let deadline = Instant::now() + Duration::from_secs(8);
+    while Instant::now() < deadline {
+        if let Some(status) = child.try_wait().expect("poll stdin-seal child") {
+            drop(held_stdin);
+            let output = child.wait_with_output().expect("collect stdin-seal child");
+            assert!(
+                status.success(),
+                "stdin-seal child failed with status {status}\nstdout:\n{}\nstderr:\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+
+    child.kill().expect("kill hung stdin-seal child");
+    drop(held_stdin);
+    let output = child
+        .wait_with_output()
+        .expect("collect killed stdin-seal child");
+    panic!(
+        "native startup inherited a live stdin pipe and blocked instead of sealing fd 0\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn dynamic_plugin_native_startup_seals_inherited_stdin_child() {
+    if std::env::var_os("LIBPGLITE_RUN_STDIN_SEAL_CHILD").is_none() {
+        return;
+    }
+
+    let _guard = test_guard();
+    let Some(mut runtime) = load_native_runtime("dynamic-plugin-stdin-seal-test") else {
+        return;
+    };
+    runtime.shutdown().expect("runtime shuts down");
+}
+
+fn assert_backend_output_contains_phase(ledger: &PgliteBackendOutputLedger, phase: &str) {
+    assert!(
+        ledger.records.iter().any(|record| record.phase == phase),
+        "expected backend output ledger to contain phase {phase}, got {:?}",
+        ledger.records
     );
 }
 
@@ -288,12 +369,15 @@ fn dynamic_plugin_tokio_postgres_client_child() {
         config.user("postgres");
         config.dbname("postgres");
 
-        let (mut client, connection) = libpglite::postgres_client::connect(runtime, &config)
+        let mut session =
+            libpglite::postgres_client::connect_with_driver(runtime, &config, |connection| async {
+                Ok::<_, std::convert::Infallible>(tokio::task::spawn_local(async move {
+                    connection.await.expect("tokio-postgres connection runs");
+                }))
+            })
             .await
-            .expect("tokio-postgres connects through libpglite transport");
-        let connection = tokio::task::spawn_local(async move {
-            connection.await.expect("tokio-postgres connection runs");
-        });
+            .expect("tokio-postgres retained session connects through libpglite transport");
+        let client = session.client_mut();
 
         let row = client
             .query_one(
@@ -333,8 +417,15 @@ fn dynamic_plugin_tokio_postgres_client_child() {
         let rolled_back: bool = row.get(0);
         assert!(rolled_back);
 
-        drop(client);
+        let (_, connection, mut backend_output) = session.into_parts();
         connection.await.expect("connection task joins");
+        let output = backend_output.take_backend_output();
+        assert_backend_output_contains_phase(&output, "native_backend_startup");
+        assert_backend_output_contains_phase(&output, "native_backend_shutdown");
+        assert!(
+            backend_output.take_backend_output().is_empty(),
+            "session backend output drain must be affine"
+        );
     });
 }
 
@@ -552,7 +643,7 @@ static LibpglitePluginStatus json_status(const char *json) {{
 }}
 
 uint32_t libpglite_plugin_abi_version(void) {{
-    return 1;
+    return 2;
 }}
 
 void libpglite_plugin_buffer_free(LibpglitePluginBuffer buffer) {{
@@ -585,6 +676,11 @@ LibpglitePluginStatus libpglite_plugin_runtime_exec_protocol_raw(void *runtime, 
 LibpglitePluginStatus libpglite_plugin_runtime_shutdown(void *runtime) {{
     (void)runtime;
     return json_status("{{}}");
+}}
+
+LibpglitePluginStatus libpglite_plugin_runtime_take_backend_output(void *runtime) {{
+    (void)runtime;
+    return json_status("{{\"records\":[]}}");
 }}
 "#
     ))

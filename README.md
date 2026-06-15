@@ -44,10 +44,7 @@ use libpglite::{PgliteConfig, PgliteRuntime};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = PgliteConfig::new("example-host", "./pgdata");
-    let mut runtime = DynamicPgliteRuntime::initialize_with_bundled_plugin(
-        config,
-        std::env::current_exe()?,
-    )?;
+    let mut runtime = DynamicPgliteRuntime::open(config)?;
 
     let response = runtime.exec_protocol_raw(&[])?;
     assert!(response.is_empty());
@@ -55,6 +52,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+`DynamicPgliteRuntime::open(...)` resolves the plugin through the current host
+executable's bundled-plugin frontier, with `LIBPGLITE_PLUGIN_PATH` as an exact
+override. It does not install from or fall back to a user-local cache. Cache
+resolution is reserved for explicit release tooling via `NativePluginResolver`
+with an admitted cache root.
 
 The first stable runtime contract is PostgreSQL frontend protocol bytes in and
 backend protocol bytes out. Higher-level SQL clients should be layered above

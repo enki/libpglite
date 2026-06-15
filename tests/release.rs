@@ -1,7 +1,7 @@
 use libpglite::release::{
-    BundledNativePluginResolver, LIBPGLITE_PLUGIN_PATH_ENV, NativePluginResolver,
-    NativePluginSource, POSTGRES_PREFIX_DIR, RELEASE_TAG, current_native_plugin_asset,
-    expected_checksum, verify_file_checksum,
+    BundledNativePluginResolver, LIBPGLITE_HOME_ENV, LIBPGLITE_PLUGIN_PATH_ENV,
+    NativePluginResolver, NativePluginSource, POSTGRES_PREFIX_DIR, RELEASE_TAG,
+    current_native_plugin_asset, expected_checksum, verify_file_checksum,
 };
 
 #[test]
@@ -85,6 +85,26 @@ fn resolver_uses_standard_release_cache() {
 }
 
 #[test]
+fn resolver_does_not_use_cache_without_explicit_root() {
+    let asset = current_native_plugin_asset().expect("current target is supported");
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let cached_plugin = asset.cached_plugin_path(tempdir.path());
+    std::fs::create_dir_all(cached_plugin.parent().expect("plugin parent")).expect("cache dir");
+    std::fs::write(&cached_plugin, b"not a real dynamic library").expect("write plugin");
+
+    let error = NativePluginResolver::new()
+        .resolve()
+        .expect_err("ambient cache should not resolve without explicit cache root");
+    let message = error.to_string();
+
+    assert!(
+        !message.contains(&cached_plugin.display().to_string()),
+        "{message}"
+    );
+    assert!(message.contains("No cache root was admitted"), "{message}");
+}
+
+#[test]
 fn bundled_resolver_uses_plugin_next_to_host_binary() {
     let asset = current_native_plugin_asset().expect("current target is supported");
     let tempdir = tempfile::tempdir().expect("tempdir");
@@ -106,6 +126,68 @@ fn bundled_resolver_uses_plugin_next_to_host_binary() {
 }
 
 #[test]
+fn bundled_resolver_uses_canonical_host_binary_for_symlinked_launchers() {
+    let asset = current_native_plugin_asset().expect("current target is supported");
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let real_dir = tempdir.path().join("real");
+    let shim_dir = tempdir.path().join("shim");
+    std::fs::create_dir_all(&real_dir).expect("create real dir");
+    std::fs::create_dir_all(&shim_dir).expect("create shim dir");
+    let real_host_binary = real_dir.join("product-host");
+    let shim_host_binary = shim_dir.join("product-host");
+    let plugin_path = real_dir.join(asset.plugin_filename);
+    let postgres_prefix = real_dir.join(POSTGRES_PREFIX_DIR);
+    std::fs::write(&real_host_binary, b"host").expect("write host placeholder");
+    std::fs::write(&plugin_path, b"not a real dynamic library").expect("write plugin placeholder");
+    std::fs::create_dir_all(&postgres_prefix).expect("create bundled prefix");
+
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&real_host_binary, &shim_host_binary)
+        .expect("create host binary symlink");
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_file(&real_host_binary, &shim_host_binary)
+        .expect("create host binary symlink");
+
+    let resolved = BundledNativePluginResolver::new()
+        .with_host_binary_path(&shim_host_binary)
+        .resolve()
+        .expect("bundled plugin resolves through canonical host binary");
+
+    assert_eq!(
+        resolved.path,
+        std::fs::canonicalize(plugin_path).expect("canonical plugin path")
+    );
+    assert_eq!(
+        resolved.postgres_prefix,
+        Some(std::fs::canonicalize(postgres_prefix).expect("canonical postgres prefix"))
+    );
+    assert_eq!(resolved.source, NativePluginSource::Bundled);
+}
+
+#[test]
+fn bundled_resolver_accepts_plugin_in_parent_of_cargo_deps_test_binary() {
+    let asset = current_native_plugin_asset().expect("current target is supported");
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let deps_dir = tempdir.path().join("deps");
+    std::fs::create_dir_all(&deps_dir).expect("create deps dir");
+    let host_binary = deps_dir.join("product-host-test-binary");
+    let plugin_path = tempdir.path().join(asset.plugin_filename);
+    let postgres_prefix = tempdir.path().join(POSTGRES_PREFIX_DIR);
+    std::fs::write(&host_binary, b"host").expect("write host placeholder");
+    std::fs::write(&plugin_path, b"not a real dynamic library").expect("write plugin placeholder");
+    std::fs::create_dir_all(&postgres_prefix).expect("create bundled prefix");
+
+    let resolved = BundledNativePluginResolver::new()
+        .with_host_binary_path(&host_binary)
+        .resolve()
+        .expect("bundled plugin resolves from parent of Cargo deps dir");
+
+    assert_eq!(resolved.path, plugin_path);
+    assert_eq!(resolved.postgres_prefix, Some(postgres_prefix));
+    assert_eq!(resolved.source, NativePluginSource::Bundled);
+}
+
+#[test]
 fn resolver_missing_plugin_error_is_actionable() {
     let asset = current_native_plugin_asset().expect("current target is supported");
     let tempdir = tempfile::tempdir().expect("tempdir");
@@ -116,6 +198,7 @@ fn resolver_missing_plugin_error_is_actionable() {
     let message = error.to_string();
 
     assert!(message.contains(LIBPGLITE_PLUGIN_PATH_ENV), "{message}");
+    assert!(message.contains(LIBPGLITE_HOME_ENV), "{message}");
     assert!(message.contains(&asset.asset_name), "{message}");
     assert!(message.contains(&asset.archive_url()), "{message}");
     assert!(message.contains(&asset.target), "{message}");
