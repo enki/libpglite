@@ -30,6 +30,8 @@ const POSTGRES_PREFIX_ENV: &str = "LIBPGLITE_POSTGRES_PREFIX";
 const PGLITE_EXIT_ALIVE: i32 = 99;
 #[cfg(libpglite_native_link_pglite)]
 const POSTGRES_MAIN_LONGJMP: i32 = 100;
+#[cfg(any(test, libpglite_native_link_pglite))]
+const POSTMASTER_PID_FILE: &str = "postmaster.pid";
 
 #[cfg(libpglite_native_link_pglite)]
 mod ffi {
@@ -125,6 +127,7 @@ impl PgliteRuntime for NativePgliteRuntime {
             std::hint::black_box(ffi::native_link_probe());
             let postgres_prefix = postgres_prefix(&config)?;
             ensure_data_dir(&postgres_prefix, &config.data_dir)?;
+            remove_stale_single_user_postmaster_pid(&config.data_dir)?;
             claim_native_backend_start()?;
 
             let mut runtime = Self {
@@ -232,6 +235,7 @@ impl PgliteRuntime for NativePgliteRuntime {
             ACTIVE_TRANSPORT.store(ptr::null_mut(), Ordering::SeqCst);
             ffi::pgl_set_rw_cbs(None, None);
             check_status(status, "pgl_run_atexit_funcs")?;
+            remove_current_single_user_postmaster_pid(&self.config.data_dir)?;
         }
         self.shutdown = true;
         Ok(())
@@ -382,6 +386,100 @@ fn ensure_data_dir(postgres_prefix: &Path, data_dir: &Path) -> PgliteResult<()> 
     Ok(())
 }
 
+#[cfg(any(test, libpglite_native_link_pglite))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PostmasterPidLock {
+    SingleUser { pid: i32 },
+    Postmaster,
+}
+
+#[cfg(any(test, libpglite_native_link_pglite))]
+fn remove_stale_single_user_postmaster_pid(data_dir: &std::path::Path) -> PgliteResult<()> {
+    let Some(PostmasterPidLock::SingleUser { pid }) = read_postmaster_pid_lock(data_dir)? else {
+        return Ok(());
+    };
+    if native_process_is_alive(pid) {
+        return Err(PgliteError::initialize(format!(
+            "native PGlite data directory {} is locked by active single-user process {pid}",
+            data_dir.display()
+        )));
+    }
+    remove_postmaster_pid(data_dir, "stale single-user")
+}
+
+#[cfg(any(test, libpglite_native_link_pglite))]
+fn remove_current_single_user_postmaster_pid(data_dir: &std::path::Path) -> PgliteResult<()> {
+    let Some(PostmasterPidLock::SingleUser { pid }) = read_postmaster_pid_lock(data_dir)? else {
+        return Ok(());
+    };
+    if pid != std::process::id() as i32 {
+        if native_process_is_alive(pid) {
+            return Err(PgliteError::shutdown(format!(
+                "native PGlite data directory {} is locked by active single-user process {pid}",
+                data_dir.display()
+            )));
+        }
+        return remove_postmaster_pid(data_dir, "stale single-user");
+    }
+    remove_postmaster_pid(data_dir, "current single-user")
+}
+
+#[cfg(any(test, libpglite_native_link_pglite))]
+fn read_postmaster_pid_lock(data_dir: &std::path::Path) -> PgliteResult<Option<PostmasterPidLock>> {
+    let path = data_dir.join(POSTMASTER_PID_FILE);
+    let contents = match std::fs::read_to_string(&path) {
+        Ok(contents) => contents,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(PgliteError::initialize(format!(
+                "failed to read native PGlite lockfile {}: {error}",
+                path.display()
+            )));
+        }
+    };
+    let Some(first_line) = contents.lines().next() else {
+        return Ok(Some(PostmasterPidLock::Postmaster));
+    };
+    let Ok(raw_pid) = first_line.trim().parse::<i64>() else {
+        return Ok(Some(PostmasterPidLock::Postmaster));
+    };
+    if raw_pid >= 0 {
+        return Ok(Some(PostmasterPidLock::Postmaster));
+    }
+    let pid = raw_pid
+        .checked_abs()
+        .and_then(|pid| i32::try_from(pid).ok())
+        .ok_or_else(|| {
+            PgliteError::initialize(format!(
+                "native PGlite single-user lock pid is outside supported range in {}",
+                path.display()
+            ))
+        })?;
+    Ok(Some(PostmasterPidLock::SingleUser { pid }))
+}
+
+#[cfg(any(test, libpglite_native_link_pglite))]
+fn remove_postmaster_pid(data_dir: &std::path::Path, lock_kind: &'static str) -> PgliteResult<()> {
+    let path = data_dir.join(POSTMASTER_PID_FILE);
+    match std::fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(PgliteError::initialize(format!(
+            "failed to remove {lock_kind} native PGlite lockfile {}: {error}",
+            path.display()
+        ))),
+    }
+}
+
+#[cfg(any(test, libpglite_native_link_pglite))]
+fn native_process_is_alive(pid: i32) -> bool {
+    if pid <= 0 {
+        return false;
+    }
+    let status = unsafe { libc::kill(pid, 0) };
+    status == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+}
+
 #[cfg(libpglite_native_link_pglite)]
 fn check_status(status: i32, operation: &str) -> PgliteResult<()> {
     if status == 0 {
@@ -431,4 +529,82 @@ unsafe extern "C" fn native_write(buffer: *const c_void, length: usize) -> isize
     let bytes = unsafe { std::slice::from_raw_parts(buffer.cast::<u8>(), length) };
     unsafe { &mut *transport }.output.extend_from_slice(bytes);
     length as isize
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn unique_data_dir(label: &str) -> std::path::PathBuf {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock is after Unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "libpglite-native-{label}-{}-{timestamp}",
+            std::process::id(),
+        ))
+    }
+
+    fn with_data_dir(label: &str, test: impl FnOnce(&std::path::Path)) {
+        let data_dir = unique_data_dir(label);
+        std::fs::create_dir_all(&data_dir).expect("create temp native data dir");
+        test(&data_dir);
+        std::fs::remove_dir_all(&data_dir).expect("remove temp native data dir");
+    }
+
+    fn write_postmaster_pid(data_dir: &std::path::Path, first_line: impl std::fmt::Display) {
+        std::fs::write(
+            data_dir.join(POSTMASTER_PID_FILE),
+            format!("{first_line}\n{}\n0\n5432\n", data_dir.display()),
+        )
+        .expect("write postmaster.pid");
+    }
+
+    #[test]
+    fn stale_single_user_postmaster_pid_is_removed_before_startup() {
+        with_data_dir("stale-single-user", |data_dir| {
+            write_postmaster_pid(data_dir, -2_147_483_647_i64);
+
+            remove_stale_single_user_postmaster_pid(data_dir)
+                .expect("remove stale single-user postmaster.pid");
+
+            assert!(!data_dir.join(POSTMASTER_PID_FILE).exists());
+        });
+    }
+
+    #[test]
+    fn positive_postmaster_pid_is_not_removed_before_startup() {
+        with_data_dir("positive-postmaster", |data_dir| {
+            write_postmaster_pid(data_dir, 2_147_483_647_i64);
+
+            remove_stale_single_user_postmaster_pid(data_dir)
+                .expect("leave positive postmaster.pid in place");
+
+            assert!(data_dir.join(POSTMASTER_PID_FILE).exists());
+        });
+    }
+
+    #[test]
+    fn current_single_user_postmaster_pid_is_removed_at_shutdown() {
+        with_data_dir("current-single-user", |data_dir| {
+            write_postmaster_pid(data_dir, -(std::process::id() as i64));
+
+            remove_current_single_user_postmaster_pid(data_dir)
+                .expect("remove current single-user postmaster.pid");
+
+            assert!(!data_dir.join(POSTMASTER_PID_FILE).exists());
+        });
+    }
+
+    #[test]
+    fn non_pid_postmaster_pid_is_not_single_user() {
+        with_data_dir("non-pid-postmaster", |data_dir| {
+            write_postmaster_pid(data_dir, "not-a-pid");
+
+            let lock = read_postmaster_pid_lock(data_dir).expect("read lock");
+
+            assert_eq!(lock, Some(PostmasterPidLock::Postmaster));
+        });
+    }
 }

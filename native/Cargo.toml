@@ -14,5 +14,5 @@ doctest = false
 internal-adapter = []
 
 [dependencies]
+libc = "0.2"
 libpglite = { path = ".." }
-

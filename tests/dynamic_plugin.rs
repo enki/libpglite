@@ -3,6 +3,7 @@
 use libpglite::PgliteConfig;
 use libpglite::PgliteRuntime;
 use libpglite::dynamic::DynamicPgliteRuntime;
+use std::process::Stdio;
 use std::sync::Mutex;
 use std::sync::OnceLock;
 
@@ -221,6 +222,47 @@ fn dynamic_plugin_rejects_nonempty_uninitialized_data_dir_before_backend_start()
     assert!(
         message.contains("exists but is not an initialized PostgreSQL cluster"),
         "{message}"
+    );
+}
+
+#[test]
+fn dynamic_plugin_reuses_initialized_data_dir_without_stale_single_user_lock() {
+    let _guard = test_guard();
+    let Some(plugin_path) = std::env::var_os("LIBPGLITE_TEST_PLUGIN_PATH") else {
+        return;
+    };
+    let Some(postgres_prefix) = std::env::var_os("LIBPGLITE_TEST_POSTGRES_PREFIX") else {
+        return;
+    };
+    let tempdir = tempfile::tempdir().expect("tempdir");
+    let data_dir = tempdir.path().join("pgdata");
+
+    run_native_runtime_child(
+        "dynamic_plugin_prefix_initialize_child",
+        "LIBPGLITE_RUN_PREFIX_INITIALIZE_CHILD",
+        &plugin_path,
+        &postgres_prefix,
+        &data_dir,
+    );
+    assert!(
+        data_dir.join("PG_VERSION").is_file(),
+        "first native child should initialize the reusable data directory"
+    );
+    assert!(
+        !data_dir.join("postmaster.pid").exists(),
+        "native single-user shutdown must not leave postmaster.pid in a reusable data directory"
+    );
+
+    run_native_runtime_child(
+        "dynamic_plugin_prefix_resume_child",
+        "LIBPGLITE_RUN_PREFIX_RESUME_CHILD",
+        &plugin_path,
+        &postgres_prefix,
+        &data_dir,
+    );
+    assert!(
+        !data_dir.join("postmaster.pid").exists(),
+        "native single-user resume must leave the reusable data directory unlocked"
     );
 }
 
@@ -443,6 +485,35 @@ fn load_native_runtime_result_with_data_dir(
         postgres_prefix.to_string_lossy().as_ref(),
     )]);
     DynamicPgliteRuntime::load(plugin_path, config)
+}
+
+fn run_native_runtime_child(
+    test_name: &str,
+    marker_env: &str,
+    plugin_path: &std::ffi::OsStr,
+    postgres_prefix: &std::ffi::OsStr,
+    data_dir: &std::path::Path,
+) {
+    let output = std::process::Command::new(std::env::current_exe().expect("current test exe"))
+        .arg("--exact")
+        .arg(test_name)
+        .arg("--nocapture")
+        .env(marker_env, "1")
+        .env("LIBPGLITE_TEST_PLUGIN_PATH", plugin_path)
+        .env("LIBPGLITE_TEST_POSTGRES_PREFIX", postgres_prefix)
+        .env("LIBPGLITE_TEST_DATA_DIR", data_dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("run native runtime child");
+    assert!(
+        output.status.success(),
+        "{test_name} failed with status {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn build_fake_plugin_with_abi_version(version: u32) -> Option<std::path::PathBuf> {
